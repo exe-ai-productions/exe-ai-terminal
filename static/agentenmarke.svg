@@ -1,0 +1,37 @@
+<!--
+  Exe AI Terminal — agent mark (jobs section).
+
+  A torso with hat brim, crown and coat collar, the eyes as a mirrored
+  chevron pair.
+
+  Why mirrored and not both pointing right as in the terminal mark:
+  the arrow there is directed, it points at the input. Eyes have no
+  direction but an axis — two same-direction chevrons read as a
+  fast-forward key at small sizes, the mirrored pair immediately as a
+  face. What matters stays shared: the same shape, the same angle, the
+  same stroke family as in static/favicon.svg and
+  frontend/src/teile/Wortmarke.svelte.
+
+  No face outline: under the brim stand only the eyes. That is the
+  agent gaze, and it saves the strokes that would close up at small
+  sizes anyway.
+
+  The color is inherited (currentColor), so it flips along on mode
+  switch by itself — unlike the favicon, which carries a fixed color of
+  its own because no text color is inherited in the browser tab.
+
+  Stroke widths here are calculated for the large rendering. For 16 px
+  see the values in frontend/src/teile/Agentenmarke.svelte.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Hat brim -->
+  <path d="M6 24 Q32 30 58 24" stroke-width="3.6"/>
+  <!-- Crown -->
+  <path d="M18 24 V15 Q18 8 32 8 Q46 8 46 15 V24" stroke-width="3.6"/>
+  <!-- Eyes: the terminal mark's chevron, scaled down and mirrored -->
+  <path d="M23 30 L27 33 L23 36" stroke-width="3.2"/>
+  <path d="M41 30 L37 33 L41 36" stroke-width="3.2"/>
+  <!-- Coat collar with lapels -->
+  <path d="M8 60 V51 Q8 42 19 39.5 L32 47 L45 39.5 Q56 42 56 51 V60" stroke-width="3.6"/>
+</svg>

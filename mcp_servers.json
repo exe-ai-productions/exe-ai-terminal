@@ -1,0 +1,73 @@
+{
+  "mcpServers": {
+    "websuche": {
+      "command": ".venv/bin/python",
+      "args": [
+        "mcp/ddgs_server.py"
+      ],
+      "env": {
+        "SUCHE_MAX_TREFFER": "8",
+        "SUCHE_QUELLEN": "duckduckgo, brave, mojeek",
+        "ABRUF_MAX_ZEICHEN": "6000"
+      },
+      "enabled": true,
+      "type": "stdio",
+      "allowed_tools": [
+        "web_search",
+        "read_webpage"
+      ],
+      "needs_confirmation": []
+    },
+    "searxng": {
+      "command": ".venv/bin/python",
+      "args": [
+        "mcp/searxng_server.py"
+      ],
+      "env": {
+        "SEARXNG_URL": "${SEARXNG_URL}",
+        "SUCHE_MAX_TREFFER": "8",
+        "ABRUF_MAX_ZEICHEN": "6000"
+      },
+      "enabled": false,
+      "type": "stdio",
+      "allowed_tools": [
+        "web_search",
+        "read_webpage"
+      ],
+      "needs_confirmation": []
+    },
+    "notion": {
+      "command": "node",
+      "args": [
+        "mcp/notion/node_modules/@notionhq/notion-mcp-server/bin/cli.mjs"
+      ],
+      "env": {
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
+      },
+      "enabled": false,
+      "type": "http",
+      "allowed_tools": [
+        "API-post-search",
+        "API-post-page",
+        "API-get-block-children",
+        "API-update-page-markdown",
+        "API-retrieve-a-page",
+        "notion-search",
+        "notion-fetch"
+      ],
+      "needs_confirmation": [],
+      "url": "https://mcp.notion.com/mcp"
+    },
+    "recraft": {
+      "type": "http",
+      "url": "https://mcp.recraft.ai/mcp",
+      "enabled": false,
+      "allowed_tools": [
+        "generate_image",
+        "image_to_image",
+        "remove_background",
+        "inpaint_image"
+      ]
+    }
+  }
+}

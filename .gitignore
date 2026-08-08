@@ -1,0 +1,76 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime data — does not belong in the repository
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm
+
+.DS_Store
+node_modules/
+dist/
+
+# Built frontend - produced from frontend/ via npm run build
+static/app/
+
+# Agents are the user's content — the folder ships empty (6.3)
+prompts/agenten/
+
+# The system prompt is the user's content - it ships empty (3.10)
+prompts/system.md
+
+# The memory is the user's content, and more personal than any of the rest:
+# it fills up with who they are and how they work. It ships empty.
+prompts/memory.md
+
+# The user's own skills. The shipped ones live in skills/ next to the code
+# and are versioned; this folder is theirs and ships empty.
+prompts/skills/
+
+# The empty marker keeps the otherwise user-owned prompts/ folder in the clone.
+!prompts/.gitkeep
+
+# Backup files do not belong in the repository — they regularly
+# contain values that must never be versioned.
+*.vor-*
+*.vorher
+*.bak
+*.orig
+_Sicherungen/
+
+# Personal configuration. What ships is config.example.yaml; on first
+# start your own copy is created from it.
+config.yaml
+
+
+# Packaging output — rebuilt from the spec, never committed.
+dist/
+build/
+
+# Model weights — far too large for a repository.
+*.gguf
+*.safetensors
+
+# Stray log files outside the log folder.
+*.log
+
+# Local environment variants. Only the example ships.
+.env.*
+!.env.example
+
+# Assistant working files — session-local, never part of the program.
+.claude/
+CLAUDE.md
+
+# The command-line client is private for now — its own README says it
+# does not belong in any release. The starter next to it is dead without it.
+cli/
+exe

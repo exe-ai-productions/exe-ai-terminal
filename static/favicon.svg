@@ -1,0 +1,23 @@
+<!--
+  Exe AI Terminal — favicon for the browser bar.
+
+  Always the dark version, in both modes. The earlier media query
+  flipped the color to light in dark mode — on the desktop that came
+  across as a white mark and was not intended.
+
+  Slightly stronger strokes than in the large mark: at 16 pixels a
+  faithful line would close up.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 64" width="80" height="64"
+     fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    /* Always the dark version — no media query
+       anymore: the tab carries the same black mark in both modes. */
+    .marke { stroke: #141413; }
+  </style>
+  <g class="marke">
+    <rect x="4" y="4" width="72" height="56" rx="15" stroke-width="7"/>
+    <path d="M21 23 L34 32 L21 41" stroke-width="6.5"/>
+    <path d="M43 41 H 57" stroke-width="6.5"/>
+  </g>
+</svg>

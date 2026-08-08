@@ -1,0 +1,121 @@
+# Exe AI Terminal
+
+An AI agent harness you operate entirely from its window: download a model,
+start it, talk to it, hand your agents tools and schedules — nothing ever
+needs a terminal or a config file. Local models are the normal case, not the
+exception; cloud providers are one key away, and nothing leaves your machine
+unless you set that up yourself.
+
+## What it does
+
+- **Local models, end to end.** A curated list of GGUF models sized to your
+  machine's memory, a Hugging Face search, a one-button download and a
+  built-in `llama-server` runner. Fetch, start, chat — no shell, no scripts.
+- **Cloud providers when you want them.** Anthropic, OpenAI or any
+  OpenAI-compatible endpoint. The API key goes into a local file with tight
+  permissions and is never displayed again — the interface only ever learns
+  *whether* a key is set.
+- **Chats with history**, stored in a local SQLite database. Rename, pin,
+  search, delete — it is your data, on your disk.
+- **Agents and jobs.** Reusable agent files (Markdown with front matter),
+  one-off or scheduled runs, with a step-by-step log and a final report.
+- **Tools via MCP.** A built-in web search (SearXNG) and shell tool ship with
+  the program; any MCP server can be added. Tools that reach outside ask
+  first.
+- **Documents and images.** PDF/TXT/MD upload into the conversation, image
+  input for vision models, image generation through ComfyUI or an
+  OpenAI-compatible image endpoint.
+- **Two languages.** English and German, switchable at runtime — including
+  every error message the service produces.
+
+## Privacy stance
+
+The service binds to `127.0.0.1`. Chats, settings, keys and models live in
+local files and a local database. The optional memory feature sends its
+content to cloud providers only if you switch that on. Model downloads talk
+to `huggingface.co` directly; the model search runs through the service so
+your browser never contacts a third party.
+
+## Quick start
+
+### From source
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp config.example.yaml config.yaml   # optional: port, language, endpoints
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
+```
+
+Then open `http://127.0.0.1:8090/app/`.
+
+To run local models, install [llama.cpp](https://github.com/ggml-org/llama.cpp)
+(`brew install llama.cpp` on macOS, prebuilt releases exist for Windows and
+Linux). The interface finds `llama-server` on its own.
+
+### Packaged
+
+`deploy/exe-ai-terminal.spec` builds a single self-contained file with
+PyInstaller — no Python required on the target machine:
+
+```bash
+.venv/bin/pyinstaller deploy/exe-ai-terminal.spec
+```
+
+Double-clicking the result starts the service and opens the browser; a second
+start just brings the window back.
+
+### Docker
+
+```bash
+docker compose up
+```
+
+## Configuration
+
+`config.example.yaml` is version-controlled and serves as the template: copy
+it to `config.yaml` — your personal, unversioned copy — and adjust port,
+language, feature flags and candidate endpoints there. Secrets belong in
+`.env`, which never ends up in the repository. Everything else — providers,
+models, tools, agents — can be set up from the interface.
+
+Which endpoints are actually reachable is decided at runtime by a health
+check; the list in the file is only the set of candidates.
+
+## API
+
+The frontend talks to a plain HTTP API, which you can use directly.
+
+| Address | Purpose |
+|---|---|
+| `/health` | Service status (fixed address for monitoring) |
+| `/api/v1/meta` | Features, languages, version |
+| `/api/v1/models` | Reachable endpoints with their reported model names |
+| `/api/v1/chats` | Create, list, rename, delete chats |
+| `/api/v1/chat/completions` | Generate a response (Server-Sent Events) |
+| `/api/v1/tools` | Available tools (MCP) |
+| `/api/v1/agents`, `/api/v1/jobs` | Agents and their runs |
+| `/docs` | Interactive API documentation |
+
+## Project layout
+
+```
+app/          FastAPI service: providers, discovery, tools, agents, db
+app/locales/  Translation catalogs (EN is the source, DE the translation)
+frontend/     Svelte 5 source of the interface (Vite)
+static/       Served files, including the built frontend
+mcp/          Bundled MCP servers (web search)
+deploy/       PyInstaller spec and systemd unit
+tests/        pytest suite — run with .venv/bin/pytest
+```
+
+## Tests
+
+```bash
+.venv/bin/pytest
+```
+
+## License
+
+Not yet decided — all rights reserved until one is chosen. You are welcome to
+read the code; please do not reuse or redistribute it yet.

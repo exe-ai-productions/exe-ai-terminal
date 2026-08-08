@@ -1,0 +1,16 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+PyYAML==6.0.2
+python-dotenv==1.0.1
+httpx==0.28.1
+
+# Web search without an instance of our own — the engine behind the shipped
+# search server (mcp/ddgs_server.py).
+ddgs==9.14.4
+
+# Tests
+pytest==8.3.4
+pytest-asyncio==0.25.0
+
+pypdf==6.14.2

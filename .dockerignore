@@ -1,0 +1,18 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.git/
+.gitignore
+.env
+data/
+logs/
+tests/
+deploy/
+node_modules/
+frontend/node_modules/
+dist/
+# The frontend is rebuilt inside the image, not copied along.
+static/app/
+*.md

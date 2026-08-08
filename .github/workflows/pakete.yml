@@ -1,0 +1,76 @@
+# Builds the shipped packages for all three systems.
+#
+# PyInstaller cannot cross-build, so each system builds its own package —
+# that is what the matrix is for. Everything else is the same three steps
+# a developer runs locally: build the interface, freeze the program,
+# hand over the result.
+#
+# Runs on a version tag (v1.0.0) or by hand from the Actions page.
+
+name: Build packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests/ -q
+
+  paket:
+    needs: tests
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            name: macos-arm64
+          - os: macos-13
+            name: macos-intel
+          - os: windows-latest
+            name: windows
+          - os: ubuntu-latest
+            name: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The interface first — otherwise the program ships with one older
+      # than itself.
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # PyInstaller stays out of requirements.txt on purpose: build tools
+      # do not belong inside the package they build.
+      - run: pip install -r requirements.txt pyinstaller
+      - run: pyinstaller deploy/exe-ai-terminal.spec
+
+      # The macOS bundle is a folder; zipping with ditto keeps its
+      # structure and marks intact.
+      - name: Pack the app bundle
+        if: startsWith(matrix.os, 'macos')
+        run: ditto -c -k --keepParent "dist/Exe AI Terminal.app" "dist/Exe-AI-Terminal-${{ matrix.name }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe-ai-terminal-${{ matrix.name }}
+          path: |
+            dist/Exe-AI-Terminal-*.zip
+            dist/Exe AI Terminal*
+          if-no-files-found: error
