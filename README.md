@@ -21,7 +21,7 @@ unless you set that up yourself.
   search, delete — it is your data, on your disk.
 - **Agents and jobs.** Reusable agent files (Markdown with front matter),
   one-off or scheduled runs, with a step-by-step log and a final report.
-- **Tools via MCP.** A built-in web search (SearXNG) and shell tool ship with
+- **Tools via MCP.** The built-in exe-websearch and a shell tool ship with
   the program; any MCP server can be added. Tools that reach outside ask
   first.
 - **Documents and images.** PDF/TXT/MD upload into the conversation, image

@@ -78,3 +78,6 @@ fenster/target/
 fenster/node_modules/
 fenster/binaries/
 fenster/gen/
+
+# Its test belongs to the private client, same as the client itself.
+tests/test_cli.py
