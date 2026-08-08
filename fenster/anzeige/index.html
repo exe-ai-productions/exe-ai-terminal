@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exe AI Terminal</title>
+<style>
+  /* The moment between double click and service — the wordmark on the
+     house background, nothing that could be mistaken for content. */
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #141413; color: #ecebe6;
+    font: 15px/1.6 -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  main { text-align: center; }
+  svg { display: block; margin: 0 auto 14px; }
+  p { margin: 0; opacity: 0.55; font-size: 13px; }
+  [data-zustand="fehlgeschlagen"] p::after {
+    content: "The service did not answer — check the log files.";
+    display: block; margin-top: 6px; color: #e5484d; opacity: 1;
+  }
+</style>
+</head>
+<body>
+<main>
+  <svg width="72" height="58" viewBox="0 0 80 64" fill="none" stroke="#ecebe6"
+       stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="4" width="72" height="56" rx="15" />
+    <path d="M20 22 L34 32 L20 42" stroke-width="5" />
+    <path d="M42 42 H58" stroke-width="5" />
+  </svg>
+  <p>Starting …</p>
+</main>
+</body>
+</html>

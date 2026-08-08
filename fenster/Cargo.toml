@@ -1,0 +1,23 @@
+# The native window around the service — a Tauri shell.
+#
+# Its own little program on purpose: the service neither knows nor cares
+# what shows it (blueprint rule: the service runs on its own, the window
+# is only a window). This crate starts the packaged service as a sidecar,
+# waits for the port, and shows the interface in the system's own webview
+# — WKWebView on macOS, WebView2 on Windows. Nothing for the user to
+# install, nothing bundled beyond these few hundred kilobytes of shell.
+
+[package]
+name = "exe-ai-terminal-fenster"
+version = "1.0.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+
+[profile.release]
+strip = true
