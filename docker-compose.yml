@@ -1,0 +1,35 @@
+# Exe AI Terminal — start with a single command:
+#
+#     cp .env.example .env
+#     docker compose up -d
+#
+# Note on the model servers: they usually run on the host or on another
+# machine. From inside the container, "127.0.0.1" is the container itself,
+# not the host — which is why config.yaml uses either "host.docker.internal"
+# or the real network address for local services.
+
+services:
+  exe-ai-terminal:
+    build: .
+    image: exe-ai-terminal:latest
+    container_name: exe-ai-terminal
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      # Data and logs survive a new image.
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Configuration editable from outside, without rebuilding.
+      - ./config.yaml:/app/config.yaml:ro
+      - ./mcp_servers.json:/app/mcp_servers.json:ro
+    env_file:
+      - .env
+    extra_hosts:
+      # So "host.docker.internal" also works on Linux.
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

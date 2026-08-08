@@ -1,0 +1,163 @@
+# Exe AI Terminal — configuration
+#
+# This file is version-controlled and serves as the template. Secrets (API keys,
+# passwords) do NOT belong here — put them in .env, see .env.example.
+#
+# All paths are relative to the project directory unless given as absolute.
+#
+# Comments here are English because everyone who sets this up reads them.
+# The source code stays German; that is the project's own language.
+
+app:
+  # Address the service listens on.
+  # Local only: the service binds to 127.0.0.1; put your own reverse proxy
+  # in front if you need remote access.
+  host: "127.0.0.1"
+  port: 8090
+  # Default language of the interface: "en" or "de". English is the primary
+  # language, German is kept fully equivalent. A client that sends an
+  # Accept-Language header gets its own language and overrides this.
+  language: "en"
+  # Timezone for agent schedules (6.7). Times like schedule: "08:00" in an
+  # agent file are read in this zone. Without it, the server zone applies —
+  # and this server runs on UTC, which is not what a schedule usually means.
+  timezone: "Europe/Berlin"
+  # Directory for the database, uploaded documents and generated images.
+  data_dir: "./data"
+  log_dir: "./logs"
+  # Response length when neither the request nor the chat specifies one. Keep it
+  # generous: models with a long reasoning pass spend part of it before the
+  # actual answer even begins — too small a value shows up as an empty bubble.
+  default_max_tokens: 8192
+  # Where the system prompt lives. Exactly one file for the whole program — not
+  # one per model and no copy in the database. It is read fresh on EVERY
+  # request, so an edit takes effect immediately, including in chats that
+  # already exist. Edit it in the program under Chat -> System prompt, or by
+  # hand. It ships empty.
+  system_prompt_file: "./prompts/system.md"
+
+database:
+  # Only "sqlite" is supported right now. The repository pattern makes it
+  # possible to add "postgres" later without touching the application logic.
+  backend: "sqlite"
+  path: "./data/exe-ai-terminal.db"
+
+# Turn features on and off without changing code.
+features:
+  mcp: true                  # Tool calls through MCP servers
+  image_generation: true     # Image generation (phase 4.2)
+  document_upload: true      # Per-chat document upload (phase 4.1)
+  beta_lock: false            # Beta: settings, tools and agents are read-only.
+                             # Set to false to hand the full app back.
+
+# Candidate endpoints — WHERE a model server is and HOW to talk to it.
+#
+# What the model is CALLED is deliberately not in here. The name is read from
+# the server itself (GET /v1/models) so that nobody has to maintain it in two
+# places. An optional `name:` exists as a fallback for servers that report
+# nothing; without it the id below is shown.
+#
+# The list is maintained by hand; which entries are actually reachable is
+# checked at runtime by the health check.
+#
+# reasoning_format — how the reasoning pass is read out of the response:
+#   native  = separate field delta.reasoning (Gemma 4)
+#   harmony = marker <|channel|>analysis (GPT-OSS)
+#   think   = <think> tags (Magistral, Qwen, DeepSeek-R1)
+#   none    = the model produces no reasoning pass
+#
+# parameter_dialect — what the server calls its sampling parameters:
+#   llama_cpp | mlx | openai (the last one also covers anything unknown)
+#
+# Empty on purpose: a fresh install knows no server yet. Uncomment one of
+# the examples below, or add your own. One reachable entry is enough.
+endpoints: []
+  # Add one entry per model server you want to use. One reachable endpoint
+  # is enough - the program works with a single one.
+  #
+  # Local servers (nothing leaves this computer):
+  #
+  #   - id: "llama-cpp"
+  #     group: "local"
+  #     base_url: "http://127.0.0.1:8080/v1"
+  #     parameter_dialect: "llama_cpp"
+  #
+  #   - id: "lm-studio"
+  #     group: "local"
+  #     base_url: "http://127.0.0.1:1234/v1"
+  #
+  #   - id: "ollama"
+  #     group: "local"
+  #     base_url: "http://127.0.0.1:11434/v1"
+  #
+  # Cloud services (requests leave this computer, key goes into .env):
+  #
+  #   - id: "openai"
+  #     group: "cloud"
+  #     base_url: "https://api.openai.com/v1"
+  #     api_key_env: "OPENAI_API_KEY"
+  #     parameter_dialect: "openai"
+  #
+  #   - id: "anthropic"
+  #     group: "cloud"
+  #     provider: "anthropic"
+  #     base_url: "https://api.anthropic.com/v1"
+  #     api_key_env: "ANTHROPIC_API_KEY"
+  #     parameter_dialect: "anthropic"
+  #
+  # An entry without `modell:` is a PROVIDER: its catalogue is asked for and
+  # every model in it can be picked. With `modell:` the entry stands for
+  # exactly that one model — useful where the catalogue holds hundreds of
+  # entries that have nothing to do with chatting.
+mcp:
+  servers_file: "./mcp_servers.json"
+
+# Image generation (phase 4.2). Deliberately just one address: whether ComfyUI
+# or Forge sits behind it directly, or an arbiter that lets the language model
+# and the image model take turns on the GPU, makes no difference to this
+# program — both are an HTTP interface. Without an arbiter, put your backend
+# here directly. That way there is no special case in the code.
+image:
+  base_url: "http://127.0.0.1:7861"
+  timeout_seconds: 300
+
+# ─────────────────────────────────────────────────────────────────────────
+#  image servers
+#
+#  dialect       comfyui        ComfyUI API, needs a workflow file
+#                openai_images  POST /v1/images/generations
+#  api_key_env   name of the variable in .env, never the key itself.
+#                Leave out for a local server that wants none.
+#
+#   - id: "comfyui"
+#     dialect: "comfyui"
+#     base_url: "http://127.0.0.1:8188"
+#     workflow: "./mein-workflow.json"   # your own workflow, required for ComfyUI
+#     enabled: true
+#
+#   - id: "openai"
+#     dialect: "openai_images"
+#     base_url: "https://api.openai.com/v1"
+#     api_key_env: "OPENAI_API_KEY"
+#     enabled: true
+# ─────────────────────────────────────────────────────────────────────────
+image_servers: []
+
+
+# How often endpoint reachability is checked, in seconds.
+discovery:
+  interval_seconds: 15
+  timeout_seconds: 3
+
+logging:
+  level: "INFO"
+  # "text" reads well in the journal, "json" can be processed by machine.
+  format: "text"
+  # File name inside log_dir. Leave empty for console/journal only.
+  file: "exe-ai-terminal.log"
+  # Rotate above this size, keep this many old files.
+  max_bytes: 10485760
+  file_count: 5
+
+# Image generators live in their own file (bild_server.json) - the form
+# in the editor (Settings -> Tools -> Image servers) edits exactly that file.

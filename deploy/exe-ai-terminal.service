@@ -1,0 +1,29 @@
+[Unit]
+Description=Exe AI Terminal — an interface of its own to local language models
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust paths and user to your installation.
+User=exe
+Group=exe
+WorkingDirectory=/home/exe/exe-ai-terminal
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/exe/exe-ai-terminal/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
+Restart=on-failure
+RestartSec=5
+
+# The service only needs its own directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/exe/exe-ai-terminal/data /home/exe/exe-ai-terminal/logs
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=exe-ai-terminal
+
+[Install]
+WantedBy=multi-user.target

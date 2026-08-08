@@ -1,0 +1,134 @@
+"""Searching the model catalogue.
+
+Nothing here talks to Hugging Face: the answer is faked, because what is
+being tested is our side — which kinds we allow, what we make of an entry,
+and what happens when somebody else's server has a bad day.
+"""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+
+from app.api.v1 import modellsuche
+
+
+class FalscheAntwort:
+    def __init__(self, daten, fehler=None):
+        self._daten = daten
+        self._fehler = fehler
+
+    def raise_for_status(self):
+        if self._fehler:
+            raise self._fehler
+
+    def json(self):
+        return self._daten
+
+
+class FalscherKlient:
+    """Stands in for httpx and remembers what it was asked for."""
+
+    letzte_parameter: dict | None = None
+
+    def __init__(self, daten, fehler=None):
+        self._antwort = FalscheAntwort(daten, fehler)
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get(self, adresse, params=None):
+        FalscherKlient.letzte_parameter = params
+        if isinstance(self._antwort._fehler, httpx.HTTPError):
+            raise self._antwort._fehler
+        return self._antwort
+
+
+@pytest.fixture
+def katalog(monkeypatch):
+    def setzen(daten, fehler=None):
+        monkeypatch.setattr(modellsuche.httpx, "AsyncClient", FalscherKlient(daten, fehler))
+    return setzen
+
+
+EINTRAG = {
+    "modelId": "lmstudio-community/Qwen3.6-27B-MLX-6bit",
+    "downloads": 829410,
+    "likes": 14,
+    "pipeline_tag": "text-generation",
+}
+
+
+# --- What comes back ------------------------------------------------------
+
+
+def test_ein_eintrag_wird_zu_einem_fund(client, katalog):
+    katalog([EINTRAG])
+    antwort = client.get("/api/v1/models/search?q=qwen3")
+    assert antwort.status_code == 200
+
+    fund = antwort.json()[0]
+    assert fund["anbieter"] == "lmstudio-community"
+    assert fund["name"] == "Qwen3.6-27B-MLX-6bit"
+    assert fund["ladungen"] == 829410
+    assert fund["beliebt"] == 14
+    assert fund["art"] == "gguf"
+
+
+def test_ein_name_ohne_anbieter_bleibt_ganz(client, katalog):
+    katalog([{"modelId": "einzelname", "downloads": 5}])
+    fund = client.get("/api/v1/models/search?q=x").json()[0]
+    assert fund["anbieter"] == ""
+    assert fund["name"] == "einzelname"
+
+
+def test_muell_im_katalog_wird_uebergangen(client, katalog):
+    katalog([EINTRAG, "kein Eintrag", None])
+    assert len(client.get("/api/v1/models/search?q=x").json()) == 1
+
+
+# --- What we ask for ------------------------------------------------------
+
+
+def test_gesucht_wird_nach_ladungen_sortiert(client, katalog):
+    katalog([])
+    client.get("/api/v1/models/search?q=qwen&art=gguf&anzahl=5")
+    parameter = FalscherKlient.letzte_parameter
+    assert parameter["filter"] == "gguf"
+    assert parameter["sort"] == "downloads"
+    assert parameter["limit"] == 5
+
+
+@pytest.mark.parametrize("art", ["safetensors", "pytorch", "onnx", "mlx", ""])
+def test_andere_arten_werden_abgelehnt(client, katalog, art):
+    # Only what the program can fetch as one file and start by itself —
+    # everything else would be a promise we cannot keep. MLX is on this
+    # list for the same reason it left the runner.
+    katalog([])
+    assert client.get(f"/api/v1/models/search?q=x&art={art}").status_code == 400
+
+
+def test_ohne_suchbegriff_geht_nichts(client, katalog):
+    katalog([])
+    assert client.get("/api/v1/models/search?q=").status_code == 422
+
+
+# --- When the other side has a bad day ------------------------------------
+
+
+def test_katalog_antwortet_nicht(client, katalog):
+    katalog(None, httpx.ConnectError("weg"))
+    assert client.get("/api/v1/models/search?q=x").status_code == 502
+
+
+def test_katalog_antwortet_unsinn(client, katalog):
+    # An empty list means "nothing found"; something that is not a list at
+    # all means the catalogue is broken, and that must not look the same.
+    katalog({"unerwartet": True})
+    assert client.get("/api/v1/models/search?q=x").status_code == 502

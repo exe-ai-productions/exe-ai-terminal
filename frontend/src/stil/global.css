@@ -1,0 +1,158 @@
+/*
+  Colors, spacing, and foundations in one place.
+
+  Every color appears once and is used via a variable. Dark mode only
+  overrides the variables — no component has to know which mode it is
+  currently running in.
+*/
+
+:root {
+  --bg: #fff;
+  --bg-leiste: #f6f5f2;
+  --bg-seite: #faf9f6;
+  --bg-erhoben: #fff;
+  --linie: #e4e2da;
+  --linie-stark: #d2cfc5;
+  --text: #1a1a18;
+  --text-leise: #6f6d66;
+  --text-still: #9a978e;
+  --blase: #f1efe9;
+  --radius: 10px;
+  /* The four colours mean STATE, never decoration. That rule was already
+     lived everywhere; writing it down makes it arguable.
+
+       gruen  fertig, bereit, verbunden
+       gelb   wartet — and its second meaning, caution: a job waiting for a
+              decision, the context meter running low, a command reaching
+              beyond the shared folders
+       blau   läuft, aktiv, angeschaltet
+       rot    gescheitert, gefährlich, löscht
+
+     Everything that is a fact rather than a state — a shared folder, an
+     attachment, a command about to run — works with brightness alone, from
+     --text down to --text-still. A pill in blue claims something is running
+     when nothing is.
+
+     For surfaces the quiet form: color-mix(in srgb, var(--gelb) 12%, var(--bg)).
+     Never the full colour behind text. */
+  --gruen: #6b8e6f;
+  --gelb: #c9a227;
+  --blau: #5b8dbe;
+  --rot: #b4544c;
+
+  /* Code design: muted instead of glowing. */
+  --code-bg: #fbfaf7;
+  --code-text: #2b2a27;
+  --sx-schl: #8a5a2b;
+  --sx-text: #3f6b4a;
+  /* One step more distinct than
+     the quiet first take — readable without competing with the code. */
+  --sx-komm: #7d7a71;
+  --sx-zahl: #7a5c8f;
+  --sx-ruf: #2f5d80;
+
+  --schrift: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui,
+    sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --schrift-fest: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* The run-up: in an empty chat the input sits centered and glides down
+     on send. Timing and curve live here because two components share
+     them — App (mark, space below) and Eingabeleiste (footer line). */
+  --anlauf-dauer: 800ms;
+  --anlauf-schwung: cubic-bezier(0.32, 0.72, 0.2, 1);
+}
+
+:root[data-modus='dunkel'] {
+  --bg: #131312;
+  --bg-leiste: #1a1a18;
+  --bg-seite: #171716;
+  --bg-erhoben: #1f1f1d;
+  --linie: #2e2e2a;
+  --linie-stark: #3d3d38;
+  --text: #ecebe6;
+  --text-leise: #a3a099;
+  --text-still: #6f6d66;
+  --blase: #232320;
+  --code-bg: #191918;
+  --code-text: #dedbd3;
+  --sx-schl: #d9a05b;
+  --sx-text: #8fc099;
+  --sx-komm: #8a877c;
+  --sx-zahl: #c1a3d8;
+  --sx-ruf: #8ab4d8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-modus='hell']) {
+    --bg: #131312;
+    --bg-leiste: #1a1a18;
+    --bg-seite: #171716;
+    --bg-erhoben: #1f1f1d;
+    --linie: #2e2e2a;
+    --linie-stark: #3d3d38;
+    --text: #ecebe6;
+    --text-leise: #a3a099;
+    --text-still: #6f6d66;
+    --blase: #232320;
+    --code-bg: #191918;
+    --code-text: #dedbd3;
+    --sx-schl: #d9a05b;
+    --sx-text: #8fc099;
+    --sx-komm: #8a877c;
+    --sx-zahl: #c1a3d8;
+    --sx-ruf: #8ab4d8;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: var(--schrift);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+#wurzel {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Whoever doesn't use the mouse has to see where they are. */
+:focus-visible {
+  outline: 2px solid var(--blau);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Whoever can't tolerate motion gets none. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* House rule: no visible scrollbars, anywhere.
+   Scrolling still works — wheel, gesture, keys all function unchanged,
+   only the display is dropped. Whoever ever wants to soften the rule:
+   it came up when the bar ran right across the tile gallery. */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}

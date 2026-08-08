@@ -1,0 +1,245 @@
+"""The model runner.
+
+No real model server is started here — that would need a binary and several
+gigabytes. What is tested is the part that decides: which file may be loaded,
+which command comes out of it, and what happens when there is no program to
+run at all.
+
+The dangerous one is the folder boundary. A name that is secretly a path
+would let anything on the machine be handed to a program that runs for hours.
+"""
+
+from __future__ import annotations
+
+import os
+import stat
+from pathlib import Path
+
+import pytest
+
+from app.modellrunner import Modellrunner, RunnerFehler, modelle_auflisten, programm_finden
+
+
+@pytest.fixture
+def ordner(tmp_path: Path) -> Path:
+    (tmp_path / "klein.gguf").write_bytes(b"x" * 2000)
+    (tmp_path / "gross.gguf").write_bytes(b"x" * 9000)
+    (tmp_path / "keinmodell.txt").write_text("nein")
+    return tmp_path
+
+
+@pytest.fixture
+def falsches_programm(tmp_path: Path) -> Path:
+    """Something executable that is not a model server."""
+    pfad = tmp_path / "llama-server"
+    pfad.write_text("#!/bin/sh\nsleep 30\n")
+    pfad.chmod(pfad.stat().st_mode | stat.S_IEXEC)
+    return pfad
+
+
+# --- What is in the folder ------------------------------------------------
+
+
+def test_nur_gguf_zaehlt_als_modell(ordner):
+    namen = [m.name for m in modelle_auflisten(ordner)]
+    assert namen == ["gross.gguf", "klein.gguf"]
+
+
+def test_das_groesste_steht_oben(ordner):
+    assert modelle_auflisten(ordner)[0].name == "gross.gguf"
+
+
+def test_ein_ordner_der_nicht_existiert_ist_leer(tmp_path):
+    assert modelle_auflisten(tmp_path / "gibtsnicht") == []
+
+
+# --- The program ----------------------------------------------------------
+
+
+def test_eine_vorgabe_die_nicht_ausfuehrbar_ist_gilt_nicht(tmp_path):
+    pfad = tmp_path / "attrappe"
+    pfad.write_text("kein Programm")
+    assert programm_finden(str(pfad)) is None
+
+
+def test_eine_ausfuehrbare_vorgabe_gilt(falsches_programm):
+    assert programm_finden(str(falsches_programm)) == falsches_programm
+
+
+# --- The command ----------------------------------------------------------
+
+
+def test_der_befehl_zeigt_alles_was_er_tut(ordner, falsches_programm):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    befehl = runner.befehl("klein.gguf", 4096, 33, 8081)
+
+    assert befehl[0] == str(falsches_programm)
+    # Everything the window shows has to be in there, or the window lies.
+    assert "--ctx-size" in befehl and "4096" in befehl
+    assert "--n-gpu-layers" in befehl and "33" in befehl
+    assert "--port" in befehl and "8081" in befehl
+    # Never reachable from the network: a model server has no protection of
+    # its own, and whoever reaches it can use the whole machine's memory.
+    assert befehl[befehl.index("--host") + 1] == "127.0.0.1"
+
+
+# --- Where it has to refuse -----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["../draussen.gguf", "unter/tief.gguf", "/etc/passwd", "..%2Fweg.gguf"],
+)
+def test_ein_name_ist_nie_ein_pfad(ordner, falsches_programm, name):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    with pytest.raises(RunnerFehler) as fehler:
+        runner.starten(name)
+    assert fehler.value.grund == "kein_modell"
+
+
+def test_was_nicht_im_ordner_liegt_startet_nicht(ordner, falsches_programm):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    with pytest.raises(RunnerFehler) as fehler:
+        runner.starten("gibtsnicht.gguf")
+    assert fehler.value.grund == "kein_modell"
+
+
+def test_ohne_programm_geht_nichts(ordner):
+    runner = Modellrunner(ordner, "/pfad/den/es/nicht/gibt")
+    with pytest.raises(RunnerFehler) as fehler:
+        runner.starten("klein.gguf")
+    assert fehler.value.grund == "kein_programm"
+
+
+# --- One at a time --------------------------------------------------------
+
+
+def test_ein_zweiter_server_wird_abgelehnt(ordner, falsches_programm):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    # An out-of-the-way port: the default one may be taken by a real server
+    # on the developer's machine, and this test is about something else.
+    runner.starten("klein.gguf", port=18101)
+    try:
+        assert runner.laeuft()
+        with pytest.raises(RunnerFehler) as fehler:
+            runner.starten("gross.gguf", port=18102)
+        assert fehler.value.grund == "laeuft_schon"
+    finally:
+        runner.stoppen()
+
+
+def test_gestartet_und_wieder_angehalten(ordner, falsches_programm):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    lauf = runner.starten("klein.gguf", kontext=2048, schichten=10, port=8099)
+
+    assert lauf.modell == "klein.gguf"
+    assert lauf.kontext == 2048
+    assert runner.lauf() is not None
+
+    assert runner.stoppen() is True
+    assert not runner.laeuft()
+    assert runner.lauf() is None
+
+
+def test_anhalten_ohne_lauf_ist_kein_fehler(ordner, falsches_programm):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    assert runner.stoppen() is False
+
+
+# --- Vision companions ----------------------------------------------------
+
+
+def test_ein_projektor_ist_kein_modell(tmp_path):
+    ordner = tmp_path / "modelle"
+    ordner.mkdir()
+    (ordner / "klein.gguf").write_bytes(b"x" * 10)
+    (ordner / "klein-mmproj-Q8_0.gguf").write_bytes(b"x" * 5)
+    from app.modellrunner import mmproj_auflisten
+
+    assert [m.name for m in modelle_auflisten(ordner)] == ["klein.gguf"]
+    assert mmproj_auflisten(ordner) == ["klein-mmproj-Q8_0.gguf"]
+
+
+def test_der_befehl_haengt_die_passenden_augen_an(ordner, falsches_programm):
+    (ordner / "klein-mmproj-Q8_0.gguf").write_bytes(b"x" * 5)
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    befehl = runner.befehl("klein.gguf", 4096, 33, 8081)
+    assert "--mmproj" in befehl
+    assert befehl[befehl.index("--mmproj") + 1].endswith("klein-mmproj-Q8_0.gguf")
+
+
+def test_ohne_augen_kein_mmproj(ordner, falsches_programm):
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    assert "--mmproj" not in runner.befehl("klein.gguf", 4096, 33, 8081)
+
+
+def test_fremde_augen_bleiben_liegen(ordner, falsches_programm):
+    # The shared prefix ends before the word mmproj — those are somebody
+    # else's eyes, and attaching them would be worse than none.
+    (ordner / "anderes-modell-mmproj-BF16.gguf").write_bytes(b"x" * 5)
+    (ordner / "mmproj-BF16.gguf").write_bytes(b"x" * 5)
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    assert "--mmproj" not in runner.befehl("klein.gguf", 4096, 33, 8081)
+
+
+def test_von_zwei_paaren_gewinnt_das_laengere(ordner, falsches_programm):
+    (ordner / "Qwen3.6-27B-Q4_K_M.gguf").write_bytes(b"x" * 10)
+    (ordner / "Qwen3.6-27B-mmproj-BF16.gguf").write_bytes(b"x" * 5)
+    (ordner / "Qwen3.6-35B-A3B-mmproj-BF16.gguf").write_bytes(b"x" * 5)
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    befehl = runner.befehl("Qwen3.6-27B-Q4_K_M.gguf", 4096, 33, 8081)
+    assert befehl[befehl.index("--mmproj") + 1].endswith("Qwen3.6-27B-mmproj-BF16.gguf")
+
+
+# --- The orphan after a service restart ------------------------------------
+
+
+def test_der_start_merkt_sich_die_pid(ordner, falsches_programm):
+    from app.modellrunner import PID_DATEI
+    import json
+
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    lauf = runner.starten("klein.gguf", port=18099)
+    assert lauf is not None
+    notiz = json.loads((ordner / PID_DATEI).read_text())
+    assert notiz["pid"] == runner._prozess.pid
+    runner.stoppen()
+    assert not (ordner / PID_DATEI).exists()
+
+
+def test_aufraeumen_beendet_nur_echte_server(ordner):
+    from app.modellrunner import PID_DATEI
+    import json, subprocess
+
+    schlaefer = subprocess.Popen(["sleep", "30"], start_new_session=True)
+    (ordner / PID_DATEI).write_text(json.dumps({"pid": schlaefer.pid}))
+    runner = Modellrunner(ordner)
+
+    # Somebody else's process id: the note goes, the process stays.
+    assert runner.aufraeumen(ist_unserer=lambda pid: False) is False
+    assert not (ordner / PID_DATEI).exists()
+    assert schlaefer.poll() is None
+
+    # Our own kind: it gets ended.
+    (ordner / PID_DATEI).write_text(json.dumps({"pid": schlaefer.pid}))
+    assert runner.aufraeumen(ist_unserer=lambda pid: True) is True
+    schlaefer.wait(timeout=5)
+
+
+def test_aufraeumen_ohne_notiz_ist_still(ordner):
+    assert Modellrunner(ordner).aufraeumen() is False
+
+
+def test_ein_belegter_port_faellt_sofort_auf(ordner, falsches_programm):
+    import socket
+
+    with socket.socket() as belegt:
+        belegt.bind(("127.0.0.1", 0))
+        belegt.listen(1)
+        port = belegt.getsockname()[1]
+        runner = Modellrunner(ordner, programm=str(falsches_programm))
+        try:
+            runner.starten("klein.gguf", port=port)
+            raise AssertionError("kein Fehler")
+        except RunnerFehler as fehler:
+            assert fehler.grund == "port_belegt"

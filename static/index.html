@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- The favicon is the dark version in both modes. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <title>Exe AI Terminal</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        font: 15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+        background: Canvas;
+        color: CanvasText;
+      }
+      main { text-align: center; padding: 2rem; max-width: 34rem; }
+      p { margin: 0.25rem 0; opacity: 0.65; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      /* Die Wortmarke erbt die Textfarbe — hell wie dunkel ohne zweite Datei. */
+      .wortmarke { display: block; margin: 0 auto 1.25rem; height: 34px; width: auto; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg class="wortmarke" viewBox="0 0 300 40" xmlns="http://www.w3.org/2000/svg"
+           role="img" aria-label="Exe AI Terminal">
+        <title>Exe AI Terminal</title>
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="35" height="28" rx="7.5" stroke-width="2.7"/>
+          <path d="M11.5 16 L17.5 20.5 L11.5 25" stroke-width="2.5"/>
+          <path d="M22 25 H 29" stroke-width="2.5"/>
+        </g>
+        <text x="53" y="28" fill="currentColor"
+              style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',system-ui,sans-serif;font-size:20px;font-weight:600;letter-spacing:-0.02em">Exe AI Terminal</text>
+      </svg>
+      <p>Phase 1 — Fundament. Die Oberfläche entsteht in Phase 2.</p>
+      <p><code>/health</code> · <code>/api/v1/meta</code> · <code>/docs</code></p>
+    </main>
+  </body>
+</html>
