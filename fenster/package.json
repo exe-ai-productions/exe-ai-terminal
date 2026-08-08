@@ -1,0 +1,11 @@
+{
+  "name": "exe-ai-terminal-fenster",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "bauen": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

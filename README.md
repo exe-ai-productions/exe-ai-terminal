@@ -6,6 +6,8 @@ needs a terminal or a config file. Local models are the normal case, not the
 exception; cloud providers are one key away, and nothing leaves your machine
 unless you set that up yourself.
 
+![A local model debugging a 502 — reasoning unfolded, web search used, all offline-first](docs/chat.png)
+
 ## What it does
 
 - **Local models, end to end.** A curated list of GGUF models sized to your
@@ -27,6 +29,8 @@ unless you set that up yourself.
   OpenAI-compatible image endpoint.
 - **Two languages.** English and German, switchable at runtime — including
   every error message the service produces.
+
+![The local window: a running model with its parameters, fetching and starting live next door](docs/local.png)
 
 ## Privacy stance
 

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Exe AI Terminal",
+  "version": "1.0.0",
+  "identifier": "net.exe-hq.exe-ai-terminal",
+  "build": {
+    "frontendDist": "./anzeige"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "haupt",
+        "title": "Exe AI Terminal",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 720,
+        "minHeight": 480,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "../deploy/icon.icns",
+      "../deploy/icon.ico",
+      "../static/icons/icon-512.png"
+    ],
+    "externalBin": ["binaries/exe-ai-terminal"]
+  }
+}

@@ -79,14 +79,21 @@ def _browser_oeffnen(port: int) -> None:
     that only prints log lines looks like a program that failed. Waiting for
     the port and not for a fixed number of seconds: a first start sets up a
     database and takes longer than a second one.
+
+    Preferably as a window of its own (app/appfenster.py); the plain
+    browser tab is the fallback for machines without one.
     """
     import time
     import webbrowser
 
+    from app.appfenster import oeffnen
+
     ende = time.time() + 30
     while time.time() < ende:
         if _antwortet(port):
-            webbrowser.open(f"http://127.0.0.1:{port}/app/")
+            adresse = f"http://127.0.0.1:{port}/app/"
+            if not oeffnen(adresse):
+                webbrowser.open(adresse)
             return
         time.sleep(0.3)
 

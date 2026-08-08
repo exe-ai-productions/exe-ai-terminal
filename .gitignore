@@ -74,3 +74,9 @@ CLAUDE.md
 # does not belong in any release. The starter next to it is dead without it.
 cli/
 exe
+
+# The window shell builds its own artifacts; only its sources travel.
+fenster/target/
+fenster/node_modules/
+fenster/binaries/
+fenster/gen/
