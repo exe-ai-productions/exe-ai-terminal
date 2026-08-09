@@ -85,7 +85,13 @@ async def suchen(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        import os
+
+        kopf = {}
+        wert = os.environ.get("HF_TOKEN", "").strip()
+        if wert:
+            kopf["Authorization"] = f"Bearer {wert}"
+        async with httpx.AsyncClient(timeout=15, headers=kopf) as client:
             antwort = await client.get(HF_ADRESSE, params=parameter)
             antwort.raise_for_status()
             daten = antwort.json()

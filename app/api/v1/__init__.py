@@ -19,6 +19,7 @@ from app.api.v1 import (
     gedaechtnis,
     generierung,
     health,
+    hf_token,
     meta,
     modelldateien,
     modelle,
@@ -37,6 +38,7 @@ router.include_router(modelle.router)
 router.include_router(anbieter.router)
 router.include_router(modellsuche.router)
 router.include_router(modelldateien.router)
+router.include_router(hf_token.router)
 router.include_router(runner.router)
 router.include_router(werkzeuge.router)
 router.include_router(dateien.router)

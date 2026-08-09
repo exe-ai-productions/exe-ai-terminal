@@ -118,9 +118,18 @@ class Modelldownload:
         halb = self._ordner / (ziel_name + UNFERTIG)
         adresse = f"{BASIS}/{repo}/resolve/main/{datei}"
 
+        # A Hugging Face token, when the user set one: lifts rate limits and
+        # opens gated models. Everything public works without it.
+        import os
+
+        kopf = {}
+        wert = os.environ.get("HF_TOKEN", "").strip()
+        if wert:
+            kopf["Authorization"] = f"Bearer {wert}"
+
         try:
             with httpx.stream(
-                "GET", adresse, follow_redirects=True, timeout=60
+                "GET", adresse, follow_redirects=True, timeout=60, headers=kopf
             ) as antwort:
                 antwort.raise_for_status()
                 gesamt = int(antwort.headers.get("content-length") or 0)

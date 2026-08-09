@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from app.api.abhaengigkeiten import hole_config, hole_sprache
 from app.config import Config, EndpointConfig
+from app.env_datei import env_schreiben
 from app.i18n import t
 
 router = APIRouter(prefix="/providers", tags=["anbieter"])
@@ -65,28 +66,6 @@ class NeuerAnbieter(BaseModel):
 class Angelegt(BaseModel):
     id: str
     api_key_env: str
-
-
-def _env_schreiben(datei: Path, name: str, wert: str) -> None:
-    """Puts one key into .env, replacing an entry of the same name.
-
-    Line by line rather than through a parser: the file belongs to the user
-    and their comments and order are worth more than a tidy rewrite.
-    """
-    zeilen = datei.read_text(encoding="utf-8").splitlines() if datei.exists() else []
-    neu, gesetzt = [], False
-    for zeile in zeilen:
-        if re.match(rf"^\s*#?\s*{re.escape(name)}\s*=", zeile):
-            if not gesetzt:
-                neu.append(f"{name}={wert}")
-                gesetzt = True
-            continue
-        neu.append(zeile)
-    if not gesetzt:
-        neu.append(f"{name}={wert}")
-    datei.parent.mkdir(parents=True, exist_ok=True)
-    datei.write_text("\n".join(neu).rstrip() + "\n", encoding="utf-8")
-    datei.chmod(0o600)
 
 
 @router.post("", response_model=Angelegt, summary="Cloud-Anbieter hinzufügen")
@@ -133,7 +112,7 @@ async def hinzufuegen(
     # The key last: an entry without a key shows a red lamp and can be
     # repaired, a key without an entry belongs to nothing and is only lying
     # around.
-    _env_schreiben(config.pfad("./.env"), vorlage["api_key_env"], daten.schluessel.strip())
+    env_schreiben(config.pfad("./.env"), vorlage["api_key_env"], daten.schluessel.strip())
 
     # The file serves the next start; the running service reads its
     # environment. Without this line the provider stays red until a restart —

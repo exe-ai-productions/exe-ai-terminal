@@ -72,7 +72,12 @@ def _ist_llama_server(pid: int) -> bool:
 
 
 def programm_finden(vorgabe: str | None = None) -> Path | None:
-    """The llama-server binary, or nothing if this machine has none."""
+    """The llama-server binary, or nothing if this machine has none.
+
+    Last on the list is the copy the program fetched itself — after PATH
+    and the package managers' places, because somebody who installed their
+    own build means that one.
+    """
     if vorgabe:
         pfad = Path(vorgabe).expanduser()
         return pfad if pfad.is_file() and os.access(pfad, os.X_OK) else None
@@ -85,7 +90,11 @@ def programm_finden(vorgabe: str | None = None) -> Path | None:
         pfad = Path(ort)
         if pfad.is_file() and os.access(pfad, os.X_OK):
             return pfad
-    return None
+
+    from app.paketierung import daten
+    from app.serverdownload import gefundener_server
+
+    return gefundener_server(daten())
 
 
 @dataclass

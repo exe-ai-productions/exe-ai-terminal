@@ -18,6 +18,11 @@
   let protokollOffen = $state(false)
   let arbeitet = $state(false)
   let protokollKasten = $state(null)
+  /* Fetching the server program itself — the way out of "not installed". */
+  let programmStand = $state(null)
+  const programmLaedt = $derived(
+    Boolean(programmStand) && !programmStand.fertig && !programmStand.fehler,
+  )
 
   /* The end of a log is where the news is — a fresh line pulls the view
      down, the way a terminal would. */
@@ -45,6 +50,9 @@
         port = auskunft.port
       }
       if (protokollOffen || auskunft.laeuft) protokoll = await api.runnerProtokoll()
+      /* While the server program is missing or arriving, watch the fetch —
+         the moment it lands, the form above replaces this whole section. */
+      if (!auskunft.programm) programmStand = await api.serverProgrammStand()
       /* A server that runs but is missing from the model list is still
          loading its model. Ask with a fresh check until it appears — the
          regular pass comes only every half minute, and whoever pressed
@@ -98,6 +106,25 @@
 
   {#if !hatProgramm}
     <p class="hinweis">{t('modell.kein_programm')}</p>
+    <p class="hinweis leiser">{t('modell.server_holen_erklaerung')}</p>
+    {#if programmLaedt}
+      <div class="balkenzeile">
+        <span class="balken"><i style="width:{Math.round(programmStand.anteil * 100)}%"></i></span>
+        <span class="balkenzahl">{Math.round(programmStand.anteil * 100)} %</span>
+      </div>
+    {:else}
+      {#if programmStand?.fehler}
+        <p class="fehlzeile">{t('fehler.serverdownload_fehlgeschlagen')}</p>
+      {/if}
+      <div class="knopfzeile">
+        <button
+          class="knopf wichtig"
+          onclick={() => api.serverProgrammHolen().then((s) => (programmStand = s)).catch((f) => melde(f.message, 'fehler'))}
+        >
+          {t('modell.server_holen')}
+        </button>
+      </div>
+    {/if}
   {:else if !hatModelle && !laeuft}
     <p class="hinweis">{t('modell.kein_modell_da')}</p>
   {:else}
@@ -158,6 +185,15 @@
     color: var(--text-still); font-weight: 500; margin: 4px 0 10px;
   }
   .hinweis { color: var(--text-still); font-size: 13px; margin: 4px 0; }
+  .hinweis.leiser { font-size: 12px; margin-bottom: 10px; }
+  .fehlzeile { font-size: 11.5px; color: var(--rot); margin: 0 0 8px; }
+  .balkenzeile { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; }
+  .balken { flex: 1; height: 5px; border-radius: 99px; background: var(--linie); overflow: hidden; }
+  .balken i { display: block; height: 100%; background: var(--blau); transition: width 0.3s; }
+  .balkenzahl {
+    font: 400 11.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-still); font-variant-numeric: tabular-nums;
+  }
 
   .regler {
     display: grid; grid-template-columns: 1fr auto; gap: 9px 12px;
