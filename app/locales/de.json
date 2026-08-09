@@ -136,6 +136,7 @@
     "dateien_laden": "Dateiliste wird geladen …",
     "keine_dateien": "Keine einzelne GGUF-Datei in diesem Repository",
     "ordner_oeffnen": "Modellordner öffnen",
+    "augen": "Vision",
     "hf_token": "Hugging-Face-Token",
     "hf_token_hinweis": "Optional. Hebt die Drosselgrenzen des Katalogs auf und öffnet zugangsbeschränkte Modelle. Liegt wie jeder Schlüssel nur auf diesem Rechner und wird nie angezeigt.",
     "hf_token_gesetzt": "Hugging-Face-Token ist gesetzt",

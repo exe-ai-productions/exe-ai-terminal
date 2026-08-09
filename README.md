@@ -13,8 +13,9 @@ unless you set that up yourself.
 - **Local models, end to end.** A curated list of GGUF models sized to your
   machine's memory, a Hugging Face search, a one-button download and a
   built-in `llama-server` runner. Fetch, start, chat — no shell, no scripts.
-- ** Full integrated Persistent Memory System. The agent learns your work style 
-  over time and improves alongside you. It also independently saves memories and can retrieve them on demand. The same applies to tools and skills.
+- **A fully integrated persistent memory.** The agent learns your working
+  style over time and improves alongside you — it saves memories on its own
+  and retrieves them on demand. The same applies to tools and skills.
 - **Cloud providers when you want them.** Anthropic, OpenAI or any
   OpenAI-compatible endpoint. The API key goes into a local file with tight
   permissions and is never displayed again — the interface only ever learns

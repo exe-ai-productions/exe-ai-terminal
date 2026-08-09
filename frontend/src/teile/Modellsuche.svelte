@@ -36,6 +36,24 @@
 
   const laedt = $derived(Boolean(stand) && !stand.fertig && !stand.fehler)
 
+  /* The speed, measured between two polls and lightly smoothed — the
+     difference between "waiting" and "stuck" is a number. */
+  let tempo = $state(0)
+  let messung = null
+
+  function tempoMessen(neu) {
+    const jetzt = Date.now()
+    if (neu && messung && messung.datei === neu.datei && jetzt > messung.zeit) {
+      const frisch = ((neu.geladen - messung.geladen) / (jetzt - messung.zeit)) * 1000
+      tempo = tempo ? tempo * 0.4 + frisch * 0.6 : frisch
+    } else {
+      tempo = 0
+    }
+    messung = neu ? { datei: neu.datei, geladen: neu.geladen, zeit: jetzt } : null
+  }
+
+  const mbs = $derived(tempo > 50_000 ? (tempo / 1e6).toFixed(1) + ' MB/s' : '')
+
   /* While something is being fetched the bar has to move, so the state is
      asked for again. The rest of the time this costs one request every two
      seconds and keeps the list of what is already there up to date. */
@@ -43,6 +61,7 @@
     const holen = async () => {
       try {
         stand = await api.modellHolenStand()
+        tempoMessen(stand && !stand.fertig && !stand.fehler ? stand : null)
         const auskunft = await api.runnerAuskunft()
         vorhanden = [...auskunft.modelle.map((m) => m.name), ...(auskunft.mmproj ?? [])]
         if (stand?.fertig && nachzug && stand.datei === nachzug.datei) {
@@ -203,7 +222,7 @@
           <div class="balkenzeile">
             <span class="balken"><i style="width:{Math.round(stand.anteil * 100)}%"></i></span>
             <span class="balkenzahl">
-              {gb(stand.geladen)} / {gb(stand.gesamt)} GB · {Math.round(stand.anteil * 100)} %
+              {m.mmproj_ziel && stand.datei === m.mmproj_ziel ? t('modell.augen') + ' · ' : ''}{gb(stand.geladen)} / {gb(stand.gesamt)} GB · {Math.round(stand.anteil * 100)} %{mbs ? ' · ' + mbs : ''}
             </span>
           </div>
         {:else if schiefGegangen(m.datei) || (m.mmproj_ziel && schiefGegangen(m.mmproj_ziel))}
@@ -279,7 +298,7 @@
               <div class="balkenzeile">
                 <span class="balken"><i style="width:{Math.round(stand.anteil * 100)}%"></i></span>
                 <span class="balkenzahl">
-                  {gb(stand.geladen)} / {gb(stand.gesamt)} GB · {Math.round(stand.anteil * 100)} %
+                  {ziel && stand.datei === ziel ? t('modell.augen') + ' · ' : ''}{gb(stand.geladen)} / {gb(stand.gesamt)} GB · {Math.round(stand.anteil * 100)} %{mbs ? ' · ' + mbs : ''}
                 </span>
               </div>
             {:else if schiefGegangen(d.datei) || (ziel && schiefGegangen(ziel))}

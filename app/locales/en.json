@@ -138,6 +138,7 @@
     "dateien_laden": "Fetching the file list …",
     "keine_dateien": "No single-file GGUF in this repository",
     "ordner_oeffnen": "Open model folder",
+    "augen": "vision",
     "hf_token": "Hugging Face token",
     "hf_token_hinweis": "Optional. Lifts the catalogue's rate limits and opens gated models. Stored like every key: on this machine, shown never.",
     "hf_token_gesetzt": "Hugging Face token is set",

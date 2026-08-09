@@ -24,6 +24,24 @@
     Boolean(programmStand) && !programmStand.fertig && !programmStand.fehler,
   )
 
+  /* Speed between two polls, lightly smoothed — "waiting" and "stuck"
+     differ by exactly this number. */
+  let tempo = $state(0)
+  let messung = null
+
+  function tempoMessen(neu) {
+    const jetzt = Date.now()
+    if (neu && messung && jetzt > messung.zeit) {
+      const frisch = ((neu.geladen - messung.geladen) / (jetzt - messung.zeit)) * 1000
+      tempo = tempo ? tempo * 0.4 + frisch * 0.6 : frisch
+    } else {
+      tempo = 0
+    }
+    messung = neu ? { geladen: neu.geladen, zeit: jetzt } : null
+  }
+
+  const mbs = $derived(tempo > 50_000 ? (tempo / 1e6).toFixed(1) + ' MB/s' : '')
+
   /* The end of a log is where the news is — a fresh line pulls the view
      down, the way a terminal would. */
   $effect(() => {
@@ -52,7 +70,14 @@
       if (protokollOffen || auskunft.laeuft) protokoll = await api.runnerProtokoll()
       /* While the server program is missing or arriving, watch the fetch —
          the moment it lands, the form above replaces this whole section. */
-      if (!auskunft.programm) programmStand = await api.serverProgrammStand()
+      if (!auskunft.programm) {
+        programmStand = await api.serverProgrammStand()
+        tempoMessen(
+          programmStand && !programmStand.fertig && !programmStand.fehler
+            ? programmStand
+            : null,
+        )
+      }
       /* A server that runs but is missing from the model list is still
          loading its model. Ask with a fresh check until it appears — the
          regular pass comes only every half minute, and whoever pressed
@@ -110,7 +135,7 @@
     {#if programmLaedt}
       <div class="balkenzeile">
         <span class="balken"><i style="width:{Math.round(programmStand.anteil * 100)}%"></i></span>
-        <span class="balkenzahl">{Math.round(programmStand.anteil * 100)} %</span>
+        <span class="balkenzahl">{Math.round(programmStand.anteil * 100)} %{mbs ? ' · ' + mbs : ''}</span>
       </div>
     {:else}
       {#if programmStand?.fehler}
