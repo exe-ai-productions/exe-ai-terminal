@@ -41,8 +41,9 @@ jobs:
         include:
           - os: macos-latest
             name: macos-arm64
-          - os: macos-13
-            name: macos-intel
+          # No Intel macOS: the hosted Intel runners are being retired and
+          # a queued job sat unserved for nine hours. The build comes back
+          # the day somebody with an Intel machine asks for it.
           - os: windows-latest
             name: windows
           - os: ubuntu-latest
