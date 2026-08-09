@@ -41,7 +41,10 @@ export const zustand = $state({
   lokalOffen: false,
   cloudOffen: false,
   werkzeugeOffen: false,
-  werkzeugfrage: null, // { generationId, aufrufId, name, argumente }
+  werkzeugfrage: null, // { generationId, aufrufId, name, argumente, chatId }
+  // Chats with a finished answer nobody has looked at yet — the sidebar
+  // shows the pulsing dot for them.
+  fertigeChats: [],
   // Which section fills the sidebar and the main area (6.5, variant A):
   // 'chats' or 'auftraege'. Deliberately not in localStorage — after
   // opening, you usually want to chat, not see yesterday's job list.
@@ -87,14 +90,42 @@ export function frageBeantworten(wert) {
   offene.aufloesen(wert)
 }
 
+/* Chats whose answer finished while the user was looking elsewhere. The
+   sidebar marks them with the pulsing dot until they are opened. */
+export function chatFertigMerken(id) {
+  if (id && !zustand.fertigeChats.includes(id)) zustand.fertigeChats.push(id)
+}
+
+export function chatFertigGesehen(id) {
+  if (id && zustand.fertigeChats.includes(id))
+    zustand.fertigeChats = zustand.fertigeChats.filter((c) => c !== id)
+}
+
+/* A standing yes for one tool in one chat, given via the third button in
+   the confirmation box. Kept in memory only: a reload starts cautious
+   again, which is the right side to err on for a tool that runs
+   commands. */
+const werkzeugFreigaben = new Map()
+
+export function werkzeugImmerErlaubt(chatId, name) {
+  return werkzeugFreigaben.get(chatId)?.has(name) ?? false
+}
+
+export function werkzeugImmerErlauben(chatId, name) {
+  if (!chatId || !name) return
+  if (!werkzeugFreigaben.has(chatId)) werkzeugFreigaben.set(chatId, new Set())
+  werkzeugFreigaben.get(chatId).add(name)
+}
+
 /* Yes or no to the server. The box disappears immediately — the answer
    has been given, leaving it up would invite a second click. If reporting
    it fails, the server runs into the rejection on its own after its
    timeout; hence only a notice, no restoring. */
-export async function werkzeugfrageBeantworten(erlaubt) {
+export async function werkzeugfrageBeantworten(erlaubt, immer = false) {
   const frage = zustand.werkzeugfrage
   if (!frage) return
   zustand.werkzeugfrage = null
+  if (immer && erlaubt) werkzeugImmerErlauben(frage.chatId, frage.name)
   try {
     await api.werkzeugBestaetigen(frage.generationId, frage.aufrufId, erlaubt)
   } catch {
@@ -225,6 +256,7 @@ export async function chatOeffnen(id) {
     return
   }
   zustand.aktiverChat = id
+  chatFertigGesehen(id)
   try {
     zustand.nachrichten = await api.nachrichten(id)
   } catch {

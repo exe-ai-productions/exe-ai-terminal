@@ -36,8 +36,17 @@
   })
   import {
     zustand, melde, aktualisiereMeldung, modelleLaden, featuresLaden, chatsLaden, aktuellerChat, neuerChat,
-    werkzeugfrageBeantworten, frageBeantworten, seitenleisteSchalten,
+    werkzeugfrageBeantworten, werkzeugImmerErlaubt, frageBeantworten, seitenleisteSchalten,
+    chatFertigMerken, chatFertigGesehen,
   } from './lib/zustand.svelte.js'
+
+  /* Coming back to the window counts as seeing the open chat — its dot,
+     if it earned one meanwhile, has said its piece. */
+  $effect(() => {
+    const zurueck = () => chatFertigGesehen(zustand.aktiverChat)
+    window.addEventListener('focus', zurueck)
+    return () => window.removeEventListener('focus', zurueck)
+  })
 
   /* The mode lives here since the buttons moved from the menu bar into
      the settings window (3.11). It acts via an attribute on the root
@@ -282,7 +291,7 @@
     const platzhalter = zustand.nachrichten[zustand.nachrichten.length - 1]
 
     const abbruch = new AbortController()
-    zustand.laeuft = { abbruch, generationId: null }
+    zustand.laeuft = { abbruch, generationId: null, chatId: zustand.aktiverChat }
     tempo = { zustand: 'prompt', wert: null }
 
     /* Real-time speed: sliding 2.5 s window instead
@@ -293,6 +302,7 @@
     const zeiten = []
     let inhaltAngekommen = false
     let erstesHaeppchen = 0
+    let abgebrochen = false
     const messen = () => {
       const jetzt = Date.now()
       while (zeiten.length && jetzt - zeiten[0] > FENSTER_S * 1000) zeiten.shift()
@@ -337,17 +347,25 @@
           messen()
           runter()
         } else if (ereignis.typ === 'tool_confirm') {
-          /* The server halts and waits. No toast for this — the box above
-             the input field is conspicuous enough, and two notices for
-             the same thing is one too many. */
-          zustand.werkzeugfrage = {
-            generationId: zustand.laeuft?.generationId,
-            aufrufId: ereignis.aufruf_id,
-            name: ereignis.name,
-            argumente: ereignis.argumente,
-            // Why this call is being asked about — empty when the tool is
-            // simply configured to always ask.
-            grund: ereignis.grund || '',
+          /* This chat may have given the tool a standing yes — then the
+             call is answered on the spot instead of asking again what has
+             been decided. */
+          if (werkzeugImmerErlaubt(zustand.aktiverChat, ereignis.name)) {
+            api.werkzeugBestaetigen(zustand.laeuft?.generationId, ereignis.aufruf_id, true).catch(() => {})
+          } else {
+            /* The server halts and waits. No toast for this — the box above
+               the input field is conspicuous enough, and two notices for
+               the same thing is one too many. */
+            zustand.werkzeugfrage = {
+              generationId: zustand.laeuft?.generationId,
+              aufrufId: ereignis.aufruf_id,
+              name: ereignis.name,
+              argumente: ereignis.argumente,
+              chatId: zustand.aktiverChat,
+              // Why this call is being asked about — empty when the tool is
+              // simply configured to always ask.
+              grund: ereignis.grund || '',
+            }
           }
         } else if (ereignis.typ === 'tool_call') {
           /* Stays up until the result is in — then the same notification
@@ -400,13 +418,25 @@
         }
       }
     } catch (fehler) {
-      if (fehler.name !== 'AbortError') melde(String(fehler.message || fehler), 'fehler')
+      abgebrochen = fehler.name === 'AbortError'
+      if (!abgebrochen) melde(String(fehler.message || fehler), 'fehler')
     } finally {
       // If the answer aborts while the confirmation stands, nobody is
       // waiting for it anymore — the box has to go, otherwise it points
       // into the void.
       clearInterval(taktgeber)
       zustand.werkzeugfrage = null
+      /* The finished dot: only when nobody was watching — someone sitting
+         in this chat with the window in front saw the answer arrive, and
+         whoever hit stop is not waiting for anything. */
+      const fertigerChat = zustand.laeuft?.chatId
+      if (
+        !abgebrochen &&
+        fertigerChat &&
+        (fertigerChat !== zustand.aktiverChat || !document.hasFocus())
+      ) {
+        chatFertigMerken(fertigerChat)
+      }
       zustand.laeuft = null
       tempo = { zustand: 'bereit', wert: null }
       await chatsLaden()

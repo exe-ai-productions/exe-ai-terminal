@@ -206,6 +206,9 @@
             onclick={() => chatOeffnen(chat.id)}
             oncontextmenu={(e) => menueOeffnen(e, chat)}
           >
+            {#if zustand.fertigeChats.includes(chat.id)}
+              <span class="fertigpunkt" title={t('chat.antwort_fertig')} aria-label={t('chat.antwort_fertig')}></span>
+            {/if}
             <span class="titel">{chat.title}</span>
             <!-- The pin releases on click — no detour
                  through the right-click menu when the symbol is standing
@@ -246,6 +249,9 @@
             onclick={() => chatOeffnen(chat.id)}
             oncontextmenu={(e) => menueOeffnen(e, chat)}
           >
+            {#if zustand.fertigeChats.includes(chat.id)}
+              <span class="fertigpunkt" title={t('chat.antwort_fertig')} aria-label={t('chat.antwort_fertig')}></span>
+            {/if}
             <span class="titel">{chat.title}</span>
             <!-- Quick pinning: the pin only appears on
                  hover — the same pin as above, just as an invitation
@@ -443,7 +449,9 @@
   }
 
   .seitenleiste {
-    width: 248px;
+    /* 15 percent wider than the 248 it started with — titles were
+       truncating earlier than the free space around them justified. */
+    width: 285px;
     flex: none;
     display: flex;
     flex-direction: column;
@@ -610,6 +618,24 @@
     color: var(--text-leise);
     cursor: pointer;
     transition: background 0.12s, color 0.12s;
+  }
+  /* The finished answer waiting to be seen: blue is the house colour for
+     "running, active" and this is its afterglow — ringed in text colour so
+     it reads on the active row too, pulsing so the eye finds it. */
+  .fertigpunkt {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+    background: var(--blau);
+    box-shadow: 0 0 0 1.5px var(--text);
+    animation: fertigpuls 1.6s ease-in-out infinite;
+  }
+  @keyframes fertigpuls {
+    50% { opacity: 0.45; transform: scale(0.82); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fertigpunkt { animation: none; }
   }
   .chat:hover {
     background: var(--linie);

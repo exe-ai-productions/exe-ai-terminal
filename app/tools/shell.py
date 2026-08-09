@@ -181,8 +181,15 @@ def greift_nach_draussen(befehl: str, ordner: list[str]) -> str | None:
         if teil.startswith(("~", "/")) or ".." in teil:
             kandidaten.append(teil)
     for treffer in _PFAD_MUSTER.findall(befehl):
-        if treffer not in kandidaten:
-            kandidaten.append(treffer)
+        if treffer in kandidaten:
+            continue
+        # The raw scan cannot see quoting, so a path with spaces comes out
+        # cut off at the first blank. If a properly split word carries on
+        # where the match stops, the match is that word's stump, not a path
+        # of its own.
+        if any(t.startswith(treffer) and len(t) > len(treffer) for t in teile):
+            continue
+        kandidaten.append(treffer)
 
     for kandidat in kandidaten:
         # Strip what the shell would treat as syntax, not as part of the path.
