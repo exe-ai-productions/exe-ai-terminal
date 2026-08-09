@@ -149,6 +149,7 @@
     "herunterladen": "Download",
     "abbrechen": "Cancel",
     "im_ordner": "downloaded",
+    "laedt_weiter": "fetching in the background",
     "server": "Model server",
     "server_aus": "Server is off",
     "server_starten": "Start server",

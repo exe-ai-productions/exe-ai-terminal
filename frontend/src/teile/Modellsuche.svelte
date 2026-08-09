@@ -54,6 +54,31 @@
 
   const mbs = $derived(tempo > 50_000 ? (tempo / 1e6).toFixed(1) + ' MB/s' : '')
 
+  /* A fetch outlives the view it was started from. When its file belongs to
+     no visible row — search results gone, window reopened — it still needs a
+     face, so the panel carries it at the top. */
+  const laufend = $derived(stand && !stand.fertig && !stand.fehler ? stand : null)
+  const anKachel = $derived.by(() => {
+    if (!laufend) return false
+    if (
+      EMPFEHLUNGEN.some((s) =>
+        s.modelle.some((m) => laufend.datei === m.datei || laufend.datei === m.mmproj_ziel)
+      )
+    )
+      return true
+    if (
+      offenesRepo &&
+      dateien?.length &&
+      dateien.some(
+        (d) =>
+          laufend.datei === d.datei ||
+          (repoAugen && laufend.datei === augenZiel(d.datei, repoAugen.datei))
+      )
+    )
+      return true
+    return false
+  })
+
   /* While something is being fetched the bar has to move, so the state is
      asked for again. The rest of the time this costs one request every two
      seconds and keeps the list of what is already there up to date. */
@@ -190,6 +215,20 @@
 </script>
 
 <div class="tafel">
+
+  {#if laufend && !anKachel}
+    <div class="zeile">
+      <span class="wer">
+        <span class="name">{laufend.datei}</span>
+        <span class="unter">{t('modell.laedt_weiter')}</span>
+      </span>
+      <button class="knopf still" onclick={abbrechen}>{t('modell.abbrechen')}</button>
+    </div>
+    <div class="balkenzeile">
+      <span class="balken"><i style="width:{Math.round(laufend.anteil * 100)}%"></i></span>
+      <span class="balkenzahl">{gb(laufend.geladen)} / {gb(laufend.gesamt)} GB · {Math.round(laufend.anteil * 100)} %{mbs ? ' · ' + mbs : ''}</span>
+    </div>
+  {/if}
 
   <h4>{t('modell.empfohlen')}</h4>
   {#each EMPFEHLUNGEN as stufe}
