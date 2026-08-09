@@ -14,6 +14,7 @@
     "nein": "Nein"
   },
   "chat": {
+    "antwort_fertig": "Antwort fertig",
     "neu": "Neuer Chat",
     "unbenannt": "Unbenannter Chat",
     "umbenennen": "Umbenennen",
@@ -96,6 +97,7 @@
     "neu_senden": "Nochmal senden"
   },
   "werkzeug": {
+    "immer_erlauben": "In diesem Chat immer erlauben",
     "laeuft": "{name} …",
     "fertig": "{name} fertig",
     "fehlgeschlagen": "{name} fehlgeschlagen",

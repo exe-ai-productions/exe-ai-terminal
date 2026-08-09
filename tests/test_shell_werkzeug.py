@@ -112,6 +112,33 @@ def test_zweiter_freigegebener_ordner_ist_drinnen(tmp_path):
     assert shell.greift_nach_draussen(f"cp {zwei}/datei.txt .", ordner) is None
 
 
+def test_ordner_mit_leerzeichen_bleibt_drinnen(tmp_path):
+    # A shared folder with a space in its name: the raw path scan used to
+    # cut the quoted path at the blank and report the stump as outside.
+    heim = tmp_path / "Working Dir EAIT"
+    heim.mkdir()
+    ordner = [str(heim)]
+    assert shell.greift_nach_draussen(f'open "{heim}/unter.txt"', ordner) is None
+    assert shell.greift_nach_draussen(f"ls '{heim}'", ordner) is None
+
+
+def test_leerzeichen_mit_backslash_bleibt_drinnen(tmp_path):
+    heim = tmp_path / "Working Dir"
+    heim.mkdir()
+    ordner = [str(heim)]
+    maskiert = str(heim).replace(" ", "\\ ")
+    assert shell.greift_nach_draussen(f"cat {maskiert}/notiz.txt", ordner) is None
+
+
+def test_pfad_in_option_wird_weiter_erkannt(tmp_path):
+    # The raw scan exists for paths hiding in option words — that net must
+    # survive the stump filter.
+    heim = tmp_path / "heim"
+    heim.mkdir()
+    ordner = [str(heim)]
+    assert shell.greift_nach_draussen("tar --file=/etc/passwd -x", ordner) is not None
+
+
 def test_bestaetigung_nur_ausserhalb(tmp_path):
     ordner = [str(tmp_path)]
     assert shell.braucht_bestaetigung({"command": "ls -la"}, ordner) is False

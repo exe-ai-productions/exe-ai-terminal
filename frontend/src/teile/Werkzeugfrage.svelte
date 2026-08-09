@@ -130,6 +130,9 @@
   {/if}
 
   <div class="fuss">
+    <!-- The standing yes sits apart on the left: it decides more than this
+         one call, so it must not sit where the routine click lands. -->
+    <button class="knopf immer" onclick={() => antworten(true, true)}>{t('werkzeug.immer_erlauben')}</button>
     <button class="knopf" onclick={() => antworten(false)}>{t('werkzeug.ablehnen')}</button>
     <button class="knopf wichtig" onclick={() => antworten(true)}>{t('werkzeug.ausfuehren')}</button>
   </div>
@@ -288,6 +291,16 @@
   }
   .knopf:active {
     transform: scale(0.975);
+  }
+  /* Quieter than the pair on the right, and pushed to the far edge — a
+     bigger decision deserves a deliberate reach, not a routine click. */
+  .immer {
+    margin-right: auto;
+    border-color: var(--linie);
+    color: var(--text-still);
+  }
+  .immer:hover {
+    color: var(--text);
   }
   .wichtig {
     background: var(--text);
