@@ -185,10 +185,10 @@ class FeatureFlags(BaseModel):
     image_generation: bool = False
     document_upload: bool = False
     # The shell tool (app/tools/shell.py): lets the model run commands in the
-    # folders the user shared with a chat. Off by default for the same reason
-    # as beta_lock above — a tool that writes to the disk is switched on
-    # explicitly in config.yaml, never silently by a schema default.
-    shell_tool: bool = False
+    # folders the user shared with a chat. Shipped on, because the guard sits
+    # in the tool itself: sharing a folder is the permission, without one it
+    # stays shut, and any command reaching outside the share asks first.
+    shell_tool: bool = True
 
 
 class MCPConfig(BaseModel):
