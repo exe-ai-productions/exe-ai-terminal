@@ -24,6 +24,7 @@ from app.api.v1 import router as api_v1_router
 from app.api.v1.health import _health_ermitteln
 from app.modelldownload import Modelldownload
 from app.modellrunner import Modellrunner
+from app.serverdownload import Serverdownload
 from app.config import PROJEKT_WURZEL, Config, get_config
 from app.paketierung import ressourcen
 from app.db import datenbank_oeffnen, repositories_erstellen
@@ -145,6 +146,9 @@ async def lebenszyklus(app: FastAPI):
     if app.state.modellrunner.aufraeumen():
         log.info("Verwaister Modellserver aus dem vorigen Lauf beendet")
     app.state.modelldownload = Modelldownload(modellordner)
+    # The model server itself, fetchable in one click on machines that do
+    # not have it — into the user's data folder, next to their models.
+    app.state.serverdownload = Serverdownload(config.pfad("."))
     await discovery.starten()
 
     # The alarm clock (6.7) comes after discovery: its first pass catches up

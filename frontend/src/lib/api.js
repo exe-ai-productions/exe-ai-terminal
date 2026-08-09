@@ -86,8 +86,14 @@ export const api = {
     ruf(`/models/search?q=${encodeURIComponent(q)}&art=${art}&anzahl=${anzahl}`),
   /* The GGUF files of one found repository — what the download can finish. */
   modellDateien: (repo) => ruf(`/models/files?repo=${encodeURIComponent(repo)}`),
+  /* The Hugging Face token: set once, never handed back out. */
+  hfTokenStand: () => ruf('/models/token'),
+  hfTokenSetzen: (token) => ruf('/models/token', { method: 'POST', body: alsText({ token }) }),
   /* Shows the model folder in the file manager. Always that one folder. */
   modellordnerOeffnen: () => ruf('/runner/folder', { method: 'POST' }),
+  /* The model server itself — fetched once on machines without one. */
+  serverProgrammHolen: () => ruf('/runner/programm', { method: 'POST' }),
+  serverProgrammStand: () => ruf('/runner/programm'),
 
   /* Turns a file from the chat into a real file in a released folder. */
   erzeugnisAblegen: (daten) =>

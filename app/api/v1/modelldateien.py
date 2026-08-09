@@ -104,7 +104,13 @@ async def dateien(
         )
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        import os
+
+        kopf = {}
+        wert = os.environ.get("HF_TOKEN", "").strip()
+        if wert:
+            kopf["Authorization"] = f"Bearer {wert}"
+        async with httpx.AsyncClient(timeout=15, headers=kopf) as client:
             antwort = await client.get(f"{HF_BASIS}/{repo}/tree/main")
             antwort.raise_for_status()
             daten = antwort.json()

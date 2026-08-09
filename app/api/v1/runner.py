@@ -22,6 +22,7 @@ from app.i18n import t
 from app.modelldownload import DownloadFehler, Modelldownload
 from app.modellrunner import Modellrunner, RunnerFehler
 from app.ordner_oeffnen import OeffnenNichtMoeglich, ordner_oeffnen
+from app.serverdownload import Serverdownload, ServerdownloadFehler
 
 router = APIRouter(prefix="/runner", tags=["runner"])
 
@@ -201,6 +202,69 @@ def holen(
 @router.delete("/download", response_model=bool, summary="Holen abbrechen")
 def abbrechen(download: Modelldownload = Depends(hole_download)) -> bool:
     return download.abbrechen()
+
+
+# --- Fetching the model server itself -------------------------------------
+
+
+class ServerFortschritt(BaseModel):
+    geladen: int
+    gesamt: int
+    anteil: float
+    fertig: bool
+    fehler: str | None = None
+
+
+def hole_serverdownload(request: Request) -> Serverdownload:
+    return request.app.state.serverdownload
+
+
+def _serverstand(download: Serverdownload) -> ServerFortschritt | None:
+    stand = download.stand()
+    if stand is None:
+        return None
+    return ServerFortschritt(
+        geladen=stand.geladen,
+        gesamt=stand.gesamt,
+        anteil=stand.anteil,
+        fertig=stand.fertig,
+        fehler=stand.fehler,
+    )
+
+
+@router.get(
+    "/programm", response_model=ServerFortschritt | None, summary="Wie weit ist der Server"
+)
+def server_fortschritt(
+    download: Serverdownload = Depends(hole_serverdownload),
+) -> ServerFortschritt | None:
+    return _serverstand(download)
+
+
+@router.post("/programm", response_model=ServerFortschritt, summary="Modellserver holen")
+def server_holen(
+    download: Serverdownload = Depends(hole_serverdownload),
+    sprache: str = Depends(hole_sprache),
+) -> ServerFortschritt:
+    """Fetches llama-server from the official llama.cpp release.
+
+    The one step that used to be an instruction ("install llama.cpp") is a
+    button now — a machine without the server gets it in one click, into
+    the user's data folder, where the runner looks by itself.
+    """
+    try:
+        download.starten()
+    except ServerdownloadFehler as fehler:
+        lage = {
+            "laeuft_schon": status.HTTP_409_CONFLICT,
+            "schon_da": status.HTTP_409_CONFLICT,
+        }.get(fehler.grund, status.HTTP_400_BAD_REQUEST)
+        raise HTTPException(
+            lage, t(f"fehler.serverdownload_{fehler.grund}", sprache)
+        ) from None
+    stand = _serverstand(download)
+    assert stand is not None
+    return stand
 
 
 @router.post("/folder", response_model=bool, summary="Modellordner zeigen")

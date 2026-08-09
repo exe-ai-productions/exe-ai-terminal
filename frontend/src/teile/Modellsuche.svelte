@@ -123,13 +123,24 @@
     modellDatei.replace(/\.gguf$/i, '') +
     '-' + mmprojDatei.slice(mmprojDatei.toLowerCase().indexOf('mmproj'))
 
-  async function holen(repo, datei, augen = null) {
+  async function holen(repo, datei, augen = null, ziel = null) {
     try {
-      stand = await api.modellHolen(repo, datei)
+      stand = await api.modellHolen(repo, datei, ziel)
       nachzug = augen ? { repo, datei, ...augen } : null
     } catch (fehler) {
       melde(fehler.message, 'fehler')
     }
+  }
+
+  /* The button fetches what is missing — the model, or only its eyes when
+     the model already arrived. The follow-up marker lives in page memory,
+     so a reload in mid-download would otherwise strand a model without
+     its projector, with a button that keeps failing on "already there". */
+  function fehlendesHolen(repo, datei, mmproj, mmprojZiel) {
+    if (!istDa(datei)) {
+      return holen(repo, datei, mmproj ? { mmproj, ziel: mmprojZiel } : null)
+    }
+    return holen(repo, mmproj, null, mmprojZiel)
   }
 
   async function abbrechen() {
@@ -139,6 +150,24 @@
   const gb = (bytes) => (bytes / 1e9).toFixed(1)
 
   const zahl = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n))
+
+  /* The optional Hugging Face token: lifts rate limits, opens gated
+     models. Asked once when the panel opens; set like every other key —
+     stored on this machine, shown never. */
+  let hfGesetzt = $state(false)
+  let hfEingabe = $state('')
+  $effect(() => {
+    api.hfTokenStand().then((s) => (hfGesetzt = s.gesetzt)).catch(() => {})
+  })
+  async function hfSetzen() {
+    try {
+      await api.hfTokenSetzen(hfEingabe.trim())
+      hfEingabe = ''
+      hfGesetzt = true
+    } catch (fehler) {
+      melde(fehler.message, 'fehler')
+    }
+  }
 </script>
 
 <div class="tafel">
@@ -161,7 +190,7 @@
           {:else}
             <button
               class="knopf wichtig"
-              onclick={() => holen(m.id, m.datei, m.mmproj ? { mmproj: m.mmproj, ziel: m.mmproj_ziel } : null)}
+              onclick={() => fehlendesHolen(m.id, m.datei, m.mmproj, m.mmproj_ziel)}
               disabled={laedt}
             >
               {t('modell.herunterladen')}
@@ -239,7 +268,7 @@
               {:else}
                 <button
                   class="knopf wichtig"
-                  onclick={() => holen(f.id, d.datei, repoAugen ? { mmproj: repoAugen.datei, ziel } : null)}
+                  onclick={() => fehlendesHolen(f.id, d.datei, repoAugen?.datei, ziel)}
                   disabled={laedt}
                 >
                   {t('modell.herunterladen')}
@@ -264,6 +293,25 @@
     {/each}
   {:else if treffer}
     <p class="leer">{t('modell.keine_treffer')}</p>
+  {/if}
+
+  {#if hfGesetzt}
+    <p class="leer">{t('modell.hf_token_gesetzt')}</p>
+  {:else}
+    <div class="suchzeile hf">
+      <input
+        class="feld"
+        type="password"
+        bind:value={hfEingabe}
+        placeholder={t('modell.hf_token')}
+        autocomplete="off"
+        onkeydown={(e) => { if (e.key === 'Enter' && hfEingabe.trim().length >= 8) hfSetzen() }}
+      />
+      <button class="knopf" disabled={hfEingabe.trim().length < 8} onclick={hfSetzen}>
+        {t('modell.verbinden')}
+      </button>
+    </div>
+    <p class="leer klein">{t('modell.hf_token_hinweis')}</p>
   {/if}
 
   <!-- The way to what all the buttons above produce: the folder itself. -->
@@ -382,4 +430,6 @@
   .fehlzeile { font-size: 11.5px; color: var(--rot); padding: 0 2px 8px; margin-top: -1px; }
 
   .ordner { align-self: flex-start; margin-top: 14px; }
+  .suchzeile.hf { margin-top: 14px; margin-bottom: 4px; }
+  .leer.klein { font-size: 11.5px; padding-top: 0; }
 </style>
