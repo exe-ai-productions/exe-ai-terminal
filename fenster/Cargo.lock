@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "exe-ai-terminal-fenster"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "tauri",
  "tauri-build",
