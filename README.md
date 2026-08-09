@@ -130,5 +130,7 @@ tests/        pytest suite — run with .venv/bin/pytest
 
 ## License
 
-Not yet decided — all rights reserved until one is chosen. You are welcome to
-read the code; please do not reuse or redistribute it yet.
+[PolyForm Noncommercial 1.0.0](LICENSE.md) — in plain words: use it, change
+it and share it freely for anything personal, educational or otherwise
+noncommercial. Using it commercially — in a company, for paid work — needs a
+commercial license: write to dev@exe-hq.net.
