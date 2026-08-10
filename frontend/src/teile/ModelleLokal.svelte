@@ -15,6 +15,7 @@
   import Parametertafel from './Parametertafel.svelte'
   import Modellsuche from './Modellsuche.svelte'
   import Modellserver from './Modellserver.svelte'
+  import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
   import { zustand } from '../lib/zustand.svelte.js'
   import { modellwahl, auswahlLaden, istAn, schalten, lokale } from '../lib/modelle.svelte.js'
@@ -51,12 +52,32 @@
   /* Engine names are names and stay untranslated; only the paraphrase for
      "anything speaking OpenAI's interface" is a sentence and goes through
      the catalogue. */
+  /* The machine total for the head — asked once; it does not change while
+     the window is open. */
+  let maschineGb = $state(null)
+  $effect(() => {
+    api.runnerAuskunft().then((a) => (maschineGb = a.speicher_gb)).catch(() => {})
+  })
+
   const dialektName = (d) =>
     d === 'openai' ? t('modell.eigener_unter') : ({ llama_cpp: 'llama.cpp', mlx: 'MLX' }[d] ?? d)
 </script>
 
 <Fenster bind:offen titel={t('menue.lokal')} art="liste">
   <div class="zaehler">{t('modell.aktiv_zahl').replace('{zahl}', anzahlAn)}</div>
+
+  {#if maschineGb || zustand.serverPlan}
+    <div class="vramzeile">
+      {#if maschineGb}
+        <span class="vramwort">{t('modell.vram_label')}:</span>
+        <span class="vramwert">{maschineGb} GB</span>
+      {/if}
+      {#if zustand.serverPlan}
+        <span class="vramwort">{t('modell.vram_erwartet')}:</span>
+        <span class="vramwert">{zustand.serverPlan.gesamt.toFixed(1)} GB</span>
+      {/if}
+    </div>
+  {/if}
 
   <div class="zwei">
     <div class="links">
@@ -148,6 +169,36 @@
 </Fenster>
 
 <style>
+  /* The readout sits on the shoulder of the inner box, right-aligned: a
+     loud label outside, the bare number in a stroked pill — the same
+     stroke-on-dark look the tool chips in the chat wear. */
+  .vramzeile {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    margin: -4px 0 8px;
+  }
+  .vramwort {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .vramwort + .vramwert {
+    margin-right: 10px;
+  }
+  .vramzeile .vramwort:first-child {
+    margin-left: 0;
+  }
+  .vramwert {
+    border: 1px solid var(--linie-stark);
+    border-radius: 9px;
+    padding: 4px 10px;
+    font: 500 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
   .zaehler { font-size: 11.5px; color: var(--text-still); margin: -6px 0 10px; }
   /* The way out of an empty list. Marked off by a line above rather than a
      colour: it is a different kind of entry, not a different state. */

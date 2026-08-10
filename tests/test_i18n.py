@@ -54,6 +54,11 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # "Skill" is the name of the thing, in both languages. Translating it
         # would invent a German word nobody types into the slash list.
         "skills.quelle",
+        # VRAM is the label on graphics memory in both languages — a German
+        # spelling of it does not exist outside dictionaries.
+        "modell.vram_label",
+        # Server is the German word for server as much as the English one.
+        "modell.server_status_label",
         # A network port is called a port in German too. "Anschluss" is the
         # dictionary answer and not what anybody says or reads.
         "modell.feld_port",

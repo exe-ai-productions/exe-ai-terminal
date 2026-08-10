@@ -31,7 +31,9 @@ fn main() {
                 None
             } else {
                 let (_ereignisse, kind) =
-                    app.handle().shell().sidecar("exe-ai-terminal")?.spawn()?;
+                    app.handle().shell().sidecar("exe-ai-terminal")?
+                        .env("EXE_AI_TERMINAL_HEADLESS", "1")
+                        .spawn()?;
                 Some(kind)
             };
             app.manage(Mutex::new(kind));

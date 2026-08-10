@@ -1,6 +1,7 @@
 <script>
   import { fly } from 'svelte/transition'
   import { t } from '../lib/texte.svelte.js'
+  import { api } from '../lib/api.js'
   import {
     zustand, aktuellerChat, chatAendern, chatLoeschen, neuerChat, melde,
     modellWaehlen, frage,
@@ -58,6 +59,20 @@
     }
     navigator.clipboard.writeText(letzte.content || '').then(() => melde(t('menue.kopiert'), 'erfolg'))
   }
+
+  /* The server at a glance: is it up, and how much memory it holds right
+     now. Polled gently — the bar lives the whole session, and a memory
+     readout does not need to race. */
+  let serverBlick = $state({ laeuft: false, belegt: null })
+  $effect(() => {
+    const holen = () =>
+      api.runnerAuskunft()
+        .then((a) => (serverBlick = { laeuft: Boolean(a.laeuft), belegt: a.belegt_gb }))
+        .catch(() => {})
+    holen()
+    const takt = setInterval(holen, 5000)
+    return () => clearInterval(takt)
+  })
 
   export function schliessen() {
     offen = null
@@ -165,6 +180,16 @@
   <!-- The manual: its own page, deliberately outside
        the app — it should be able to stay open next to the app. As an
        icon at the right edge so it no longer occupies menu space. -->
+  <span class="serverblick">
+    {#if serverBlick.laeuft && serverBlick.belegt}
+      <span class="blickwort">{t('modell.vram_belegt')}:</span>
+      <span class="blickwert">{serverBlick.belegt} GB</span>
+    {/if}
+    <span class="blickwort">{t('modell.server_status_label')}:</span>
+    <span class="blickpunkt" class:an={serverBlick.laeuft} role="img"
+          aria-label={serverBlick.laeuft ? t('status.erreichbar') : t('modell.server_aus')}></span>
+  </span>
+
   <button
     class="hilfe"
     aria-label={t('menue.hilfe')}
@@ -211,11 +236,11 @@
     align-items: center;
     gap: 2px;
     padding: 0 10px;
-    height: 30px;
+    height: 33px;
     flex: none;
     background: var(--bg-leiste);
     border-bottom: 1px solid var(--linie);
-    font-size: 12.5px;
+    font-size: 13.5px;
     color: var(--text-leise);
     user-select: none;
     position: relative;
@@ -246,8 +271,52 @@
     margin-right: 6px;
   }
   /* The help icon: right-aligned, same restraint as the menu items. */
-  .hilfe {
+  .serverblick {
     margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .blickwort {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-still);
+  }
+  .blickwert {
+    border: 1px solid var(--linie-stark);
+    border-radius: 9px;
+    padding: 1.5px 8px;
+    font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .blickwort + .blickwort {
+    margin-left: 6px;
+  }
+  /* The dot wears the finished-chat ring and breathes only while the
+     server actually runs. Green and red are exactly the two states the
+     colour rules reserve them for. */
+  .blickpunkt {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+    background: var(--rot);
+    box-shadow: 0 0 0 1.5px var(--text);
+    margin: 0 4px 0 1px;
+  }
+  .blickpunkt.an {
+    background: var(--gruen);
+    animation: blickpuls 1.6s ease-in-out infinite;
+  }
+  @keyframes blickpuls {
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .blickpunkt.an { animation: none; }
+  }
+  .hilfe {
+    margin-left: 10px;
     display: inline-flex;
     align-items: center;
     border: none;

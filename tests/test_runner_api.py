@@ -34,10 +34,13 @@ class StummerRunner:
     def lauf(self):
         return self._lauf
 
+    def belegt_gb(self):
+        return None
+
     def protokoll(self):
         return []
 
-    def starten(self, modell, *, kontext=8192, schichten=99, port=8080):
+    def starten(self, modell, *, kontext=8192, schichten=99, port=8080, drafter=None):
         self._lauf = Lauf(modell=modell, kontext=kontext, schichten=schichten, port=port)
         return self._lauf
 

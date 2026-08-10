@@ -38,11 +38,14 @@
    thing to hand somebody else — it is a Python package, not a file. */
 export const ARTEN = ['gguf']
 
-/* One family, told in four sizes. The first three steps are the same brain
-   at one, two and four bits per weight — whoever upgrades their machine
-   meets a model they already know, only sharper. The last step changes the
-   shape instead of the bits: a mixture of experts, big on disk and quick at
-   work, which is what a machine that size is actually good at.
+/* Two families, chosen for one job: calling tools without drama. The small
+   steps keep Bonsai — dense, and unbeatable per gigabyte. From 16 GB up the
+   list switches to Gemma 4, the first generation of that line trained to
+   call tools natively: dense models only, because a model where the whole
+   brain answers every word stays on task through long agent runs, which is
+   exactly where sparse expert models drift off and start talking to
+   themselves. One family across three steps also means one temperament —
+   whoever upgrades their machine meets a model they already know.
 
    Every file name and size below was checked against the repository it
    names. A recommendation that 404s looks like a broken program, not like a
@@ -72,6 +75,16 @@ export const EMPFEHLUNGEN = [
     bis: 16,
     modelle: [
       {
+        id: 'unsloth/gemma-4-12B-it-qat-GGUF',
+        name: 'Gemma 4 12B · 4 Bit QAT',
+        datei: 'gemma-4-12B-it-qat-UD-Q4_K_XL.gguf',
+        art: 'gguf',
+        groesse: 6.3,
+        mmproj: 'mmproj-F16.gguf',
+        mmproj_ziel: 'gemma-4-12B-it-qat-mmproj-F16.gguf',
+        warum: 'werkzeug_qat',
+      },
+      {
         id: 'prism-ml/Ternary-Bonsai-27B-gguf',
         name: 'Ternary Bonsai 27B · 2 Bit',
         datei: 'Ternary-Bonsai-27B-Q2_0.gguf',
@@ -87,14 +100,14 @@ export const EMPFEHLUNGEN = [
     bis: 32,
     modelle: [
       {
-        id: 'unsloth/Qwen3.6-27B-MTP-GGUF',
-        name: 'Qwen3.6 27B · 4 Bit',
-        datei: 'Qwen3.6-27B-Q4_K_M.gguf',
+        id: 'unsloth/gemma-4-31B-it-qat-GGUF',
+        name: 'Gemma 4 31B · 4 Bit QAT',
+        datei: 'gemma-4-31B-it-qat-UD-Q4_K_XL.gguf',
         art: 'gguf',
-        groesse: 17.1,
-        mmproj: 'mmproj-BF16.gguf',
-        mmproj_ziel: 'Qwen3.6-27B-mmproj-BF16.gguf',
-        warum: 'vier_bit',
+        groesse: 16.1,
+        mmproj: 'mmproj-F16.gguf',
+        mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
+        warum: 'werkzeug_flaggschiff',
       },
     ],
   },
@@ -102,14 +115,14 @@ export const EMPFEHLUNGEN = [
     bis: 64,
     modelle: [
       {
-        id: 'unsloth/Qwen3.6-35B-A3B-GGUF',
-        name: 'Qwen3.6 35B A3B · 8 Bit',
-        datei: 'Qwen3.6-35B-A3B-Q8_0.gguf',
+        id: 'unsloth/gemma-4-31B-it-GGUF',
+        name: 'Gemma 4 31B · 8 Bit',
+        datei: 'gemma-4-31B-it-UD-Q8_K_XL.gguf',
         art: 'gguf',
-        groesse: 36.9,
-        mmproj: 'mmproj-BF16.gguf',
-        mmproj_ziel: 'Qwen3.6-35B-A3B-mmproj-BF16.gguf',
-        warum: 'experten',
+        groesse: 35.0,
+        mmproj: 'mmproj-F16.gguf',
+        mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
+        warum: 'werkzeug_acht_bit',
       },
     ],
   },

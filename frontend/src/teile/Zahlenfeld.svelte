@@ -1,0 +1,111 @@
+<script>
+  /* A number field with the house's own steppers.
+
+     The browser's native spinners cannot be styled and sit in the fields
+     like a foreign body next to the select chevrons. So the input hides
+     them and carries two chevron buttons of its own — same stroke, same
+     colour as every other arrow in these forms. */
+  let {
+    wert = $bindable(0),
+    min = 0,
+    max = 999999,
+    schritt = 1,
+    id = '',
+    gesperrt = false,
+  } = $props()
+
+  function setzen(neu) {
+    wert = Math.min(max, Math.max(min, neu))
+  }
+</script>
+
+<div class="zahl" class:gesperrt>
+  <input
+    {id}
+    type="number"
+    bind:value={wert}
+    {min}
+    {max}
+    step={schritt}
+    disabled={gesperrt}
+  />
+  <span class="treppe">
+    <button
+      type="button"
+      tabindex="-1"
+      aria-label="+"
+      disabled={gesperrt}
+      onclick={() => setzen((Number(wert) || 0) + schritt)}
+    >
+      <svg width="11" height="7" viewBox="0 0 12 8" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 6.5 6 1.5l5 5" />
+      </svg>
+    </button>
+    <button
+      type="button"
+      tabindex="-1"
+      aria-label="−"
+      disabled={gesperrt}
+      onclick={() => setzen((Number(wert) || 0) - schritt)}
+    >
+      <svg width="11" height="7" viewBox="0 0 12 8" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1.5 6 6.5l5-5" />
+      </svg>
+    </button>
+  </span>
+</div>
+
+<style>
+  .zahl {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 32px;
+    border: 1px solid var(--linie-stark);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    font: 400 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 6px 4px 6px 10px;
+    text-align: right;
+    outline: none;
+    appearance: textfield;
+  }
+  input::-webkit-inner-spin-button,
+  input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+  .gesperrt input {
+    color: var(--text-still);
+  }
+  .treppe {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    padding: 2px 6px 2px 2px;
+  }
+  .treppe button {
+    display: inline-flex;
+    border: none;
+    background: none;
+    padding: 1px 2px;
+    color: var(--text-still);
+    cursor: pointer;
+  }
+  .treppe button:hover {
+    color: var(--text);
+  }
+  .treppe button:disabled {
+    color: var(--linie-stark);
+    cursor: default;
+  }
+</style>

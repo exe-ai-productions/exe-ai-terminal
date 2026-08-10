@@ -21,6 +21,7 @@ from app.config import EndpointConfig
 from app.i18n import t
 from app.modelldownload import DownloadFehler, Modelldownload
 from app.modellrunner import Modellrunner, RunnerFehler
+from app.systemspeicher import gesamt_gb
 from app.ordner_oeffnen import OeffnenNichtMoeglich, ordner_oeffnen
 from app.serverdownload import Serverdownload, ServerdownloadFehler
 
@@ -59,11 +60,16 @@ class Auskunft(BaseModel):
     # Vision companions in the folder. Their own list, not model entries:
     # they cannot start, but the window needs to know they are there.
     mmproj: list[str] = []
+    # The machine's memory — the honest ceiling any start plan has to fit.
+    speicher_gb: float | None = None
+    # What the running server holds right now — None while it is off.
+    belegt_gb: float | None = None
     laeuft: bool
     modell: str | None = None
     kontext: int | None = None
     schichten: int | None = None
     port: int | None = None
+    drafter: str | None = None
 
 
 class Start(BaseModel):
@@ -71,6 +77,9 @@ class Start(BaseModel):
     kontext: int = Field(8192, ge=512, le=1_048_576)
     schichten: int = Field(99, ge=0, le=999)
     port: int = Field(8080, ge=1024, le=65535)
+    # Optional draft model for speculative decoding — a small file from the
+    # same folder that guesses ahead while the big one only checks.
+    drafter: str | None = None
 
 
 def hole_runner(request: Request) -> Modellrunner:
@@ -95,11 +104,14 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         ordner=str(runner.ordner),
         modelle=[Modelldatei(name=m.name, groesse_gb=m.groesse_gb) for m in runner.modelle()],
         mmproj=runner.mmproj(),
+        speicher_gb=gesamt_gb(),
+        belegt_gb=runner.belegt_gb(),
         laeuft=runner.laeuft(),
         modell=lauf.modell if lauf else None,
         kontext=lauf.kontext if lauf else None,
         schichten=lauf.schichten if lauf else None,
         port=lauf.port if lauf else None,
+        drafter=lauf.drafter if lauf else None,
     )
 
 
@@ -117,7 +129,11 @@ async def starten(
 ) -> Auskunft:
     try:
         runner.starten(
-            daten.modell, kontext=daten.kontext, schichten=daten.schichten, port=daten.port
+            daten.modell,
+            kontext=daten.kontext,
+            schichten=daten.schichten,
+            port=daten.port,
+            drafter=daten.drafter,
         )
     except RunnerFehler as fehler:
         raise _fehler(fehler.grund, sprache) from None

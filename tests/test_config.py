@@ -97,3 +97,11 @@ def test_alle_drei_reasoning_formate_erlaubt():
             }
         )
         assert config.endpoints[0].reasoning_format == format_name
+
+
+def test_host_vorgabe_ist_loopback():
+    # A bare schema must bind locally — the network is opt-in, never a
+    # fallback.
+    from app.config import AppConfig
+
+    assert AppConfig().host == "127.0.0.1"

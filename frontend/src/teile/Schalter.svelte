@@ -52,7 +52,7 @@
     transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
   }
   .schalter[aria-pressed='true'] {
-    background: var(--text);
+    background: color-mix(in srgb, var(--text) 80%, var(--bg));
   }
   /* Red is reserved for taking something away, not for taste. */
   .schalter.eingriff[aria-pressed='true'] {
