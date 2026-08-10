@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import shutil
 import signal
 import socket
@@ -56,6 +57,14 @@ PROTOKOLL_ZEILEN = 400
 # take the model down mid-answer) — but after a restart the service must
 # find its own orphan again, or the next start dies quietly on a taken port.
 PID_DATEI = ".modellserver.pid"
+
+# The environment variable both sides share: the started llama-server reads
+# it as its API key, the provider reads it to sign requests. Loopback keeps
+# strangers out of the network; the key keeps out the browser on this very
+# machine, where any open web page may knock on localhost. It travels as
+# environment on purpose — on the command line it would sit in plain sight
+# in the process list and the window that shows the command.
+SCHLUESSEL_VARIABLE = "EXE_RUNNER_API_KEY"
 
 
 def _ist_llama_server(pid: int) -> bool:
@@ -116,22 +125,49 @@ def ist_mmproj(name: str) -> bool:
     return "mmproj" in name.lower()
 
 
+def ist_mtp(name: str) -> bool:
+    """A multi-token-prediction module, not a model.
+
+    It cannot chat on its own, but it is the best draft a model can get:
+    a few hundred megabytes trained alongside the big file to guess its
+    next words. Started with ``--spec-type draft-mtp`` it rides along;
+    offered as a model it would sit in the picker as one that never
+    answers.
+    """
+    return "mtp" in name.lower()
+
+
 def modelle_auflisten(ordner: Path) -> list[Modelldatei]:
     """The startable GGUF files in the model folder, largest first.
 
     Companion files are not models: vision projectors (mmproj) belong NEXT
-    to a model, and multi-token-prediction modules (mtp) are accelerator
-    parts llama-server cannot chat with — offered as models, both would sit
-    in the picker as entries that never answer.
+    to a model, and multi-token-prediction modules (mtp) ride along as
+    draft modules — offered as models, both would sit in the picker as
+    entries that never answer.
     """
     if not ordner.is_dir():
         return []
     dateien = [
         Modelldatei(name=p.name, groesse_gb=round(p.stat().st_size / 1e9, 1))
         for p in sorted(ordner.glob("*.gguf"))
-        if p.is_file() and not ist_mmproj(p.name) and "mtp" not in p.name.lower()
+        if p.is_file() and not ist_mmproj(p.name) and not ist_mtp(p.name)
     ]
     return sorted(dateien, key=lambda d: d.groesse_gb, reverse=True)
+
+
+def mtp_auflisten(ordner: Path) -> list[Modelldatei]:
+    """The draft modules lying in the folder, with their sizes.
+
+    Sizes ride along because the draft is a passenger in the memory plan —
+    a quarter gigabyte is honest weight, just not much of it.
+    """
+    if not ordner.is_dir():
+        return []
+    return [
+        Modelldatei(name=p.name, groesse_gb=round(p.stat().st_size / 1e9, 1))
+        for p in sorted(ordner.glob("*.gguf"))
+        if p.is_file() and ist_mtp(p.name) and not ist_mmproj(p.name)
+    ]
 
 
 def mmproj_auflisten(ordner: Path) -> list[str]:
@@ -210,6 +246,9 @@ class Modellrunner:
     def mmproj(self) -> list[str]:
         return mmproj_auflisten(self._ordner)
 
+    def mtp(self) -> list[Modelldatei]:
+        return mtp_auflisten(self._ordner)
+
     def laeuft(self) -> bool:
         return self._prozess is not None and self._prozess.poll() is None
 
@@ -245,6 +284,11 @@ class Modellrunner:
         zeile += startflags(modell)
         if drafter:
             zeile += ["--model-draft", str(self._ordner / drafter)]
+            # A prediction module needs its own mode; fed into the plain
+            # draft path it fails to build a context. A small sibling
+            # model is the plain path and needs no flag.
+            if ist_mtp(drafter):
+                zeile += ["--spec-type", "draft-mtp"]
         # A model whose eyes lie next to it gets them attached — that is the
         # whole difference between a vision model and the same model mute.
         augen = passende_mmproj(self._ordner, modell)
@@ -292,12 +336,17 @@ class Modellrunner:
                     raise RunnerFehler("port_belegt")
 
             self._protokoll.clear()
+            # A fresh key per start; the service keeps it in its own
+            # environment, where the provider picks it up to sign requests.
+            schluessel = secrets.token_urlsafe(24)
+            os.environ[SCHLUESSEL_VARIABLE] = schluessel
             self._prozess = subprocess.Popen(
                 self.befehl(modell, kontext, schichten, port, drafter),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env={**os.environ, "LLAMA_API_KEY": schluessel},
                 # No shell, and its own process group so stopping takes the
                 # whole thing and not just the parent.
                 start_new_session=True,
@@ -333,6 +382,8 @@ class Modellrunner:
             self._prozess = None
             self._lauf = None
             self._pid_vergessen()
+            # The key dies with the server it belonged to.
+            os.environ.pop(SCHLUESSEL_VARIABLE, None)
             return True
 
     # --- The orphan after a service restart --------------------------------

@@ -283,7 +283,7 @@
   .zeile:hover, .zeile.gewaehlt { background: var(--linie); }
   .wer { flex: 1; min-width: 0; }
   .mname {
-    font-size: 12.5px;
+    font-size: 13.5px;
     font-family: var(--schrift-fest);
     white-space: nowrap;
     overflow: hidden;
@@ -311,14 +311,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .unter { font-size: 11.5px; color: var(--text-still); margin-top: 2px; }
+  .unter { font-size: 12.5px; color: var(--text-leise); margin-top: 2px; }
 
   h4 {
     margin: 14px 0 6px;
-    font-size: 10.5px;
+    font-size: 11.5px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-still);
+    color: var(--text-leise);
     font-weight: 600;
   }
 

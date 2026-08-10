@@ -112,6 +112,7 @@
   <li><strong>Manage a chat:</strong> right-click its row — pin, rename, delete. Hovering a row shows the pin directly.</li>
   <li><strong>Hide the sidebar:</strong> <kbd>⌘B</kbd>, or grab the seam between sidebar and chat.</li>
   <li><strong>Under your own bubble:</strong> a copy button, and on your last question a <em>send again</em> arrow — it replaces the last answer, or fetches a missing one after a stop.</li>
+  <li><strong>A blue dot on a chat's row</strong> means an answer finished while you were looking elsewhere. It clears the moment you open the chat.</li>
   <li>All chats live <strong>on the server</strong>, in the terminal's own database. Your browser only keeps per-device preferences: theme, language, last model.</li>
 </ul>
 
@@ -124,6 +125,9 @@
 <h3>Getting a model</h3>
 <p>Under <strong>Local → Get a model</strong> there are four steps, by how much memory your machine has, with a suggestion in each. One button fetches it; a bar shows how far it has come. Nothing to install, nothing to type.</p>
 <p>Under <strong>Local → Model server</strong> it starts. Everything that decides how it behaves stands there as a field with a sentence beside it: how much it remembers, how much of it sits on the graphics card, which port it answers on. If a start goes wrong, the log unfolds underneath and says why.</p>
+<p>Above the fields the window shows <strong>VRAM</strong> — the memory this machine has — and <strong>Expected VRAM</strong>, a live estimate of what the start you are shaping will need. The estimate follows your choices as you change them; if it crowds the first number, pick a smaller model or fewer layers.</p>
+<p><strong>Draft model</strong> is an optional passenger: a small sibling of the main model that guesses the next words ahead so the big one only has to check them. Replies get faster; the answers themselves do not change. The list only offers small models from the same family, because guessing only helps when both speak the same way.</p>
+<p>While a server runs, the menu bar shows <strong>In use</strong> with the memory it is really taking, and the small dot beside the help button turns green. Red means none is running; <strong>Local → Model server</strong> is where it starts and stops.</p>
 <p>The program needs <code>llama-server</code> for this — a small free program that does the actual computing. If it is missing, the window says so instead of pretending.</p>
 
 <h3>Cloud providers</h3>
@@ -166,7 +170,7 @@
 <ul>
   <li>Nothing is interactive. A command that waits for input hangs until it is stopped, so anything long-running belongs in the background.</li>
   <li>A few commands are refused outright — <code>sudo</code>, wiping a disk, piping something off the net straight into a shell. That is not a question you can answer with yes.</li>
-  <li>Reaching outside your shared folders stops and asks. <strong>It is the only thing in the program that does.</strong></li>
+  <li>Reaching outside your shared folders stops and asks. <strong>It is the only thing in the program that does.</strong> For a longer stretch of such work the question offers <strong>Always allow in this chat</strong> — that trust belongs to the one chat and ends with it.</li>
 </ul>
 <h3>Web search</h3>
 <p><strong>Exe Web Search</strong> is on from the first start. Nothing to install, no account, no key. When a question needs something current — or something that happened after the model finished learning — the assistant searches, picks what looks useful, and reads those pages before answering.</p>
@@ -248,6 +252,8 @@ You are a concise researcher. …</pre>
 <h2 id="einstellungen">11 · Appearance, language, installing</h2>
 <ul>
   <li><strong>Settings → Appearance:</strong> light, dark or follow the device; speech bubbles filled or as an outline; and the display language, per device.</li>
+  <li><strong>Text size:</strong> three steps — Default, Large, Larger. Chat text and column grow together, so lines keep their length while the letters gain. Reasoning rows and tool rows stay as they are.</li>
+  <li><strong>Chat bubbles:</strong> pick a colour for your own messages. The text inside flips between light and dark on its own, so every colour stays readable. <em>Default</em> brings the original back. Both choices are remembered per device.</li>
   <li><strong>Settings → Files:</strong> the configuration and your credentials, in plain text, for when something needs changing by hand.</li>
   <li><strong>Install as an app:</strong> open the terminal over HTTPS and use your browser's “Install” or “Add to Home Screen”. It works on phone and tablet.</li>
 </ul>

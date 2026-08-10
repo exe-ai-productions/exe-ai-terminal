@@ -61,7 +61,12 @@
     <div class="popup" class:liste={art === 'liste'} class:vorschau={art === 'vorschau'}
          style="width:min({BREITE[art] ?? BREITE.frage}, 92vw)"
          transition:scale={{ duration: 190, start: 0.97 }}>
-      <h3>{@render symbol?.()}{titel}</h3>
+      <!-- A window whose body carries its own drawn heading passes an
+           empty title; a second plain-text title above it would say the
+           same thing twice. -->
+      {#if titel || symbol}
+        <h3>{@render symbol?.()}{titel}</h3>
+      {/if}
       <div class="leib">{@render children?.()}</div>
     </div>
   </div>

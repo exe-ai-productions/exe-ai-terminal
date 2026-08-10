@@ -20,7 +20,7 @@ from app.api.abhaengigkeiten import hole_sprache
 from app.config import EndpointConfig
 from app.i18n import t
 from app.modelldownload import DownloadFehler, Modelldownload
-from app.modellrunner import Modellrunner, RunnerFehler
+from app.modellrunner import Modellrunner, RunnerFehler, SCHLUESSEL_VARIABLE
 from app.systemspeicher import gesamt_gb
 from app.ordner_oeffnen import OeffnenNichtMoeglich, ordner_oeffnen
 from app.serverdownload import Serverdownload, ServerdownloadFehler
@@ -45,6 +45,10 @@ def _runner_endpunkt(port: int) -> EndpointConfig:
         provider="openai_compatible",
         parameter_dialect="llama_cpp",
         group="local",
+        # The runner hands its server a fresh key at every start; requests
+        # without it are turned away — the lock against web pages knocking
+        # on localhost from inside the user's browser.
+        api_key_env=SCHLUESSEL_VARIABLE,
     )
 
 
@@ -60,6 +64,10 @@ class Auskunft(BaseModel):
     # Vision companions in the folder. Their own list, not model entries:
     # they cannot start, but the window needs to know they are there.
     mmproj: list[str] = []
+    # Prediction modules in the folder — the built-in drafts. Their own
+    # list for the same reason, with sizes because a draft is a passenger
+    # in the memory plan.
+    mtp: list[Modelldatei] = []
     # The machine's memory — the honest ceiling any start plan has to fit.
     speicher_gb: float | None = None
     # What the running server holds right now — None while it is off.
@@ -104,6 +112,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         ordner=str(runner.ordner),
         modelle=[Modelldatei(name=m.name, groesse_gb=m.groesse_gb) for m in runner.modelle()],
         mmproj=runner.mmproj(),
+        mtp=[Modelldatei(name=m.name, groesse_gb=m.groesse_gb) for m in runner.mtp()],
         speicher_gb=gesamt_gb(),
         belegt_gb=runner.belegt_gb(),
         laeuft=runner.laeuft(),

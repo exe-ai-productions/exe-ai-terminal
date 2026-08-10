@@ -25,6 +25,15 @@
   other. The download fetches it right after the model; the runner attaches
   it by that shared name.
 
+  `drafter` is the small companion that makes answers faster: a prediction
+  module (mtp) trained alongside the model, a few hundred megabytes, or a
+  tiny sibling model where the family ships one — never a mid-sized model,
+  because a draft that costs gigabytes eats the very memory it was meant
+  to save. `drafter_ziel` names it locally (two quants of one module would
+  otherwise collide), `drafter_repo` says where it lives when that is not
+  the model's own repository. It rides the same download button, third in
+  line.
+
   A step that loses its model keeps its place with `modelle: []`. An empty
   step says "we have not chosen yet", which is true; leaving it out entirely
   would say "there is nothing for your machine", which is not.
@@ -67,6 +76,9 @@ export const EMPFEHLUNGEN = [
         groesse: 3.8,
         mmproj: 'Bonsai-27B-mmproj-Q8_0.gguf',
         mmproj_ziel: 'Bonsai-27B-mmproj-Q8_0.gguf',
+        drafter_repo: 'prism-ml/Bonsai-1.7B-gguf',
+        drafter: 'Bonsai-1.7B-Q1_0.gguf',
+        drafter_ziel: 'Bonsai-1.7B-Q1_0.gguf',
         warum: 'ein_bit',
       },
     ],
@@ -82,6 +94,8 @@ export const EMPFEHLUNGEN = [
         groesse: 6.3,
         mmproj: 'mmproj-F16.gguf',
         mmproj_ziel: 'gemma-4-12B-it-qat-mmproj-F16.gguf',
+        drafter: 'mtp-gemma-4-12B-it.gguf',
+        drafter_ziel: 'mtp-gemma-4-12B-it.gguf',
         warum: 'werkzeug_qat',
       },
       {
@@ -107,6 +121,8 @@ export const EMPFEHLUNGEN = [
         groesse: 16.1,
         mmproj: 'mmproj-F16.gguf',
         mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
+        drafter: 'mtp-gemma-4-31B-it.gguf',
+        drafter_ziel: 'mtp-gemma-4-31B-it-qat.gguf',
         warum: 'werkzeug_flaggschiff',
       },
     ],
@@ -122,6 +138,8 @@ export const EMPFEHLUNGEN = [
         groesse: 35.0,
         mmproj: 'mmproj-F16.gguf',
         mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
+        drafter: 'mtp-gemma-4-31B-it.gguf',
+        drafter_ziel: 'mtp-gemma-4-31B-it.gguf',
         warum: 'werkzeug_acht_bit',
       },
     ],

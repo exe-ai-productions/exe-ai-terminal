@@ -38,7 +38,14 @@
   import Verbindungen from './Verbindungen.svelte'
   import Schalter from './Schalter.svelte'
   import { api } from '../lib/api.js'
-  import { zustand, aktuellerChat, chatAendern, konturSetzen, melde, frage, modelleLaden } from '../lib/zustand.svelte.js'
+  import { zustand, aktuellerChat, chatAendern, konturSetzen, schriftSetzen, blasenfarbeSetzen, melde, frage, modelleLaden } from '../lib/zustand.svelte.js'
+
+  /* The picker needs a concrete start value; empty choice shows the house
+     bubble colour of the current mode. */
+  function blasenStandard() {
+    const wert = getComputedStyle(document.documentElement).getPropertyValue('--blase').trim()
+    return /^#[0-9a-fA-F]{6}$/.test(wert) ? wert : '#232320'
+  }
   import {
     t, gemerkteSprachwahl, spracheWaehlen, spracheZuruecksetzen,
   } from '../lib/texte.svelte.js'
@@ -534,6 +541,40 @@ once the question is answered.
               onschalten={(an) => konturSetzen(an)}
             />
           </div>
+
+          <div class="einstellkachel">
+            <div class="zeilentext">
+              {t('einstellungen.schrift')}
+              <span class="hinweis">{t('einstellungen.schrift_hinweis')}</span>
+            </div>
+            <div class="segment">
+              {#each [['standard', 'einstellungen.schrift_standard'], ['gross', 'einstellungen.schrift_gross'], ['groesser', 'einstellungen.schrift_groesser']] as [wert, beschriftung] (wert)}
+                <button aria-pressed={zustand.schrift === wert} onclick={() => schriftSetzen(wert)}>
+                  {t(beschriftung)}
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <div class="einstellkachel">
+            <div class="zeilentext">
+              {t('einstellungen.blase')}
+              <span class="hinweis">{t('einstellungen.blase_hinweis')}</span>
+            </div>
+            <div class="farbwahl">
+              {#if zustand.blasenfarbe}
+                <button class="ruecksetzer" onclick={() => blasenfarbeSetzen('')}>
+                  {t('einstellungen.blase_standard')}
+                </button>
+              {/if}
+              <input
+                type="color"
+                aria-label={t('einstellungen.blase')}
+                value={zustand.blasenfarbe || blasenStandard()}
+                oninput={(e) => blasenfarbeSetzen(e.currentTarget.value)}
+              />
+            </div>
+          </div>
         </div>
       {:else if istSkills}
         <Skillmaske />
@@ -917,6 +958,35 @@ once the question is answered.
     border: 1px solid var(--linie);
     border-radius: 9px;
     padding: 2px;
+  }
+  .farbwahl {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  /* The native swatch, dressed to the house: the browser paints the colour,
+     the frame is ours. */
+  .farbwahl input[type='color'] {
+    width: 44px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--linie-stark);
+    border-radius: 9px;
+    background: var(--bg-seite);
+    cursor: pointer;
+  }
+  .ruecksetzer {
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--text-leise);
+    background: none;
+    border: 1px solid var(--linie-stark);
+    border-radius: 9px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .ruecksetzer:hover {
+    color: var(--text);
   }
   .segment button {
     border: none;
