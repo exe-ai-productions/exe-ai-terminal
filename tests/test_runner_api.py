@@ -28,6 +28,9 @@ class StummerRunner:
     def mmproj(self):
         return []
 
+    def mtp(self):
+        return []
+
     def laeuft(self):
         return self._lauf is not None
 

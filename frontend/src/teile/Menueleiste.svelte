@@ -197,7 +197,7 @@
     onclick={(e) => {
       e.stopPropagation()
       offen = null
-      window.open('/hilfe/', '_blank')
+      window.open('https://exe-hq.net/docs/', '_blank')
     }}
   >
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"

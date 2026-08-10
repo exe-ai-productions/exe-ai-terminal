@@ -61,7 +61,12 @@
      when both models speak the same token language, which in practice means
      siblings of one family — and it only pays when the guesser is a
      fraction of the checker. So: a long shared name prefix, and at most
-     sixty percent of the size. Most models rightly end up with none. */
+     sixty percent of the size. Most models rightly end up with none.
+
+     Prediction modules (mtp files) come first: trained alongside their
+     model, a few hundred megabytes, the best draft there is. Their name
+     carries an mtp marker in front, so the family match strips it before
+     comparing. */
   const drafterKandidaten = $derived.by(() => {
     const haupt = (auskunft?.modelle ?? []).find((m) => m.name === modell)
     if (!haupt) return []
@@ -72,12 +77,16 @@
       while (i < x.length && i < y.length && x[i] === y[i]) i++
       return i
     }
-    return (auskunft?.modelle ?? []).filter(
+    const module = (auskunft?.mtp ?? []).filter(
+      (m) => gemeinsam(m.name.replace(/^mtp[-._]/i, ''), haupt.name) >= 5
+    )
+    const geschwister = (auskunft?.modelle ?? []).filter(
       (m) =>
         m.name !== modell &&
         gemeinsam(m.name, haupt.name) >= 5 &&
         m.groesse_gb <= haupt.groesse_gb * 0.6
     )
+    return [...module, ...geschwister]
   })
   $effect(() => {
     if (drafter && !drafterKandidaten.some((m) => m.name === drafter)) drafter = ''
@@ -89,7 +98,9 @@
   const schaetzung = $derived.by(() => {
     const haupt = (auskunft?.modelle ?? []).find((m) => m.name === modell)
     if (!haupt || !kontext) return null
-    const beifahrer = (auskunft?.modelle ?? []).find((m) => m.name === drafter)
+    const beifahrer =
+      (auskunft?.modelle ?? []).find((m) => m.name === drafter) ??
+      (auskunft?.mtp ?? []).find((m) => m.name === drafter)
     return speicherSchaetzung(haupt.groesse_gb, kontext, beifahrer?.groesse_gb ?? 0)
   })
   $effect(() => {

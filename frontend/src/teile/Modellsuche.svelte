@@ -29,10 +29,11 @@
   let repoAugen = $state(null)
   let dateienLaden = $state(false)
 
-  /* The eyes that follow the model: once the model file has arrived, its
-     vision projector is fetched next — same button, nobody has to know
-     what an mmproj is. One at a time, like the download itself. */
-  let nachzug = null
+  /* The companions that follow the model: once the model file has
+     arrived, its vision projector and its draft module are fetched next,
+     one after the other — same button, nobody has to know what an mmproj
+     or an mtp is. One at a time, like the download itself. */
+  let nachzuege = []
 
   const laedt = $derived(Boolean(stand) && !stand.fertig && !stand.fehler)
 
@@ -62,7 +63,12 @@
     if (!laufend) return false
     if (
       EMPFEHLUNGEN.some((s) =>
-        s.modelle.some((m) => laufend.datei === m.datei || laufend.datei === m.mmproj_ziel)
+        s.modelle.some(
+          (m) =>
+            laufend.datei === m.datei ||
+            laufend.datei === m.mmproj_ziel ||
+            laufend.datei === m.drafter_ziel
+        )
       )
     )
       return true
@@ -88,12 +94,23 @@
         stand = await api.modellHolenStand()
         tempoMessen(stand && !stand.fertig && !stand.fehler ? stand : null)
         const auskunft = await api.runnerAuskunft()
-        vorhanden = [...auskunft.modelle.map((m) => m.name), ...(auskunft.mmproj ?? [])]
-        if (stand?.fertig && nachzug && stand.datei === nachzug.datei) {
-          const n = nachzug
-          nachzug = null
-          if (!vorhanden.includes(n.ziel)) {
-            stand = await api.modellHolen(n.repo, n.mmproj, n.ziel)
+        vorhanden = [
+          ...auskunft.modelle.map((m) => m.name),
+          ...(auskunft.mmproj ?? []),
+          ...(auskunft.mtp ?? []).map((m) => m.name),
+        ]
+        if (stand?.fertig && !stand.fehler && nachzuege.length) {
+          while (nachzuege.length && vorhanden.includes(nachzuege[0].ziel)) {
+            nachzuege.shift()
+          }
+          const n = nachzuege.shift()
+          if (n) {
+            try {
+              stand = await api.modellHolen(n.repo, n.datei, n.ziel)
+            } catch {
+              // A broken link ends the chain; the button offers the rest.
+              nachzuege = []
+            }
           }
         }
       } catch {
@@ -167,25 +184,35 @@
     modellDatei.replace(/\.gguf$/i, '') +
     '-' + mmprojDatei.slice(mmprojDatei.toLowerCase().indexOf('mmproj'))
 
-  async function holen(repo, datei, augen = null, ziel = null) {
+  async function holen(repo, datei, ziel = null, weitere = []) {
     try {
       stand = await api.modellHolen(repo, datei, ziel)
-      nachzug = augen ? { repo, datei, ...augen } : null
+      nachzuege = weitere
     } catch (fehler) {
       melde(fehler.message, 'fehler')
     }
   }
 
-  /* The button fetches what is missing — the model, or only its eyes when
-     the model already arrived. The follow-up marker lives in page memory,
-     so a reload in mid-download would otherwise strand a model without
-     its projector, with a button that keeps failing on "already there". */
-  function fehlendesHolen(repo, datei, mmproj, mmprojZiel) {
+  /* The button fetches what is missing — the model, or only the
+     companions that never arrived. The follow-up list lives in page
+     memory, so a reload in mid-download would otherwise strand a model
+     without its projector or its draft, with a button that keeps failing
+     on "already there". */
+  function fehlendesHolen(repo, datei, teile = []) {
+    const fehlend = teile.filter((t) => t && t.datei && !istDa(t.ziel))
     if (!istDa(datei)) {
-      return holen(repo, datei, mmproj ? { mmproj, ziel: mmprojZiel } : null)
+      return holen(repo, datei, null, fehlend)
     }
-    return holen(repo, mmproj, null, mmprojZiel)
+    const [erstes, ...rest] = fehlend
+    if (erstes) return holen(erstes.repo, erstes.datei, erstes.ziel, rest)
   }
+
+  /* A catalogue entry's companions as fetch jobs: the eyes from the same
+     repository, the draft from its own when it names one. */
+  const begleiter = (m) => [
+    m.mmproj ? { repo: m.id, datei: m.mmproj, ziel: m.mmproj_ziel } : null,
+    m.drafter ? { repo: m.drafter_repo ?? m.id, datei: m.drafter, ziel: m.drafter_ziel } : null,
+  ]
 
   async function abbrechen() {
     await api.modellHolenAbbrechen()
@@ -235,20 +262,20 @@
     <div class="stufe">
       <div class="stufenkopf">{t('modell.bis_gb', { gb: stufe.bis })}</div>
       {#each stufe.modelle as m}
-        {@const dran = wirdGeholt(m.datei) || (m.mmproj_ziel && wirdGeholt(m.mmproj_ziel))}
+        {@const dran = wirdGeholt(m.datei) || (m.mmproj_ziel && wirdGeholt(m.mmproj_ziel)) || (m.drafter_ziel && wirdGeholt(m.drafter_ziel))}
         <div class="zeile">
           <span class="wer">
             <span class="name">{m.name}</span>
             <span class="unter">{t('modell.' + m.warum)} · {t('modell.gb', { zahl: m.groesse })}</span>
           </span>
-          {#if istDa(m.datei) && (!m.mmproj_ziel || istDa(m.mmproj_ziel))}
+          {#if istDa(m.datei) && (!m.mmproj_ziel || istDa(m.mmproj_ziel)) && (!m.drafter_ziel || istDa(m.drafter_ziel))}
             <span class="fertig">{t('modell.im_ordner')}</span>
           {:else if dran}
             <button class="knopf still" onclick={abbrechen}>{t('modell.abbrechen')}</button>
           {:else}
             <button
               class="knopf wichtig"
-              onclick={() => fehlendesHolen(m.id, m.datei, m.mmproj, m.mmproj_ziel)}
+              onclick={() => fehlendesHolen(m.id, m.datei, begleiter(m))}
               disabled={laedt}
             >
               {t('modell.herunterladen')}
@@ -261,10 +288,10 @@
           <div class="balkenzeile">
             <span class="balken"><i style="width:{Math.round(stand.anteil * 100)}%"></i></span>
             <span class="balkenzahl">
-              {m.mmproj_ziel && stand.datei === m.mmproj_ziel ? t('modell.augen') + ' · ' : ''}{gb(stand.geladen)} / {gb(stand.gesamt)} GB · {Math.round(stand.anteil * 100)} %{mbs ? ' · ' + mbs : ''}
+              {m.mmproj_ziel && stand.datei === m.mmproj_ziel ? t('modell.augen') + ' · ' : m.drafter_ziel && stand.datei === m.drafter_ziel ? t('modell.feld_drafter') + ' · ' : ''}{gb(stand.geladen)} / {gb(stand.gesamt)} GB · {Math.round(stand.anteil * 100)} %{mbs ? ' · ' + mbs : ''}
             </span>
           </div>
-        {:else if schiefGegangen(m.datei) || (m.mmproj_ziel && schiefGegangen(m.mmproj_ziel))}
+        {:else if schiefGegangen(m.datei) || (m.mmproj_ziel && schiefGegangen(m.mmproj_ziel)) || (m.drafter_ziel && schiefGegangen(m.drafter_ziel))}
           <!-- Red is the house colour for "failed" — a fact, said once,
                replaced by the next attempt. -->
           <div class="fehlzeile">{t('fehler.download_fehlgeschlagen')}</div>
@@ -326,7 +353,7 @@
               {:else}
                 <button
                   class="knopf wichtig"
-                  onclick={() => fehlendesHolen(f.id, d.datei, repoAugen?.datei, ziel)}
+                  onclick={() => fehlendesHolen(f.id, d.datei, repoAugen ? [{ repo: f.id, datei: repoAugen.datei, ziel }] : [])}
                   disabled={laedt}
                 >
                   {t('modell.herunterladen')}
@@ -382,10 +409,10 @@
 <style>
   .tafel { display: flex; flex-direction: column; }
   h4 {
-    font-size: 10.5px;
+    font-size: 11.5px;
     letter-spacing: 0.09em;
     text-transform: uppercase;
-    color: var(--text-still);
+    color: var(--text-leise);
     font-weight: 500;
     margin: 4px 0 8px;
   }
@@ -393,9 +420,9 @@
 
   .stufe { margin-bottom: 10px; }
   .stufenkopf {
-    font-size: 11.5px;
-    color: var(--text-still);
-    padding: 0 2px 4px;
+    font-size: 13px;
+    color: var(--text-leise);
+    padding: 0 2px 6px;
   }
   .offen-noch {
     font-size: 12px;
@@ -419,7 +446,7 @@
   .wer { flex: 1; min-width: 0; }
   .name {
     display: block;
-    font-size: 13.5px;
+    font-size: 15px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

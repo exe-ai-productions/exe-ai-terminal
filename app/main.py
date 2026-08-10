@@ -203,6 +203,11 @@ def app_erstellen(config: Config | None = None) -> FastAPI:
     # with an error along the way.
     app.add_middleware(ProtokollMiddleware)
 
+    # A browser on this machine can aim any web page at loopback; writes
+    # from foreign origins are turned away — see app/herkunftswaechter.py.
+    from app.herkunftswaechter import Herkunftswaechter
+    app.add_middleware(Herkunftswaechter)
+
     # Beta latch: locks the write-access settings. The form in the UI shows
     # it, this latch enforces it — see app/beta.py.
     if config.features.beta_lock:

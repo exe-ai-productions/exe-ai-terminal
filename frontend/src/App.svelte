@@ -726,8 +726,9 @@
     );
   }
   .spur {
-    max-width: 720px;
+    max-width: var(--chat-breite, 720px);
     margin: 0 auto;
+    font-size: var(--chat-schrift, 14px);
     /* More air at the bottom than at the top: the last bubble has to be
        able to stand above the fade-out, otherwise its end would hang in
        the gradient permanently. */

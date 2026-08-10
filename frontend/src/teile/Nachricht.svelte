@@ -375,7 +375,10 @@
   .von-mir {
     align-self: flex-end;
     max-width: 76%;
-    background: var(--blase);
+    /* The one surface the user may recolour; the ink flips with the
+       ground's luminance so no choice can make it unreadable. */
+    background: var(--blase-eigen, var(--blase));
+    color: var(--blase-eigen-text, inherit);
     border-radius: 16px;
     padding: 10px 15px;
     line-height: 1.55;
@@ -668,7 +671,8 @@
      the mode. */
   :global(:root[data-blasen='kontur']) .von-mir {
     background: transparent;
-    box-shadow: inset 0 0 0 1px var(--linie-stark);
+    color: inherit;
+    box-shadow: inset 0 0 0 1px var(--blase-eigen, var(--linie-stark));
   }
   /* Keeps the footer at height so the text doesn't jump when finishing. */
   .platzhalter {

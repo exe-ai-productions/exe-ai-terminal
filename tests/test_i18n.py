@@ -44,7 +44,7 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         "app.name", "beta.marke", "app.ok",
         # Words English and German share unchanged.
         "chat.alle", "menue.chat", "menue.cloud", "jobs.bereich_chats",
-        "editor.quelle_tools", "werkzeuge.eingebaut",
+        "editor.quelle_tools", "werkzeuge.eingebaut", "modell.server_offline",
         "editor.gruppe_app", "editor.gruppe_prompts", "jobs.agent_waehlen",
         "einstellungen.auto", "parameter.aus_global",
         # Language names stand in their own language, on purpose.

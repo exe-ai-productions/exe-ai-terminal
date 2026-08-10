@@ -32,6 +32,8 @@ export const zustand = $state({
   features: { mcp: true, image_generation: true, document_upload: true },
   // Look of the speech bubbles: filled or outline only (3.11).
   kontur: localStorage.getItem('kontur') === 'an',
+  schrift: localStorage.getItem('schrift') || 'standard',
+  blasenfarbe: localStorage.getItem('blasenfarbe') || '',
   // Pending confirmation before a tool runs (1.6). At most one at a time:
   // the server waits as long as it stands.
   /* The two model windows: local (what runs here) and cloud (providers).
@@ -223,6 +225,38 @@ export function konturSetzen(an) {
   else document.documentElement.removeAttribute('data-blasen')
 }
 konturSetzen(zustand.kontur)
+
+/* Text size of the chat contents, three steps. The column widens with the
+   letters so a line keeps its length in characters — bigger type on more
+   room, not fewer words per line. Root attribute, like the mode. */
+export function schriftSetzen(stufe) {
+  zustand.schrift = stufe
+  localStorage.setItem('schrift', stufe)
+  if (stufe && stufe !== 'standard') document.documentElement.setAttribute('data-schrift', stufe)
+  else document.documentElement.removeAttribute('data-schrift')
+}
+schriftSetzen(zustand.schrift)
+
+/* The user's own bubble colour. Only that one surface — replies, tool
+   chips and everything else keep the house palette. The text inside flips
+   between the two ink colours by the luminance of the chosen ground, so
+   no choice can make a bubble unreadable. */
+export function blasenfarbeSetzen(farbe) {
+  zustand.blasenfarbe = farbe || ''
+  const wurzel = document.documentElement.style
+  if (!farbe) {
+    localStorage.removeItem('blasenfarbe')
+    wurzel.removeProperty('--blase-eigen')
+    wurzel.removeProperty('--blase-eigen-text')
+    return
+  }
+  localStorage.setItem('blasenfarbe', farbe)
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(farbe.slice(i, i + 2), 16) / 255)
+  const hell = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  wurzel.setProperty('--blase-eigen', farbe)
+  wurzel.setProperty('--blase-eigen-text', hell > 0.45 ? '#1a1a18' : '#ecebe6')
+}
+blasenfarbeSetzen(zustand.blasenfarbe)
 
 /* One toggle for three ways in: the handle on the seam, ⌘B, and the icon
    in the menu bar on a narrow screen. On the desktop the sidebar goes away

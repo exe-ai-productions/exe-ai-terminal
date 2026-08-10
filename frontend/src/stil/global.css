@@ -156,3 +156,15 @@ button {
 *::-webkit-scrollbar {
   display: none;
 }
+
+/* Text size of the chat, three steps. The column grows with the letters so
+   a line keeps roughly its length in characters — bigger type on more room,
+   not fewer words per line. Set from the appearance settings. */
+:root[data-schrift='gross'] {
+  --chat-schrift: 15.5px;
+  --chat-breite: 810px;
+}
+:root[data-schrift='groesser'] {
+  --chat-schrift: 17px;
+  --chat-breite: 890px;
+}
