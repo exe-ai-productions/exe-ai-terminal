@@ -46,7 +46,7 @@
   })
 </script>
 
-<Fenster bind:offen titel={t('menue.cloud')} art="liste">
+<Fenster bind:offen titel={t('modell.cloud_titel')} art="liste">
   <div class="zaehler">{t('liste.gewaehlt_zahl').replace('{zahl}', anzahlGewaehlt)}</div>
 
   <div class="zwei">

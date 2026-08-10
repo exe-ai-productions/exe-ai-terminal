@@ -83,10 +83,17 @@ def _browser_oeffnen(port: int) -> None:
     Preferably as a window of its own (app/appfenster.py); the plain
     browser tab is the fallback for machines without one.
     """
+    import os
     import time
     import webbrowser
 
     from app.appfenster import oeffnen
+
+    # The native shell sets this when it starts the service as its sidecar:
+    # the shell already is the window, a second one would greet every user
+    # twice.
+    if os.environ.get("EXE_AI_TERMINAL_HEADLESS"):
+        return
 
     ende = time.time() + 30
     while time.time() < ende:

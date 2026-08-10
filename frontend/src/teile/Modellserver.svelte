@@ -12,6 +12,8 @@
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
   import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
+  import { speicherSchaetzung } from '../lib/speicherschaetzung.js'
+  import Zahlenfeld from './Zahlenfeld.svelte'
 
   let auskunft = $state(null)
   let protokoll = $state([])
@@ -53,6 +55,47 @@
   let schichten = $state(99)
   let port = $state(8080)
   let modell = $state('')
+  let drafter = $state('')
+
+  /* Draft candidates: same family, clearly smaller. Speculation only works
+     when both models speak the same token language, which in practice means
+     siblings of one family — and it only pays when the guesser is a
+     fraction of the checker. So: a long shared name prefix, and at most
+     sixty percent of the size. Most models rightly end up with none. */
+  const drafterKandidaten = $derived.by(() => {
+    const haupt = (auskunft?.modelle ?? []).find((m) => m.name === modell)
+    if (!haupt) return []
+    const gemeinsam = (a, b) => {
+      const x = a.toLowerCase()
+      const y = b.toLowerCase()
+      let i = 0
+      while (i < x.length && i < y.length && x[i] === y[i]) i++
+      return i
+    }
+    return (auskunft?.modelle ?? []).filter(
+      (m) =>
+        m.name !== modell &&
+        gemeinsam(m.name, haupt.name) >= 5 &&
+        m.groesse_gb <= haupt.groesse_gb * 0.6
+    )
+  })
+  $effect(() => {
+    if (drafter && !drafterKandidaten.some((m) => m.name === drafter)) drafter = ''
+  })
+
+  /* What the chosen combination will roughly take. Lives in the shared
+     state because the window head shows it next to the machine total — the
+     plan and the ceiling belong side by side. */
+  const schaetzung = $derived.by(() => {
+    const haupt = (auskunft?.modelle ?? []).find((m) => m.name === modell)
+    if (!haupt || !kontext) return null
+    const beifahrer = (auskunft?.modelle ?? []).find((m) => m.name === drafter)
+    return speicherSchaetzung(haupt.groesse_gb, kontext, beifahrer?.groesse_gb ?? 0)
+  })
+  $effect(() => {
+    zustand.serverPlan = laeuft ? null : schaetzung
+    return () => (zustand.serverPlan = null)
+  })
 
   const laeuft = $derived(Boolean(auskunft?.laeuft))
   const hatProgramm = $derived(Boolean(auskunft?.programm))
@@ -66,6 +109,7 @@
         kontext = auskunft.kontext
         schichten = auskunft.schichten
         port = auskunft.port
+        drafter = auskunft.drafter || ''
       }
       if (protokollOffen || auskunft.laeuft) protokoll = await api.runnerProtokoll()
       /* While the server program is missing or arriving, watch the fetch —
@@ -101,7 +145,7 @@
   async function starten() {
     arbeitet = true
     try {
-      auskunft = await api.runnerStarten({ modell, kontext, schichten, port })
+      auskunft = await api.runnerStarten({ modell, kontext, schichten, port, drafter: drafter || null })
       protokollOffen = true
       await modelleLaden(true)
     } catch (fehler) {
@@ -161,17 +205,23 @@
         {/each}
       </select>
 
+      <label for="rs-drafter">{t('modell.feld_drafter')}<span>{t('modell.feld_drafter_hilfe')}</span></label>
+      <select id="rs-drafter" class="wert" bind:value={drafter} disabled={laeuft}>
+        <option value="">{t('modell.drafter_keiner')}</option>
+        {#each drafterKandidaten as m}
+          <option value={m.name}>{m.name} · {m.groesse_gb} GB</option>
+        {/each}
+      </select>
+
       <label for="rs-kontext">{t('modell.feld_kontext')}<span>{t('modell.feld_kontext_hilfe')}</span></label>
-      <input id="rs-kontext" class="wert" type="number" bind:value={kontext} disabled={laeuft}
-             min="512" max="1048576" step="1024" />
+      <Zahlenfeld id="rs-kontext" bind:wert={kontext} gesperrt={laeuft}
+                  min={512} max={1048576} schritt={1024} />
 
       <label for="rs-schichten">{t('modell.feld_schichten')}<span>{t('modell.feld_schichten_hilfe')}</span></label>
-      <input id="rs-schichten" class="wert" type="number" bind:value={schichten} disabled={laeuft}
-             min="0" max="999" />
+      <Zahlenfeld id="rs-schichten" bind:wert={schichten} gesperrt={laeuft} min={0} max={999} />
 
       <label for="rs-port">{t('modell.feld_port')}<span>{t('modell.feld_port_hilfe')}</span></label>
-      <input id="rs-port" class="wert" type="number" bind:value={port} disabled={laeuft}
-             min="1024" max="65535" />
+      <Zahlenfeld id="rs-port" bind:wert={port} gesperrt={laeuft} min={1024} max={65535} />
     </div>
 
     <!-- Colour means state here, and only here: green is ready, grey is off. -->
@@ -221,15 +271,17 @@
   }
 
   .regler {
-    display: grid; grid-template-columns: 1fr auto; gap: 9px 12px;
+    display: grid; grid-template-columns: minmax(150px, 190px) 1fr; gap: 10px 14px;
     align-items: center; margin-bottom: 12px;
   }
   label { font-size: 13px; }
   label span { display: block; font-size: 11.5px; color: var(--text-still); }
   .wert {
+    width: 100%;
+    height: 32px;
     border: 1px solid var(--linie-stark); border-radius: 8px; background: var(--bg);
     color: var(--text); font: 400 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
-    padding: 6px 10px; min-width: 130px; text-align: right;
+    padding: 6px 10px; text-align: right;
   }
   .wert:disabled { color: var(--text-still); }
   select.wert { text-align: left; }

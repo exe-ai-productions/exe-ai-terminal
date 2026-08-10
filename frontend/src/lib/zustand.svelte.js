@@ -42,6 +42,9 @@ export const zustand = $state({
   cloudOffen: false,
   werkzeugeOffen: false,
   werkzeugfrage: null, // { generationId, aufrufId, name, argumente, chatId }
+  // What the planned model-server start will roughly take — written by the
+  // server form, shown in the local window's head next to the machine total.
+  serverPlan: null,
   // Chats with a finished answer nobody has looked at yet — the sidebar
   // shows the pulsing dot for them.
   fertigeChats: [],

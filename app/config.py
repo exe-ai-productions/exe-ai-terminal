@@ -106,7 +106,11 @@ class EndpointConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    host: str = "0.0.0.0"
+    # Loopback by schema default: a missing config file must never mean
+    # "reachable by everyone on the network". Serving a whole machine or
+    # LAN is a deliberate act — whoever means it writes 0.0.0.0 into
+    # config.yaml themselves.
+    host: str = "127.0.0.1"
     port: int = 8090
     language: str = "de"
     data_dir: str = "./data"

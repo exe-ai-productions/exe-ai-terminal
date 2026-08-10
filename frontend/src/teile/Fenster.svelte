@@ -25,9 +25,12 @@
               answer (choose a folder, start a job). Three rows in a box of
               fixed height would stand mostly empty.
 
-       liste  780 wide and a body of FIXED height — everything with a side
+       liste  900 wide and a body of FIXED height — everything with a side
               list (settings, models, tools). They are opened one after the
               other and switched between, so any difference reads as a jump.
+              The width grew from 780 when the server form's labels started
+              wrapping into three lines; the side lists keep their measure,
+              so all the new room goes to the content half.
 
        vorschau  the widest, and taller — it holds a document that was
               written to be looked at. A page squeezed into a list window
@@ -44,7 +47,7 @@
      body and scrolling inside — the bars are invisible house-wide — every
      window of one kind is the same, whether three rows stand in it or
      thirty. */
-  const BREITE = { frage: '460px', liste: '780px', vorschau: '1200px' }
+  const BREITE = { frage: '460px', liste: '900px', vorschau: '1200px' }
 
   let {
     offen = $bindable(false), titel = '', art = 'frage', symbol, children,
@@ -88,7 +91,7 @@
     align-items: center;
     gap: 8px;
     margin: 0 0 12px;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
   }
 
@@ -100,7 +103,7 @@
      window collapses to a line. The lower bound in pixels keeps it standing
      there too. */
   .popup.liste .leib {
-    height: clamp(380px, 62vh, 520px);
+    height: clamp(440px, 66vh, 640px);
     display: flex;
     flex-direction: column;
     min-height: 0;

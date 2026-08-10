@@ -32,6 +32,9 @@ import signal
 import socket
 import subprocess
 import threading
+
+from app.modellprofil import startflags
+from app.prozessspeicher import rss_gb
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -114,13 +117,19 @@ def ist_mmproj(name: str) -> bool:
 
 
 def modelle_auflisten(ordner: Path) -> list[Modelldatei]:
-    """The startable GGUF files in the model folder, largest first."""
+    """The startable GGUF files in the model folder, largest first.
+
+    Companion files are not models: vision projectors (mmproj) belong NEXT
+    to a model, and multi-token-prediction modules (mtp) are accelerator
+    parts llama-server cannot chat with — offered as models, both would sit
+    in the picker as entries that never answer.
+    """
     if not ordner.is_dir():
         return []
     dateien = [
         Modelldatei(name=p.name, groesse_gb=round(p.stat().st_size / 1e9, 1))
         for p in sorted(ordner.glob("*.gguf"))
-        if p.is_file() and not ist_mmproj(p.name)
+        if p.is_file() and not ist_mmproj(p.name) and "mtp" not in p.name.lower()
     ]
     return sorted(dateien, key=lambda d: d.groesse_gb, reverse=True)
 
@@ -169,6 +178,9 @@ class Lauf:
     kontext: int
     schichten: int
     port: int
+    # The draft model for speculative decoding, when one was chosen — a
+    # small model guesses ahead, the big one only checks.
+    drafter: str | None = None
 
 
 class Modellrunner:
@@ -207,7 +219,14 @@ class Modellrunner:
     def protokoll(self) -> list[str]:
         return list(self._protokoll)
 
-    def befehl(self, modell: str, kontext: int, schichten: int, port: int) -> list[str]:
+    def befehl(
+        self,
+        modell: str,
+        kontext: int,
+        schichten: int,
+        port: int,
+        drafter: str | None = None,
+    ) -> list[str]:
         """The command as it will be run — the same list, shown and executed.
 
         Building it in one place is the point: what the window shows cannot
@@ -221,6 +240,11 @@ class Modellrunner:
             "--host", "127.0.0.1",
             "--port", str(port),
         ]
+        # --jinja plus the family's published sampling lore — without these
+        # a model's tool calls arrive in a language it was never taught.
+        zeile += startflags(modell)
+        if drafter:
+            zeile += ["--model-draft", str(self._ordner / drafter)]
         # A model whose eyes lie next to it gets them attached — that is the
         # whole difference between a vision model and the same model mute.
         augen = passende_mmproj(self._ordner, modell)
@@ -230,8 +254,15 @@ class Modellrunner:
 
     # --- Starting and stopping ---------------------------------------------
 
+    def belegt_gb(self) -> float | None:
+        """Live resident memory of the running server, or None when idle."""
+        with self._schloss:
+            if self._prozess is None or self._prozess.poll() is not None:
+                return None
+            return rss_gb(self._prozess.pid)
+
     def starten(self, modell: str, *, kontext: int = 8192, schichten: int = 99,
-                port: int = 8080) -> Lauf:
+                port: int = 8080, drafter: str | None = None) -> Lauf:
         with self._schloss:
             if self.laeuft():
                 raise RunnerFehler("laeuft_schon")
@@ -246,6 +277,13 @@ class Modellrunner:
             if ziel.parent != self._ordner.resolve() or not ziel.is_file():
                 raise RunnerFehler("kein_modell")
 
+            # The draft model obeys the same rule as the main one: a name
+            # from the folder or nothing.
+            if drafter:
+                dziel = (self._ordner / drafter).resolve()
+                if dziel.parent != self._ordner.resolve() or not dziel.is_file():
+                    raise RunnerFehler("kein_modell")
+
             # A taken port would let the new server die quietly while the
             # old one keeps answering — the settings in the form would then
             # look applied and never be.
@@ -255,7 +293,7 @@ class Modellrunner:
 
             self._protokoll.clear()
             self._prozess = subprocess.Popen(
-                self.befehl(modell, kontext, schichten, port),
+                self.befehl(modell, kontext, schichten, port, drafter),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -264,7 +302,9 @@ class Modellrunner:
                 # whole thing and not just the parent.
                 start_new_session=True,
             )
-            self._lauf = Lauf(modell=modell, kontext=kontext, schichten=schichten, port=port)
+            self._lauf = Lauf(
+                modell=modell, kontext=kontext, schichten=schichten, port=port, drafter=drafter
+            )
             self._pid_merken(self._prozess.pid)
             threading.Thread(target=self._mitlesen, daemon=True).start()
             return self._lauf
