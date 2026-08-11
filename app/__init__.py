@@ -1,3 +1,3 @@
 """Exe AI Terminal — our own interface to local and remote language models."""
 
-__version__ = "1.0.8"
+__version__ = "1.0.10"
