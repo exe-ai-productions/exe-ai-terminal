@@ -57,10 +57,17 @@ def werkzeuge_im_template(template: str) -> bool:
     return "tools" in (template or "")
 
 
-async def _faehigkeiten_erkennen(base_url: str, timeout: float) -> dict[str, bool] | None:
+async def _faehigkeiten_erkennen(
+    base_url: str, timeout: float, api_key_env: str | None = None
+) -> dict[str, bool] | None:
     """Asks the /props endpoint (llama.cpp) for everything the server
     reveals about itself: the thinking switch and tools live in the chat
     template, vision in the `modalities` object.
+
+    The request carries the endpoint's key — newer llama-server builds
+    guard /props like every other route, and an unauthenticated knock
+    comes back 401, which used to read as "nothing there". Read fresh
+    from the environment on every call, same as the provider does.
 
     No /props, no JSON — simply means: nothing detected (None).
     mlx_lm/mlx_vlm have no such endpoint; there the configuration alone
@@ -72,19 +79,36 @@ async def _faehigkeiten_erkennen(base_url: str, timeout: float) -> dict[str, boo
     wurzel = base_url.rstrip("/")
     if wurzel.endswith("/v1"):
         wurzel = wurzel[: -len("/v1")]
+    kopf = {}
+    if api_key_env and (wert := os.getenv(api_key_env, "").strip()):
+        kopf = {"Authorization": f"Bearer {wert}"}
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            antwort = await client.get(wurzel + "/props")
+            antwort = await client.get(wurzel + "/props", headers=kopf)
         if antwort.status_code != 200:
             return None
         daten = antwort.json()
     except Exception:  # noqa: BLE001 - purely supplementary information
         return None
+    return _faehigkeiten_aus_props(daten)
+
+
+def _faehigkeiten_aus_props(daten: dict[str, Any]) -> dict[str, bool]:
+    """What a /props answer reveals, resolved to the three switches.
+
+    Newer builds say it outright in `chat_template_caps`; only where that
+    is missing does reading the template remain — older servers serve
+    nothing else.
+    """
     template = str(daten.get("chat_template", ""))
     modalitaeten = daten.get("modalities") or {}
+    caps = daten.get("chat_template_caps") or {}
+    werkzeuge = caps.get("supports_tool_calls")
+    if werkzeuge is None:
+        werkzeuge = werkzeuge_im_template(template)
     return {
         "thinking": denkschalter_im_template(template),
-        "tool_calls": werkzeuge_im_template(template),
+        "tool_calls": bool(werkzeuge),
         "vision": bool(modalitaeten.get("vision")),
     }
 
@@ -465,7 +489,9 @@ class Discovery:
                 # otherwise every pass would knock on a dead /props again (mlx).
                 zustand.faehigkeiten_erkannt = (
                     await _faehigkeiten_erkennen(
-                        zustand.endpunkt.base_url, self.config.discovery.timeout_seconds
+                        zustand.endpunkt.base_url,
+                        self.config.discovery.timeout_seconds,
+                        zustand.endpunkt.api_key_env,
                     )
                     or {}
                 )

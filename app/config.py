@@ -425,6 +425,11 @@ def _erststart_kopie(ziel: Path, vorlage: Path) -> None:
 def config_laden(pfad: str | Path | None = None) -> Config:
     """Reads config.yaml (+ .env) and returns a validated configuration."""
     load_dotenv(PROJEKT_WURZEL / ".env", override=False)
+    # Packaged, the user's .env lives in the writable folder next to
+    # config.yaml — the project root inside the bundle is an ephemeral
+    # extraction dir, so a key saved at runtime would vanish from the
+    # environment on every restart if only the line above ran.
+    load_dotenv(aufloesen(".env", schreibbar=True), override=False)
 
     # The configuration belongs to the user, so packaged it lives next to
     # their data and not inside the program, which is read-only.

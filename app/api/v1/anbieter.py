@@ -41,12 +41,17 @@ BEKANNT = {
         "base_url": "https://api.anthropic.com/v1",
         "api_key_env": "ANTHROPIC_API_KEY",
         "parameter_dialect": "anthropic",
+        # Cloud servers have no /props to sniff, so without an explicit
+        # entry every capability resolves to "no" and tools stay silent.
+        # Both houses' chat models take tool calls and images.
+        "capabilities": {"tool_calls": True, "vision": True},
     },
     "openai": {
         "provider": "openai_compatible",
         "base_url": "https://api.openai.com/v1",
         "api_key_env": "OPENAI_API_KEY",
         "parameter_dialect": "openai",
+        "capabilities": {"tool_calls": True, "vision": True},
     },
 }
 

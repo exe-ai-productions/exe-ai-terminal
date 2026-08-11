@@ -383,6 +383,12 @@ class OpenAIKompatiblerProvider(Provider):
         if anfrage.max_tokens is not None:
             eigene["max_tokens"] = anfrage.max_tokens
         koerper.update(uebersetzen(self.endpunkt.parameter_dialect, eigene))
+        # OpenAI's newer chat models reject max_tokens and expect
+        # max_completion_tokens; every current OpenAI model accepts the new
+        # name. Other OpenAI-compatible servers still want max_tokens, so
+        # only api.openai.com is rewritten.
+        if "api.openai.com" in self.endpunkt.base_url and "max_tokens" in koerper:
+            koerper["max_completion_tokens"] = koerper.pop("max_tokens")
         # Only when the server has reported an id. Without one the field is
         # dropped: llama.cpp ignores it anyway, and mlx_lm.server answers an
         # invented id with 404.
