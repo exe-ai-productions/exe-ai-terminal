@@ -20,7 +20,10 @@ import re
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
-DURCHSUCHT = ("app", "tests", "frontend/src")
+# The whole of frontend/, not just frontend/src/: the build configuration in
+# the root folder is source too, and a rule that stops at the src boundary
+# lets exactly those files through unchecked.
+DURCHSUCHT = ("app", "tests", "frontend")
 ENDUNGEN = (".py", ".js", ".svelte")
 
 # How many name references a comment may carry: none. The counter stays at

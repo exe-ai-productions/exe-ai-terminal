@@ -2,13 +2,12 @@ import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 
 /*
-  Gebaut wird direkt nach ../static/app/ — von dort liefert FastAPI aus, ohne
-  dass ein zweiter Webserver nötig wäre. Ein Prozess, ein Port, wie im Grill
-  entschieden.
+  The build writes straight into ../static/app/, where FastAPI serves it from.
+  No second web server is needed: one process, one port.
 
-  Beim Entwickeln (npm run dev) läuft Vite auf 5173 und reicht alles unter
-  /api an den laufenden Dienst weiter. Damit ist sofortiges Neuladen möglich,
-  ohne den Server anzufassen.
+  While developing (npm run dev) Vite runs on 5173 and forwards everything
+  under /api to the running service. That gives instant reloads without
+  touching the server.
 */
 export default defineConfig({
   plugins: [svelte()],
@@ -16,8 +15,8 @@ export default defineConfig({
   build: {
     outDir: '../static/app',
     emptyOutDir: true,
-    // Für ein Werkzeug, das man selbst betreibt, sind Quellkarten Gold wert:
-    // ein Fehlerbericht zeigt die echte Zeile statt einer Zahl im Bündel.
+    // For a tool you host yourself, source maps are worth their weight: an
+    // error report points at the real line instead of a number in the bundle.
     sourcemap: true,
   },
   server: {

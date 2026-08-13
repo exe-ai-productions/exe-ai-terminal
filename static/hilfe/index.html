@@ -116,6 +116,9 @@
   <li>All chats live <strong>on the server</strong>, in the terminal's own database. Your browser only keeps per-device preferences: theme, language, last model.</li>
 </ul>
 
+<h3>The greeting</h3>
+<p>On the very first start the wordmark in the middle grows into a small welcome window: what to call you (your system already suggests a name), your language, and light or dark. From then on the empty chat greets you by name and time of day, top left — and the input line greets along until you start typing. One switch under <em>Settings &rarr; Instructions</em> rules both the greeting and the single prompt line that lets your models address you by name; off removes both. The seam between sidebar and chat can be dragged to the width you like — it remembers, and a click on its handle still folds the sidebar away.</p>
+
 <h2 id="modelle">2 · Models</h2>
 <p>The current model stands at the <strong>foot of the sidebar</strong>. Click it for a quick list of everything reachable right now; the menu bar has the full picture under <strong>Local</strong> and <strong>Cloud</strong>.</p>
 <p>The split is not cosmetic. <strong>Local</strong> means the model runs on this machine and nothing you type leaves it. <strong>Cloud</strong> means a paid service, and your text travels there. The list only ever offers what is <em>actually reachable</em> — the terminal keeps checking, and model names come from the servers themselves, never from a list somebody maintained by hand.</p>
@@ -132,6 +135,8 @@
 
 <h3>Cloud providers</h3>
 <p>Under <strong>Cloud</strong> a tile adds one: Anthropic, OpenAI, or an endpoint of your own if it speaks the OpenAI protocol. You paste the key once. It stays on this machine in a file only the service reads, and it is never shown again — the window only ever tells you whether one is there. Once the provider answers, its models appear by themselves.</p>
+
+<p>Catalogue cards and every search hit wear the original maker&rsquo;s mark of their model family — never redrawn, never guessed. The small line under a hit keeps naming who uploaded the file.</p>
 
 <h2 id="ordner">3 · Working folders</h2>
 <p>A chat can be given up to <strong>four folders</strong> to work in. Until you share one, the assistant cannot touch a single file — there is nothing for it to reach into.</p>
@@ -179,6 +184,8 @@
 
 <h3>Servers</h3>
 <p>Everything beyond the shell comes from servers you connect under <strong>Settings → Connections → Servers</strong>: a tile per server, on or off, with sign-in where it is needed. Secrets never appear here — the file holds only the <em>name</em> of an entry in the server's <code>.env</code>, and a small lamp says whether it is set or missing. Saving applies at once; runs already going finish with the old set.</p>
+
+<p>The sources in the tools window fold: the chevron beside a running source opens its command list, everything starts folded, and the list stays quiet until you ask for more.</p>
 
 <h2 id="antwort">7 · Inside a reply</h2>
 <p>When the assistant uses a tool, the call appears as its own quiet row between your question and the answer. The sign in front says what kind of tool ran, and it <em>draws itself while the call is running</em>, then stands still. Click the row to unfold the exact arguments and the raw result.</p>
@@ -251,9 +258,9 @@ You are a concise researcher. …</pre>
 
 <h2 id="einstellungen">11 · Appearance, language, installing</h2>
 <ul>
-  <li><strong>Settings → Appearance:</strong> light, dark or follow the device; speech bubbles filled or as an outline; and the display language, per device.</li>
+  <li><strong>Settings → Appearance:</strong> light, dark or follow the device; messages filled or as an outline; and the display language, per device.</li>
   <li><strong>Text size:</strong> three steps — Default, Large, Larger. Chat text and column grow together, so lines keep their length while the letters gain. Reasoning rows and tool rows stay as they are.</li>
-  <li><strong>Chat bubbles:</strong> pick a colour for your own messages. The text inside flips between light and dark on its own, so every colour stays readable. <em>Default</em> brings the original back. Both choices are remembered per device.</li>
+  <li><strong>Message colour:</strong> pick a colour for your own messages. The text inside flips between light and dark on its own, so every colour stays readable. <em>Default</em> brings the original back. Both choices are remembered per device.</li>
   <li><strong>Settings → Files:</strong> the configuration and your credentials, in plain text, for when something needs changing by hand.</li>
   <li><strong>Install as an app:</strong> open the terminal over HTTPS and use your browser's “Install” or “Add to Home Screen”. It works on phone and tablet.</li>
 </ul>
