@@ -77,6 +77,10 @@
     if (!offen) return
     if (!werkzeugwahl.geladen) werkzeugeLaden()
   })
+
+  // Which source boxes are unfolded — every box starts folded, so the list
+  // reads as sources first and commands on demand.
+  let aufgeklappt = $state({})
 </script>
 
 <Fenster bind:offen titel={t('werkzeuge.titel')} art="liste">
@@ -93,6 +97,7 @@
              the source carries the sign, name and its ringed status; each
              tool below it a name and a switch. -->
         <div class="qbox">
+          <div class="qkopf">
           <button
             class="qeintrag"
             class:gewaehlt={quelle.id === gewaehlteQuelle?.id && !gewaehltesWerkzeug}
@@ -124,8 +129,21 @@
               groesse={7}
             />
           </button>
+            {#if quelle.laeuft && quelle.werkzeuge.length}
+              <button
+                class="qklapp"
+                class:auf={aufgeklappt[quelle.id]}
+                onclick={() => (aufgeklappt[quelle.id] = !aufgeklappt[quelle.id])}
+                aria-expanded={Boolean(aufgeklappt[quelle.id])}
+                aria-label={aufgeklappt[quelle.id] ? t('werkzeuge.zuklappen') : t('werkzeuge.aufklappen')}
+                title={aufgeklappt[quelle.id] ? t('werkzeuge.zuklappen') : t('werkzeuge.aufklappen')}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+            {/if}
+          </div>
 
-          {#if quelle.laeuft}
+          {#if quelle.laeuft && aufgeklappt[quelle.id]}
             {#each quelle.werkzeuge as werkzeug (werkzeug.name)}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
@@ -399,5 +417,35 @@
   @media (max-width: 720px) {
     .zwei { flex-direction: column; flex: none; }
     .links { width: 100%; border-right: none; border-bottom: 1px solid var(--linie); }
+  }
+  /* The fold control sits beside the source entry, never inside it — a
+     button in a button is not a thing, and the entry keeps its whole face
+     for choosing the source. */
+  .qkopf {
+    display: flex;
+    align-items: stretch;
+  }
+  .qkopf :global(.qeintrag) {
+    flex: 1;
+    min-width: 0;
+  }
+  .qklapp {
+    flex: none;
+    border: none;
+    background: none;
+    color: var(--text-still);
+    padding: 0 12px 0 4px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .qklapp:hover {
+    color: var(--text);
+  }
+  .qklapp svg {
+    transition: transform 0.15s;
+  }
+  .qklapp.auf svg {
+    transform: rotate(180deg);
   }
 </style>

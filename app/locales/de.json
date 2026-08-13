@@ -489,6 +489,8 @@
     "aktiv_zahl": "{zahl} aktiv, aus {quellen} Quellen",
     "von_zahl": "{an} von {gesamt} an",
     "gemeldet_zahl": "{zahl} Werkzeuge gemeldet",
+    "aufklappen": "Werkzeuge ausklappen",
+    "zuklappen": "Werkzeuge einklappen",
     "keine_quelle": "Keine Werkzeugquelle eingerichtet",
     "was_es_tut": "Was es tut",
     "verhalten": "Verhalten",

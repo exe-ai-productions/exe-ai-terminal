@@ -489,6 +489,8 @@
     "aktiv_zahl": "{zahl} active, from {quellen} sources",
     "von_zahl": "{an} of {gesamt} on",
     "gemeldet_zahl": "{zahl} tools reported",
+    "aufklappen": "Unfold the tools",
+    "zuklappen": "Fold the tools away",
     "keine_quelle": "No tool source set up",
     "was_es_tut": "What it does",
     "verhalten": "Behaviour",
