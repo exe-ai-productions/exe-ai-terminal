@@ -5,7 +5,7 @@
      chat and shrinks back into it on Done: the program does not open a
      dialog, its own mark comes toward you. Shown once per installation;
      everything it asks lives in the settings afterwards. */
-  import { t, spracheWaehlen } from '../lib/texte.svelte.js'
+  import { t, texte, spracheWaehlen } from '../lib/texte.svelte.js'
   import {
     begruessung, anredeSpeichern, erststartNoetig, erststartErledigt,
   } from '../lib/begruessung.svelte.js'
@@ -20,7 +20,13 @@
 
   let phase = $state('aus') // aus | klein | auf | zu
   let name = $state('')
-  let sprachwahl = $state(localStorage.getItem('sprache') || 'de')
+  // The pill mirrors the language that is actually loaded — never a guess:
+  // a pill that claims German over an English window would lie.
+  let sprachwahl = $state(texte.sprache)
+
+  $effect(() => {
+    sprachwahl = texte.sprache
+  })
 
   $effect(() => {
     if (phase === 'aus' && erststartNoetig()) {
