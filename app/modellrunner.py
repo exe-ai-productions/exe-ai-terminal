@@ -34,6 +34,7 @@ import socket
 import subprocess
 import threading
 
+from app import modellzuordnung
 from app.modellprofil import startflags
 from app.prozessspeicher import rss_gb
 from collections import deque
@@ -291,10 +292,30 @@ class Modellrunner:
                 zeile += ["--spec-type", "draft-mtp"]
         # A model whose eyes lie next to it gets them attached — that is the
         # whole difference between a vision model and the same model mute.
-        augen = passende_mmproj(self._ordner, modell)
+        # The declared projector wins over the name heuristic: the manifest is
+        # written when the pair is fetched together, while the heuristic reads
+        # shared prefixes and can pick the wrong one when two models share one.
+        augen = self._manifest_pfad(modell, "mmproj")
+        if augen is None:
+            augen = passende_mmproj(self._ordner, modell)
         if augen is not None:
             zeile += ["--mmproj", str(augen)]
         return zeile
+
+    def _manifest_pfad(self, modell: str, rolle: str) -> Path | None:
+        """The manifest companion for a model, as a path inside the folder.
+
+        The name comes back validated and existing from the manifest; the
+        resolve check here is the same folder boundary a start obeys, so a
+        hand-edited note can never point a flag outside the model folder.
+        """
+        name = modellzuordnung.fuer(self._ordner, modell).get(rolle)
+        if not name:
+            return None
+        pfad = (self._ordner / name).resolve()
+        if pfad.parent != self._ordner.resolve() or not pfad.is_file():
+            return None
+        return pfad
 
     # --- Starting and stopping ---------------------------------------------
 
@@ -320,6 +341,13 @@ class Modellrunner:
             ziel = (self._ordner / modell).resolve()
             if ziel.parent != self._ordner.resolve() or not ziel.is_file():
                 raise RunnerFehler("kein_modell")
+
+            # No draft chosen by the caller: fall back to the one the manifest
+            # declared for this model, so the bond survives a restart and the
+            # status reports it. The manifest returns a validated, existing
+            # name; the guard below is the same folder boundary either way.
+            if drafter is None:
+                drafter = modellzuordnung.fuer(self._ordner, modell).get("mtp")
 
             # The draft model obeys the same rule as the main one: a name
             # from the folder or nothing.

@@ -29,6 +29,8 @@ from pathlib import Path
 
 import httpx
 
+from app import modellzuordnung
+
 BASIS = "https://huggingface.co"
 ENDUNG = ".gguf"
 UNFERTIG = ".teil"
@@ -88,13 +90,25 @@ class Modelldownload:
         self._abbruch.set()
         return True
 
-    def starten(self, repo: str, datei: str, ziel: str | None = None) -> Fortschritt:
+    def starten(
+        self,
+        repo: str,
+        datei: str,
+        ziel: str | None = None,
+        gehoert_zu: str | None = None,
+        rolle: str | None = None,
+    ) -> Fortschritt:
         """``ziel`` is the local name, when it must differ from the remote one.
 
         Vision companions need this: several repositories call their
         projector plainly ``mmproj-BF16.gguf``, and two of those in one
         folder would silently overwrite each other. The remote name stays in
         the address, the local name keeps the model it belongs to.
+
+        ``gehoert_zu`` and ``rolle`` declare that this file is a companion of
+        another model: when both are set, the bond is written into the folder
+        manifest once the file is truly in place, so the runner reads it
+        instead of guessing. Left absent, a download behaves as before.
         """
         with self._schloss:
             if self.laeuft():
@@ -108,11 +122,20 @@ class Modelldownload:
             self._abbruch.clear()
             self._stand = Fortschritt(datei=ziel, geladen=0, gesamt=0)
             threading.Thread(
-                target=self._holen, args=(repo, datei, ziel), daemon=True
+                target=self._holen,
+                args=(repo, datei, ziel, gehoert_zu, rolle),
+                daemon=True,
             ).start()
             return self._stand
 
-    def _holen(self, repo: str, datei: str, ziel_name: str) -> None:
+    def _holen(
+        self,
+        repo: str,
+        datei: str,
+        ziel_name: str,
+        gehoert_zu: str | None = None,
+        rolle: str | None = None,
+    ) -> None:
         self._ordner.mkdir(parents=True, exist_ok=True)
         ziel = self._ordner / ziel_name
         halb = self._ordner / (ziel_name + UNFERTIG)
@@ -147,6 +170,12 @@ class Modelldownload:
             # Only now does it become a model. Renaming is the one step that
             # makes a finished file visible to the runner.
             halb.replace(ziel)
+
+            # The bond is recorded only after the file is truly in place, so a
+            # cancelled or failed fetch leaves no dangling manifest entry.
+            if gehoert_zu and rolle:
+                modellzuordnung.eintragen(self._ordner, gehoert_zu, rolle, ziel_name)
+
             if self._stand:
                 self._stand.geladen = ziel.stat().st_size
                 self._stand.gesamt = self._stand.geladen

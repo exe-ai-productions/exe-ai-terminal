@@ -12,10 +12,12 @@ actually starts.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from app import modellzuordnung
 from app.api.abhaengigkeiten import hole_sprache
 from app.config import EndpointConfig
 from app.i18n import t
@@ -78,6 +80,12 @@ class Auskunft(BaseModel):
     schichten: int | None = None
     port: int | None = None
     drafter: str | None = None
+    # The declared bond of each model to its companions, read from the folder
+    # manifest and filtered to files that are still there. Keyed by model
+    # file name; each value carries the projector and the draft, or null. The
+    # window shows the association and pre-selects the right draft without
+    # guessing from name prefixes.
+    zuordnung: dict[str, dict[str, str | None]] = {}
 
 
 class Start(BaseModel):
@@ -92,6 +100,25 @@ class Start(BaseModel):
 
 def hole_runner(request: Request) -> Modellrunner:
     return request.app.state.modellrunner
+
+
+def _zuordnung(runner: Modellrunner) -> dict[str, dict[str, str | None]]:
+    """The folder manifest, filtered to model files that are still present.
+
+    A model whose file is gone drops out entirely, and inside each entry a
+    deleted companion drops out too, so the window never offers a bond to a
+    file that is no longer there. The same folder boundary as the start: a
+    key that resolves outside the model folder is ignored.
+    """
+    ordner = Path(runner.ordner)
+    basis = ordner.resolve()
+    ergebnis: dict[str, dict[str, str | None]] = {}
+    for modell in modellzuordnung.lade(ordner):
+        ziel = (ordner / modell).resolve()
+        if ziel.parent != basis or not ziel.is_file():
+            continue
+        ergebnis[modell] = modellzuordnung.fuer(ordner, modell)
+    return ergebnis
 
 
 def _fehler(grund: str, sprache: str) -> HTTPException:
@@ -121,6 +148,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         schichten=lauf.schichten if lauf else None,
         port=lauf.port if lauf else None,
         drafter=lauf.drafter if lauf else None,
+        zuordnung=_zuordnung(runner),
     )
 
 
@@ -171,6 +199,13 @@ class Holen(BaseModel):
     # Local name, when it must differ from the remote one — see
     # Modelldownload.starten.
     ziel: str | None = Field(None, min_length=1, max_length=200)
+    # The model this file is a companion of, and which place it takes next to
+    # it. Set together, they write the bond into the folder manifest once the
+    # file has arrived; absent, the download behaves as before. The role is
+    # constrained here, so nothing but a projector or a draft is ever
+    # declared.
+    gehoert_zu: str | None = Field(None, min_length=1, max_length=200)
+    rolle: Literal["mmproj", "mtp"] | None = None
 
 
 class Fortschritt(BaseModel):
@@ -212,7 +247,9 @@ def holen(
     sprache: str = Depends(hole_sprache),
 ) -> Fortschritt:
     try:
-        download.starten(daten.repo, daten.datei, daten.ziel)
+        download.starten(
+            daten.repo, daten.datei, daten.ziel, daten.gehoert_zu, daten.rolle
+        )
     except DownloadFehler as fehler:
         lage = {
             "laeuft_schon": status.HTTP_409_CONFLICT,

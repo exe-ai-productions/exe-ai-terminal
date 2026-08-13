@@ -191,6 +191,52 @@ def test_von_zwei_paaren_gewinnt_das_laengere(ordner, falsches_programm):
     assert befehl[befehl.index("--mmproj") + 1].endswith("Qwen3.6-27B-mmproj-BF16.gguf")
 
 
+# --- The folder manifest wins over the name heuristic ----------------------
+
+
+def test_der_befehl_bevorzugt_das_manifest_gegenueber_der_heuristik(ordner, falsches_programm):
+    from app import modellzuordnung
+
+    # The heuristic would tie klein.gguf to its prefix twin; the manifest
+    # names a different projector, and the manifest is the one to trust.
+    (ordner / "klein-mmproj-Q8_0.gguf").write_bytes(b"x" * 5)
+    (ordner / "spezial-mmproj.gguf").write_bytes(b"x" * 5)
+    modellzuordnung.eintragen(ordner, "klein.gguf", "mmproj", "spezial-mmproj.gguf")
+
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    befehl = runner.befehl("klein.gguf", 4096, 33, 8081)
+    assert befehl[befehl.index("--mmproj") + 1].endswith("spezial-mmproj.gguf")
+
+
+def test_starten_nimmt_den_mtp_aus_dem_manifest(ordner, falsches_programm, monkeypatch):
+    from app import modellzuordnung
+    import app.modellrunner as mr
+
+    # A draft declared in the manifest is picked up when the caller passes
+    # none, so the bond survives a restart and the command carries it.
+    (ordner / "klein-mtp-Q8.gguf").write_bytes(b"x" * 5)
+    modellzuordnung.eintragen(ordner, "klein.gguf", "mtp", "klein-mtp-Q8.gguf")
+
+    aufgezeichnet = {}
+    echtes_popen = mr.subprocess.Popen
+
+    def merken(befehl, *args, **kwargs):
+        aufgezeichnet["befehl"] = befehl
+        return echtes_popen(befehl, *args, **kwargs)
+
+    monkeypatch.setattr(mr.subprocess, "Popen", merken)
+
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    try:
+        lauf = runner.starten("klein.gguf", port=18097)
+        assert lauf.drafter == "klein-mtp-Q8.gguf"
+        befehl = aufgezeichnet["befehl"]
+        assert befehl[befehl.index("--model-draft") + 1].endswith("klein-mtp-Q8.gguf")
+        assert befehl[befehl.index("--spec-type") + 1] == "draft-mtp"
+    finally:
+        runner.stoppen()
+
+
 # --- The orphan after a service restart ------------------------------------
 
 

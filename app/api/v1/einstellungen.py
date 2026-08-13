@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 from app.api.abhaengigkeiten import hole_repositories
 from app.db import Repositories
 from app.db.repositories.einstellungen import GLOBAL
+from app.anrede import SCHLUESSEL as ANREDE
+from app.anrede import schalter_pruefen as anrede_pruefen
 from app.gedaechtnis import SCHLUESSEL as GEDAECHTNIS
 from app.gedaechtnis import schalter_pruefen
 from app.modellwahl import aus_pruefen, wahl_pruefen
@@ -38,6 +40,7 @@ PRUEFER = {
     "katalog_wahl": wahl_pruefen,
     WERKZEUGE_AUS: werkzeuge_aus_pruefen,
     GEDAECHTNIS: schalter_pruefen,
+    ANREDE: anrede_pruefen,
     SKILLS_AUTO: skills_auto_pruefen,
 }
 

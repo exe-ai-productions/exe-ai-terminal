@@ -14,7 +14,7 @@ from __future__ import annotations
 import shutil
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import skills
 
@@ -38,6 +38,18 @@ class SkillZeile(SkillEintrag):
 
 class AutoSetzen(BaseModel):
     auto: bool
+
+
+class NeuerSkill(BaseModel):
+    """The raw ``SKILL.md`` a user writes in the editor: the front matter and
+    the body in one string, saved exactly as typed so it reads back the same.
+
+    The length bound is a guardrail against a runaway paste, not a budget — a
+    skill is an instruction, and one that long is a mistake either way.
+    """
+
+    name: str
+    inhalt: str = Field(max_length=100_000)
 
 
 def _orte(request: Request) -> tuple:
@@ -81,6 +93,49 @@ def verwaltung(request: Request) -> list[SkillZeile]:
         )
         for s in skills.skills_laden(mitgeliefert, eigen).values()
     ]
+
+
+@router.post("", response_model=SkillZeile, status_code=201)
+def anlegen(daten: NeuerSkill, request: Request) -> SkillZeile:
+    """Writes a user's own skill and hands back how it now reads.
+
+    The file lands in the user's folder, where it shadows a shipped one of the
+    same name — the same copy-on-write the settings mask uses, so the next
+    update walks past it. Content that does not parse is taken back off the
+    disk and answered with the reason, so a broken skill never lingers.
+    """
+    name = _geprueft(daten.name)
+    if not daten.inhalt.strip():
+        raise HTTPException(400, "Der Skill-Inhalt ist leer")
+
+    mitgeliefert, eigen = _orte(request)
+    ordner = eigen / name
+    frisch = not ordner.exists()
+    ordner.mkdir(parents=True, exist_ok=True)
+    datei = ordner / skills.SKILL_DATEI
+    datei.write_text(daten.inhalt, encoding="utf-8")
+
+    try:
+        skills.skill_lesen(ordner, eigen=True)
+    except skills.SkillKaputt as fehler:
+        # A file that will not load back must not be left behind. Remove only
+        # what this call put there: the whole folder when it was created here,
+        # otherwise just the file that was overwritten.
+        if frisch:
+            shutil.rmtree(ordner, ignore_errors=True)
+        else:
+            datei.unlink(missing_ok=True)
+        raise HTTPException(400, str(fehler)) from fehler
+
+    geladen = skills.skills_laden(mitgeliefert, eigen)[name]
+    ab_werk = set(skills.aus_verzeichnis(mitgeliefert, eigen=False))
+    return SkillZeile(
+        name=name,
+        beschreibung=geladen.beschreibung,
+        auto=geladen.auto,
+        eigen=True,
+        mitgeliefert=name in ab_werk,
+    )
 
 
 @router.patch("/{name}", response_model=SkillZeile)

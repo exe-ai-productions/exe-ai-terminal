@@ -166,3 +166,38 @@ def test_schon_da_zaehlt_fuer_den_zielnamen(tmp_path):
         raise AssertionError("kein Fehler")
     except DownloadFehler as fehler:
         assert fehler.grund == "schon_da"
+
+
+# --- The bond into the folder manifest ------------------------------------
+
+
+def test_ein_begleiter_wird_im_manifest_vermerkt(tmp_path, strom):
+    from app import modellzuordnung
+
+    # A projector fetched next to a model writes the bond, so the runner
+    # later reads it instead of guessing from name prefixes.
+    strom(b"abc")
+    download = Modelldownload(tmp_path)
+    download.starten(
+        "wer/was",
+        "mmproj-BF16.gguf",
+        ziel="modell-mmproj-BF16.gguf",
+        gehoert_zu="modell.gguf",
+        rolle="mmproj",
+    )
+    assert warten_bis(lambda: download.stand().fertig)
+    assert (
+        modellzuordnung.fuer(tmp_path, "modell.gguf")["mmproj"]
+        == "modell-mmproj-BF16.gguf"
+    )
+
+
+def test_ein_schlichter_download_vermerkt_nichts(tmp_path, strom):
+    from app import modellzuordnung
+
+    # No parent and no role: nothing but the file itself is left behind.
+    strom(b"abc")
+    download = Modelldownload(tmp_path)
+    download.starten("wer/was", "modell.gguf")
+    assert warten_bis(lambda: download.stand().fertig)
+    assert modellzuordnung.lade(tmp_path) == {}

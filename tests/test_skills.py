@@ -147,3 +147,88 @@ def test_nur_automatische_kosten_platz_im_prompt(tmp_path):
 
     geladen = skills.skills_laden(tmp_path / "haus", mein)
     assert [s.name for s in skills.automatische(geladen)] == ["selbst"]
+
+
+# --- writing one from the UI -------------------------------------------------
+
+
+NEU = """---
+description: Writes a plan for the next step
+auto: true
+---
+
+Lay out the next step as a short plan.
+"""
+
+
+def _verwaltung(client, name):
+    """The management row for one skill, or None if it is not offered."""
+    for zeile in client.get("/api/v1/skills/verwaltung").json():
+        if zeile["name"] == name:
+            return zeile
+    return None
+
+
+def test_ein_geschriebener_skill_taucht_in_der_verwaltung_auf(client):
+    """A written skill lands in the user's folder and reads back with its
+    front matter parsed — description and auto taken from the file."""
+    antwort = client.post("/api/v1/skills", json={"name": "planer", "inhalt": NEU})
+    assert antwort.status_code == 201
+    assert antwort.json() == {
+        "name": "planer",
+        "beschreibung": "Writes a plan for the next step",
+        "auto": True,
+        "eigen": True,
+        "mitgeliefert": False,
+    }
+
+    zeile = _verwaltung(client, "planer")
+    assert zeile["eigen"] is True
+    assert zeile["beschreibung"] == "Writes a plan for the next step"
+    assert zeile["auto"] is True
+
+
+def test_ein_ungueltiger_name_faellt_durch(client):
+    antwort = client.post("/api/v1/skills", json={"name": "Gross Raum", "inhalt": NEU})
+    assert antwort.status_code == 400
+    assert _verwaltung(client, "Gross Raum") is None
+
+
+def test_ein_leerer_inhalt_faellt_durch(client):
+    antwort = client.post("/api/v1/skills", json={"name": "leer", "inhalt": "   \n"})
+    assert antwort.status_code == 400
+    assert _verwaltung(client, "leer") is None
+
+
+def test_ein_inhalt_ohne_kopfteil_wird_wieder_entfernt(client):
+    """Content that will not load back is answered with 400 and taken off the
+    disk again, so a broken skill never lingers in the offered list."""
+    _, eigen = client.app.state.config.skillverzeichnisse
+    antwort = client.post(
+        "/api/v1/skills", json={"name": "kaputt", "inhalt": "no front matter here"}
+    )
+    assert antwort.status_code == 400
+    assert not (eigen / "kaputt").exists()
+    assert _verwaltung(client, "kaputt") is None
+
+
+def test_ein_geschriebener_skill_ueberschattet_einen_mitgelieferten(client):
+    """A name that a shipped skill already carries is not an error: the write
+    makes the user's copy, exactly the copy-on-write the mask relies on."""
+    haus, eigen = client.app.state.config.skillverzeichnisse
+    (haus / "handoff").mkdir(parents=True)
+    (haus / "handoff" / skills.SKILL_DATEI).write_text(
+        "---\ndescription: Shipped one\n---\n\nShipped body.\n", encoding="utf-8"
+    )
+
+    antwort = client.post("/api/v1/skills", json={"name": "handoff", "inhalt": NEU})
+    assert antwort.status_code == 201
+    body = antwort.json()
+    assert body["eigen"] is True
+    assert body["mitgeliefert"] is True
+    assert body["beschreibung"] == "Writes a plan for the next step"
+
+    # The user's copy is on disk and the shipped one is untouched.
+    assert (eigen / "handoff" / skills.SKILL_DATEI).is_file()
+    assert "Shipped body." in (haus / "handoff" / skills.SKILL_DATEI).read_text()
+    assert skills.skills_laden(haus, eigen)["handoff"].eigen is True

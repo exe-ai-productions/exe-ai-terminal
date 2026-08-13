@@ -214,11 +214,10 @@
       style="--laenge:130"
     />
   </svg>
-{:else if zeichen === 'hammer'}
-  <!-- Upright, with the left underside curving inward so the front corner
-       stands out as a claw. A plain rectangle on a shaft reads as a T or a
-       signpost; that one concave edge is what makes it a hammer. Two
-       strokes, head first, then the shaft — the order the eye takes it in. -->
+{:else if zeichen === 'buch'}
+  <!-- An open book — a skill comes out of a manual. Two pages sweeping up
+       from the spine, then the spine down the middle: the outline first,
+       the centre line after, the order the eye takes it in. -->
   <svg
     class="zeichen"
     class:laeuft={animiert}
@@ -231,15 +230,15 @@
   >
     <path
       class="strich z1"
-      d="M16 13 H48 V27 H27 C25 22 21 17 16 13 Z"
+      d="M32 18 C25 14 16 14 10 16 V48 C16 46 25 46 32 50 C39 46 48 46 54 48 V16 C48 14 39 14 32 18 Z"
       stroke-width="5"
-      style="--laenge:90"
+      style="--laenge:150"
     />
     <path
       class="strich z2"
-      d="M32 27 V56"
-      stroke-width="5"
-      style="--laenge:30"
+      d="M32 18 V50"
+      stroke-width="4.5"
+      style="--laenge:32"
     />
   </svg>
 {:else}
