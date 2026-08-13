@@ -71,6 +71,9 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # "Name" is the same word in both languages, and an example address
         # is a literal — translating either would only invent a difference.
         "modell.eigener_name", "modell.eigener_adresse_beispiel",
+        # MTP is the acronym for the prediction module in both languages,
+        # and Hugging Face is a product name — neither is translated.
+        "modell.mtp_label", "editor.quelle_hf",
     }
 
     def flach(knoten, praefix=""):

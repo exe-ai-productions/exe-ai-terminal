@@ -11,7 +11,7 @@
     zustand, werkzeugfrageBeantworten, melde, aktuellerChat,
   } from '../lib/zustand.svelte.js'
 
-  let { senden, abbrechen, bildErzeugen, bildStoppen, tempo, schlank = false } = $props()
+  let { senden, abbrechen, bildErzeugen, bildStoppen, tempo, schlank = false, gruss = null } = $props()
 
   let text = $state('')
   let feld = $state(null)
@@ -481,7 +481,7 @@
       bind:this={feld}
       bind:value={text}
       rows="1"
-      placeholder={bildmodus ? t('eingabe.bild_platzhalter') : t('eingabe.platzhalter')}
+      placeholder={bildmodus ? t('eingabe.bild_platzhalter') : (gruss || t('eingabe.platzhalter'))}
       onkeydown={taste}
       onpaste={einfuegen}
       aria-label={t('eingabe.nachricht')}

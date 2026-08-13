@@ -4,7 +4,7 @@
   import { api } from '../lib/api.js'
   import {
     zustand, aktuellerChat, chatAendern, chatLoeschen, neuerChat, melde,
-    modellWaehlen, frage,
+    modellWaehlen, frage, menueFensterOeffnen,
   } from '../lib/zustand.svelte.js'
 
   let { einstellungenOeffnen } = $props()
@@ -127,7 +127,7 @@
     onclick={(e) => {
       e.stopPropagation()
       offen = null
-      zustand.lokalOffen = true
+      menueFensterOeffnen('lokal')
     }}
   >
     {t('menue.lokal')}
@@ -139,10 +139,24 @@
     onclick={(e) => {
       e.stopPropagation()
       offen = null
-      zustand.cloudOffen = true
+      menueFensterOeffnen('cloud')
     }}
   >
     {t('menue.cloud')}
+  </button>
+
+  <!-- The catalogue sits between the two that compute and the machinery:
+       it is where a local model comes from, one step before the tools. -->
+  <button
+    class="punkt"
+    class:offen={zustand.katalogOffen}
+    onclick={(e) => {
+      e.stopPropagation()
+      offen = null
+      menueFensterOeffnen('katalog')
+    }}
+  >
+    {t('menue.katalog')}
   </button>
 
   <!-- Tools, after the two that compute and before the program itself:
@@ -155,7 +169,7 @@
     onclick={(e) => {
       e.stopPropagation()
       offen = null
-      zustand.werkzeugeOffen = true
+      menueFensterOeffnen('werkzeuge')
     }}
   >
     {t('menue.werkzeuge')}

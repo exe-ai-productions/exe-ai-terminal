@@ -85,11 +85,13 @@
   }
   .popup {
     background: var(--bg-erhoben);
-    border: 1px solid var(--linie-stark);
     border-radius: 16px;
     padding: 16px 18px 14px;
     width: min(400px, 92vw);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.25);
+    /* The house's outer window frame — the notifications' vector stroke,
+       a 2px ring hung off var(--text). Same frame the main windows wear. */
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 70%, transparent),
+      0 18px 48px rgba(0, 0, 0, 0.25);
   }
   .frage {
     font-size: 13.5px;

@@ -25,6 +25,24 @@ class MetaAntwort(BaseModel):
     standardsprache: str
     verfuegbare_sprachen: list[str]
     features: dict[str, bool]
+    # The first name the operating system knows — the address suggestion
+    # for the first start. Empty when the system offers none.
+    system_name: str = ""
+
+
+def _systemname() -> str:
+    """The user's first name as the system knows it, or an empty string."""
+    import os
+
+    voll = ""
+    try:
+        import pwd
+
+        voll = pwd.getpwuid(os.getuid()).pw_gecos.split(",")[0].strip()
+    except Exception:
+        voll = ""
+    kurz = voll.split()[0] if voll else ""
+    return kurz or os.environ.get("USER") or os.environ.get("USERNAME") or ""
 
 
 @router.get("/meta", response_model=MetaAntwort, summary="Funktionen und Sprachen")
@@ -33,6 +51,7 @@ def meta(
     sprache: str = Depends(hole_sprache),
 ) -> MetaAntwort:
     return MetaAntwort(
+        system_name=_systemname(),
         name="Exe AI Terminal",
         version=__version__,
         sprache=sprache,

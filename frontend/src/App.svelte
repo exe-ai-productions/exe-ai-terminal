@@ -4,10 +4,13 @@
   import Menueleiste from './teile/Menueleiste.svelte'
   import Seitenleiste from './teile/Seitenleiste.svelte'
   import Seitengriff from './teile/Seitengriff.svelte'
+  import Erststart from './teile/Erststart.svelte'
+  import Begruessungsecke from './teile/Begruessungsecke.svelte'
   import Nachricht from './teile/Nachricht.svelte'
   import Eingabeleiste from './teile/Eingabeleiste.svelte'
   import SystemPrompt from './teile/SystemPrompt.svelte'
   import ModelleLokal from './teile/ModelleLokal.svelte'
+  import Katalog from './teile/Katalog.svelte'
   import ModelleCloud from './teile/ModelleCloud.svelte'
   import Werkzeuge from './teile/Werkzeuge.svelte'
   import Frage from './teile/Frage.svelte'
@@ -37,8 +40,9 @@
   import {
     zustand, melde, aktualisiereMeldung, modelleLaden, featuresLaden, chatsLaden, aktuellerChat, neuerChat,
     werkzeugfrageBeantworten, werkzeugImmerErlaubt, frageBeantworten, seitenleisteSchalten,
-    chatFertigMerken, chatFertigGesehen,
+    chatFertigMerken, chatFertigGesehen, menueFensterOeffnen,
   } from './lib/zustand.svelte.js'
+  import { begruessung, begruessungLaden, grussSchluessel } from './lib/begruessung.svelte.js'
 
   /* Coming back to the window counts as seeing the open chat — its dot,
      if it earned one meanwhile, has said its piece. */
@@ -52,6 +56,7 @@
      the settings window (3.11). It acts via an attribute on the root
      element — no component has to know which one currently applies. */
   let modus = $state(localStorage.getItem('modus') || 'auto')
+  begruessungLaden()
 
   $effect(() => {
     if (modus === 'auto') document.documentElement.removeAttribute('data-modus')
@@ -502,7 +507,7 @@
     bind:this={menue}
     einstellungenOeffnen={() => {
       zustand.promptStart = 'darstellung'
-      zustand.promptOffen = true
+      menueFensterOeffnen('prompt')
     }}
   />
 
@@ -557,6 +562,8 @@
         <Wortmarke mitText={false} />
       </Wasserzeichen>
 
+      <Begruessungsecke sichtbar={nochLeer} />
+
       <div class="verlauf" bind:this={verlauf} onscroll={scrollGeprueft}
            onwheel={radGedreht} ontouchstart={beruehrungBeginnt} ontouchmove={beruehrungZieht}>
         <div class="spur">
@@ -585,7 +592,8 @@
         <div class="marke" class:weg={!nochLeer}>
           <Wortmarke hoehe={55} zentriert />
         </div>
-        <Eingabeleiste bind:this={eingabe} {senden} {abbrechen} {bildErzeugen} {bildStoppen} {tempo} schlank={nochLeer} />
+        <Eingabeleiste bind:this={eingabe} {senden} {abbrechen} {bildErzeugen} {bildStoppen} {tempo} schlank={nochLeer}
+          gruss={nochLeer && begruessung.an && begruessung.name ? t(grussSchluessel(true), { name: begruessung.name }) : null} />
       </div>
 
       <div class="unterraum" class:zu={!nochLeer}></div>
@@ -599,7 +607,9 @@
      open under the beta lock — locked then are only the entries that
      touch files; the effective half of the lock remains app/beta.py. -->
 <SystemPrompt bind:offen={zustand.promptOffen} bind:modus />
+<Erststart bind:modus />
 <ModelleLokal bind:offen={zustand.lokalOffen} />
+<Katalog bind:offen={zustand.katalogOffen} />
 <ModelleCloud bind:offen={zustand.cloudOffen} />
 
 <!-- The tools window. It knows one way out: to the connections, where a

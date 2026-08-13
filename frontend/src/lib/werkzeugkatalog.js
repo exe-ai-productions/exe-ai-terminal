@@ -41,7 +41,7 @@ const NACH_WERKZEUG = {
 const NACH_SERVER = {
   shell: 'eingabe',
   memory: 'wolke',
-  skills: 'hammer',
+  skills: 'buch',
   websuche: 'globus',
   searxng: 'globus',
   notion: 'seite',

@@ -16,6 +16,40 @@
   let zeilen = $state([])
   let selbstWaehlen = $state(true)
 
+  /* Writing a skill of one's own: a name and the file's text. The template
+     is filled in, not empty, so nobody has to guess the shape. `description`
+     is what the list shows; `auto` decides whether it may be reached for
+     without being named. */
+  let schreibt = $state(false)
+  let neuName = $state('')
+  let neuInhalt = $state('')
+  const VORLAGE = `---
+description: What this skill does, in one line.
+auto: false
+---
+
+Write the instruction here. When this skill is chosen, the model follows
+what stands below.
+`
+  function neuAnfangen() {
+    neuName = ''
+    neuInhalt = VORLAGE
+    schreibt = true
+  }
+  async function neuSpeichern() {
+    const name = neuName.trim()
+    if (!name || !neuInhalt.trim()) return
+    try {
+      await api.skillSchreiben(name, neuInhalt)
+      schreibt = false
+      await laden()
+      skillsLaden()
+      melde(t('skills.geschrieben', { name }), 'erfolg')
+    } catch (fehler) {
+      melde(String(fehler.message || fehler), 'fehler')
+    }
+  }
+
   /* Only the automatic ones cost anything, and only they are counted. The
      number is here because the cost is invisible otherwise: it is paid on
      every request, in a place nobody looks. */
@@ -77,6 +111,24 @@
   }
 </script>
 
+{#if schreibt}
+  <div class="schreibform">
+    <input
+      class="namensfeld"
+      bind:value={neuName}
+      placeholder={t('skills.neu_name')}
+      spellcheck="false"
+      autocapitalize="off"
+    />
+    <textarea class="inhaltsfeld" bind:value={neuInhalt} spellcheck="false"></textarea>
+    <div class="formfuss">
+      <button class="textknopf" onclick={() => (schreibt = false)}>{t('app.abbrechen')}</button>
+      <button class="knopf wichtig" disabled={!neuName.trim() || !neuInhalt.trim()} onclick={neuSpeichern}>
+        {t('app.sichern')}
+      </button>
+    </div>
+  </div>
+{:else}
 <div class="kopf">
   <span>{t('skills.wieviele', { anzahl: automatisch })}</span>
 </div>
@@ -119,6 +171,13 @@
     />
   </div>
 {/each}
+
+<button class="skillneu" onclick={neuAnfangen}>
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2.2" stroke-linecap="round"><path d="M12 5 V19 M5 12 H19" /></svg>
+  {t('skills.schreiben')}
+</button>
+{/if}
 
 <style>
   .kopf {
@@ -196,5 +255,95 @@
     padding: 14px 0 0;
     border-top: 1px solid var(--linie);
     margin: 0;
+  }
+
+  /* The way to a skill of one's own: a dashed tile, plus and word, the same
+     shape the agents list uses for a new agent. */
+  .skillneu {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 1px dashed var(--linie-stark);
+    border-radius: 12px;
+    background: none;
+    color: var(--text-still);
+    font: 600 12.5px var(--schrift);
+    padding: 0 12px;
+    height: 46px;
+    margin-top: 12px;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .skillneu:hover {
+    color: var(--text);
+    border-color: var(--text-still);
+  }
+
+  .schreibform {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .namensfeld {
+    font: 600 13.5px var(--schrift-fest);
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--linie-stark);
+    border-radius: 9px;
+    padding: 8px 12px;
+  }
+  .inhaltsfeld {
+    font: 400 12.5px/1.6 var(--schrift-fest);
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--linie-stark);
+    border-radius: 12px;
+    padding: 10px 12px;
+    min-height: 220px;
+    resize: vertical;
+    width: 100%;
+  }
+  .formfuss {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .knopf {
+    border: 1px solid var(--linie-stark);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 15px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .knopf:hover:not(:disabled) {
+    background: var(--linie);
+  }
+  .knopf.wichtig {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
+  .knopf:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .textknopf {
+    border: none;
+    background: none;
+    color: var(--text-leise);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 7px;
+  }
+  .textknopf:hover {
+    background: var(--linie);
+    color: var(--text);
   }
 </style>

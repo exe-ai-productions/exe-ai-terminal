@@ -25,6 +25,11 @@ export const zustand = $state({
   // on the seam now (teile/Seitengriff.svelte). Below 720 px,
   // `seitenleisteOffen` applies instead — there it slides over as a drawer.
   seitenleisteEingeklappt: localStorage.getItem('seitenleiste') === 'zu',
+  // The sidebar's width in px, dragged at the seam and kept across starts.
+  // While a drag runs, the width transition pauses so the edge follows the
+  // hand instead of easing after it.
+  seitenBreite: Number(localStorage.getItem('seitenbreite')) || 285,
+  seitenZieht: false,
   werkzeuge: { aktiv: false, werkzeuge: [] },
   // Feature switches from the config (GET /meta, interface milestone C).
   // Until the answer arrives, everything counts as on — otherwise the
@@ -41,6 +46,7 @@ export const zustand = $state({
      what is selected in it side by side, which no dropdown fits. Two entries
      in the menu bar, two modules: teile/ModelleLokal and teile/ModelleCloud. */
   lokalOffen: false,
+  katalogOffen: false,
   cloudOffen: false,
   werkzeugeOffen: false,
   werkzeugfrage: null, // { generationId, aufrufId, name, argumente, chatId }
@@ -73,6 +79,17 @@ export const zustand = $state({
   // confirm()/prompt() boxes of the browser. At most one at a time.
   frage: null, // { text, eingabe, okSchluessel, aufloesen }
 })
+
+/* The windows the menu bar opens are one place each — opening one closes
+   the others. Without this, a second window lands behind the first one's
+   veil and the menu click looks dead. */
+export function menueFensterOeffnen(name) {
+  zustand.lokalOffen = name === 'lokal'
+  zustand.cloudOffen = name === 'cloud'
+  zustand.katalogOffen = name === 'katalog'
+  zustand.werkzeugeOffen = name === 'werkzeuge'
+  zustand.promptOffen = name === 'prompt'
+}
 
 /* A prompt dialog in the house style. Returns a promise:
    without an input field true/false, with an input field the text or null.
@@ -267,6 +284,17 @@ export function seitenleisteSchalten() {
   zustand.seitenleisteEingeklappt = !zustand.seitenleisteEingeklappt
   zustand.seitenleisteOffen = false
   localStorage.setItem('seitenleiste', zustand.seitenleisteEingeklappt ? 'zu' : 'auf')
+}
+
+/* The sidebar is dragged, not configured: the seam clamps the hand to what
+   the head row can carry (below, the section labels would clip) and to what
+   still leaves the chat its room. */
+const SEITEN_MIN = 220
+const SEITEN_MAX = 400
+
+export function seitenBreiteSetzen(px) {
+  zustand.seitenBreite = Math.round(Math.min(SEITEN_MAX, Math.max(SEITEN_MIN, px)))
+  localStorage.setItem('seitenbreite', String(zustand.seitenBreite))
 }
 
 export function modellWaehlen(id) {

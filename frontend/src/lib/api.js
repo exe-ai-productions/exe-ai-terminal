@@ -52,6 +52,8 @@ export const api = {
   werkzeuge: () => ruf('/tools'),
   skills: () => ruf('/skills'),
   skillsVerwaltung: () => ruf('/skills/verwaltung'),
+  skillSchreiben: (name, inhalt) =>
+    ruf('/skills', { method: 'POST', body: alsText({ name, inhalt }) }),
   skillAuto: (name, auto) =>
     ruf(`/skills/${encodeURIComponent(name)}`, { method: 'PATCH', body: alsText({ auto }) }),
   skillZuruecksetzen: (name) =>
@@ -76,8 +78,14 @@ export const api = {
   runnerProtokoll: () => ruf('/runner/log'),
   runnerStarten: (daten) => ruf('/runner/start', { method: 'POST', body: alsText(daten) }),
   runnerStoppen: () => ruf('/runner/stop', { method: 'POST' }),
-  modellHolen: (repo, datei, ziel = null) =>
-    ruf('/runner/download', { method: 'POST', body: alsText({ repo, datei, ziel }) }),
+  /* A companion (mmproj/mtp) carries which model it belongs to and its
+     role, so the service records the association in a manifest and the
+     runner attaches it later without guessing from file names. */
+  modellHolen: (repo, datei, ziel = null, gehoert_zu = null, rolle = null) =>
+    ruf('/runner/download', {
+      method: 'POST',
+      body: alsText({ repo, datei, ziel, gehoert_zu, rolle }),
+    }),
   modellHolenStand: () => ruf('/runner/download'),
   modellHolenAbbrechen: () => ruf('/runner/download', { method: 'DELETE' }),
 

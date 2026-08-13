@@ -1,78 +1,157 @@
 /*
-  Which model to suggest for how much memory — the curated list.
+  The curated catalogue — which model to suggest for a machine, and in
+  which build.
 
-  Its own module because it is data, not markup, and because it is the one
-  place a name has to be changed when a better model comes along. The search
-  next to it finds everything; this list answers the question the search
-  cannot: *which of these thousands is the one for my machine.*
+  Its own module because it is data, not markup, and the one place a name
+  changes when a better model comes along. The search next to it finds
+  everything; this list answers what the search cannot: *which of the
+  thousands is the one for my machine.*
 
-  Four steps, by the memory the machine has. The step is deliberately the
-  whole machine and not the free memory: a number that changes while you look
-  at it cannot be the basis for a recommendation.
+  A card is a MODEL, not a file. One card can carry several builds
+  (`fassungen`) — a 4-bit that fits a laptop and an 8-bit that wants a
+  workstation — and the one that suits the machine is pre-picked. Every
+  build is one GGUF file that can be fetched with one button and started
+  with another; nothing here asks anybody to open a terminal.
 
-  `groesse` is the measured size of the file, not an estimate — a model needs
-  its size in memory plus room for the conversation, so a step is only honest
-  while the file stays clearly under it.
+  Each build carries the exact companion names, all checked against the
+  repository they name — a recommendation that 404s looks like a broken
+  program, not a wrong list:
+    `mmproj` is the vision projector as the repository names it,
+    `mmproj_ziel` the name it gets locally (several repositories call
+    theirs plainly `mmproj-F16.gguf`, and two of those in one folder would
+    overwrite each other).
+    `drafter` is the speed module that makes answers faster — a prediction
+    module (mtp) trained alongside the model, or a tiny sibling where the
+    family ships one, never a mid-sized model. `drafter_ziel` names it
+    locally, `drafter_repo` says where it lives when that is not the
+    model's own repository.
+    `bis` is the memory step the build is the pick for.
 
-  Every entry is one GGUF file, and that is the whole point: one file can be
-  fetched with one button and started with another. Nothing here asks anybody
-  to open a terminal.
-
-  `mmproj` is the model's vision projector as the repository names it,
-  `mmproj_ziel` the name it gets in the local folder — carrying the model's
-  own name, because several repositories call theirs plainly
-  `mmproj-BF16.gguf` and two of those in one folder would overwrite each
-  other. The download fetches it right after the model; the runner attaches
-  it by that shared name.
-
-  `drafter` is the small companion that makes answers faster: a prediction
-  module (mtp) trained alongside the model, a few hundred megabytes, or a
-  tiny sibling model where the family ships one — never a mid-sized model,
-  because a draft that costs gigabytes eats the very memory it was meant
-  to save. `drafter_ziel` names it locally (two quants of one module would
-  otherwise collide), `drafter_repo` says where it lives when that is not
-  the model's own repository. It rides the same download button, third in
-  line.
-
-  A step that loses its model keeps its place with `modelle: []`. An empty
-  step says "we have not chosen yet", which is true; leaving it out entirely
-  would say "there is nothing for your machine", which is not.
+  Only four cards are truly curated today. More arrive by data care, never
+  by guessing — a card whose repository or file name was not verified is
+  left out on purpose.
 */
 
-/* The kinds the search offers. A format name is a name, like a tool name —
-   it never goes through the translation catalogue.
+import { speicherSchaetzung } from './speicherschaetzung.js'
 
-   Only GGUF for now: it is the one the program can fetch as a single file
-   and start by itself. MLX runs beautifully on this machine and is a poor
-   thing to hand somebody else — it is a Python package, not a file. */
+/* The kinds the search offers. A format name is a name, like a tool name —
+   it never goes through the translation catalogue. Only GGUF for now: the
+   one the program can fetch as a single file and start by itself. */
 export const ARTEN = ['gguf']
 
-/* Two families, chosen for one job: calling tools without drama. The small
-   steps keep Bonsai — dense, and unbeatable per gigabyte. From 16 GB up the
-   list switches to Gemma 4, the first generation of that line trained to
-   call tools natively: dense models only, because a model where the whole
-   brain answers every word stays on task through long agent runs, which is
-   exactly where sparse expert models drift off and start talking to
-   themselves. One family across three steps also means one temperament —
-   whoever upgrades their machine meets a model they already know.
+/* The context the fit estimate assumes — the everyday case, not the model's
+   ceiling. A build "fits" when its file plus a conversation of this size
+   plus its speed module stay under the machine's memory. */
+const STANDARD_KONTEXT = 32768
 
-   Every file name and size below was checked against the repository it
-   names. A recommendation that 404s looks like a broken program, not like a
-   wrong list. */
-export const EMPFEHLUNGEN = [
+/* A rough weight for a speed module that rides along — a few hundred
+   megabytes. The estimate is an order of magnitude, not a decimal. */
+const DRAFTER_GB = 0.4
+
+/* The machine sizes an honest "needs a bigger machine" rounds up to. */
+const MASCHINEN = [8, 16, 32, 64, 128]
+
+export const KATALOG = [
   {
-    bis: 8,
-    /* One bit per weight — every weight is a single yes or no instead of a
-       number with a decimal point. That is what brings a 27B model down to a
-       file this small; a step of 8 GB has no room for anything larger,
-       because a model needs its size in memory and the conversation needs
-       the rest. */
-    modelle: [
+    id: 'gemma-4-31B',
+    name: 'Gemma 4 31B',
+    von: 'Google',
+    logo: 'G',
+    marke: 'google',
+    satz: 'katalog.satz_gemma31',
+    langsatz: 'katalog.lang_gemma31',
+    faehigkeiten: ['winkel', 'auge', 'blitz'],
+    kontext: 131072,
+    fassungen: [
+      {
+        id: 'unsloth/gemma-4-31B-it-qat-GGUF',
+        name: '4-Bit QAT',
+        datei: 'gemma-4-31B-it-qat-UD-Q4_K_XL.gguf',
+        groesse: 16.1,
+        mmproj: 'mmproj-F16.gguf',
+        mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
+        drafter: 'mtp-gemma-4-31B-it.gguf',
+        drafter_ziel: 'mtp-gemma-4-31B-it-qat.gguf',
+        warum: 'werkzeug_flaggschiff',
+        bis: 32,
+      },
+      {
+        id: 'unsloth/gemma-4-31B-it-GGUF',
+        name: '8-Bit',
+        datei: 'gemma-4-31B-it-UD-Q8_K_XL.gguf',
+        groesse: 35.0,
+        mmproj: 'mmproj-F16.gguf',
+        mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
+        drafter: 'mtp-gemma-4-31B-it.gguf',
+        drafter_ziel: 'mtp-gemma-4-31B-it.gguf',
+        warum: 'werkzeug_acht_bit',
+        bis: 64,
+      },
+    ],
+  },
+  {
+    id: 'gemma-4-12B',
+    name: 'Gemma 4 12B',
+    von: 'Google',
+    logo: 'G',
+    marke: 'google',
+    satz: 'katalog.satz_gemma12',
+    langsatz: 'katalog.lang_gemma12',
+    faehigkeiten: ['winkel', 'auge', 'blitz'],
+    kontext: 131072,
+    fassungen: [
+      {
+        id: 'unsloth/gemma-4-12B-it-qat-GGUF',
+        name: '4-Bit QAT',
+        datei: 'gemma-4-12B-it-qat-UD-Q4_K_XL.gguf',
+        groesse: 6.3,
+        mmproj: 'mmproj-F16.gguf',
+        mmproj_ziel: 'gemma-4-12B-it-qat-mmproj-F16.gguf',
+        drafter: 'mtp-gemma-4-12B-it.gguf',
+        drafter_ziel: 'mtp-gemma-4-12B-it.gguf',
+        warum: 'werkzeug_qat',
+        bis: 16,
+      },
+    ],
+  },
+  {
+    id: 'ternary-bonsai-27B',
+    name: 'Ternary Bonsai 27B',
+    von: 'Prism ML',
+    logo: 'B',
+    marke: 'prism',
+    satz: 'katalog.satz_ternary',
+    langsatz: 'katalog.lang_ternary',
+    faehigkeiten: ['winkel', 'auge'],
+    kontext: 65536,
+    fassungen: [
+      {
+        id: 'prism-ml/Ternary-Bonsai-27B-gguf',
+        name: '2 Bit',
+        datei: 'Ternary-Bonsai-27B-Q2_0.gguf',
+        groesse: 7.2,
+        mmproj: 'Ternary-Bonsai-27B-mmproj-Q8_0.gguf',
+        mmproj_ziel: 'Ternary-Bonsai-27B-mmproj-Q8_0.gguf',
+        warum: 'zwei_bit',
+        bis: 16,
+      },
+    ],
+  },
+  {
+    id: 'bonsai-27B',
+    name: 'Bonsai 27B',
+    von: 'Prism ML',
+    logo: 'B',
+    marke: 'prism',
+    satz: 'katalog.satz_bonsai',
+    langsatz: 'katalog.lang_bonsai',
+    faehigkeiten: ['winkel', 'auge', 'gluehbirne'],
+    kontext: 65536,
+    fassungen: [
       {
         id: 'prism-ml/Bonsai-27B-gguf',
-        name: 'Bonsai 27B · 1 Bit',
+        name: '1 Bit',
         datei: 'Bonsai-27B-Q1_0.gguf',
-        art: 'gguf',
         groesse: 3.8,
         mmproj: 'Bonsai-27B-mmproj-Q8_0.gguf',
         mmproj_ziel: 'Bonsai-27B-mmproj-Q8_0.gguf',
@@ -83,70 +162,58 @@ export const EMPFEHLUNGEN = [
       },
     ],
   },
-  {
-    bis: 16,
-    modelle: [
-      {
-        id: 'unsloth/gemma-4-12B-it-qat-GGUF',
-        name: 'Gemma 4 12B · 4 Bit QAT',
-        datei: 'gemma-4-12B-it-qat-UD-Q4_K_XL.gguf',
-        art: 'gguf',
-        groesse: 6.3,
-        mmproj: 'mmproj-F16.gguf',
-        mmproj_ziel: 'gemma-4-12B-it-qat-mmproj-F16.gguf',
-        drafter: 'mtp-gemma-4-12B-it.gguf',
-        drafter_ziel: 'mtp-gemma-4-12B-it.gguf',
-        warum: 'werkzeug_qat',
-      },
-      {
-        id: 'prism-ml/Ternary-Bonsai-27B-gguf',
-        name: 'Ternary Bonsai 27B · 2 Bit',
-        datei: 'Ternary-Bonsai-27B-Q2_0.gguf',
-        art: 'gguf',
-        groesse: 7.2,
-        mmproj: 'Ternary-Bonsai-27B-mmproj-Q8_0.gguf',
-        mmproj_ziel: 'Ternary-Bonsai-27B-mmproj-Q8_0.gguf',
-        warum: 'zwei_bit',
-      },
-    ],
-  },
-  {
-    bis: 32,
-    modelle: [
-      {
-        id: 'unsloth/gemma-4-31B-it-qat-GGUF',
-        name: 'Gemma 4 31B · 4 Bit QAT',
-        datei: 'gemma-4-31B-it-qat-UD-Q4_K_XL.gguf',
-        art: 'gguf',
-        groesse: 16.1,
-        mmproj: 'mmproj-F16.gguf',
-        mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
-        drafter: 'mtp-gemma-4-31B-it.gguf',
-        drafter_ziel: 'mtp-gemma-4-31B-it-qat.gguf',
-        warum: 'werkzeug_flaggschiff',
-      },
-    ],
-  },
-  {
-    bis: 64,
-    modelle: [
-      {
-        id: 'unsloth/gemma-4-31B-it-GGUF',
-        name: 'Gemma 4 31B · 8 Bit',
-        datei: 'gemma-4-31B-it-UD-Q8_K_XL.gguf',
-        art: 'gguf',
-        groesse: 35.0,
-        mmproj: 'mmproj-F16.gguf',
-        mmproj_ziel: 'gemma-4-31B-it-mmproj-F16.gguf',
-        drafter: 'mtp-gemma-4-31B-it.gguf',
-        drafter_ziel: 'mtp-gemma-4-31B-it.gguf',
-        warum: 'werkzeug_acht_bit',
-      },
-    ],
-  },
 ]
 
-/** The step a machine with this much memory falls into. */
+/** The memory a build needs to run at the everyday context, in GB. */
+export function bedarf(fassung) {
+  const beifahrer = fassung.drafter ? DRAFTER_GB : 0
+  return speicherSchaetzung(fassung.groesse, STANDARD_KONTEXT, beifahrer).gesamt
+}
+
+/** Does this build run comfortably on a machine with this much memory? */
+export function passt(fassung, gigabyte) {
+  return gigabyte != null && bedarf(fassung) <= gigabyte
+}
+
+/** The smallest standard machine size that runs this build. */
+export function brauchtMaschine(fassung) {
+  const b = bedarf(fassung)
+  return MASCHINEN.find((m) => m >= b) ?? MASCHINEN[MASCHINEN.length - 1]
+}
+
+/** The build to pre-pick for a machine: the best (largest) that fits, or —
+    when none fits — the smallest, so the choice is honest rather than
+    empty. */
+export function passendeFassung(karte, gigabyte) {
+  const passend = karte.fassungen.filter((f) => passt(f, gigabyte))
+  const pool = passend.length ? passend : karte.fassungen
+  const groesser = passend.length
+    ? (a, b) => (b.groesse > a.groesse ? b : a)
+    : (a, b) => (b.groesse < a.groesse ? b : a)
+  return pool.reduce(groesser)
+}
+
+/** Does the card fit the machine at all — has it a build that runs? */
+export function kartePasst(karte, gigabyte) {
+  return karte.fassungen.some((f) => passt(f, gigabyte))
+}
+
+/** The one card to suggest for a fresh machine: the most capable that
+    fits, so the first model is the best the machine can carry — the same
+    call the onboarding makes. Returns { karte, fassung } or null. */
+export function empfehlungFuer(gigabyte) {
+  const passend = KATALOG.filter((k) => kartePasst(k, gigabyte))
+  const pool = passend.length ? passend : KATALOG
+  let beste = null
+  for (const karte of pool) {
+    const fassung = passendeFassung(karte, gigabyte)
+    if (!beste || fassung.groesse > beste.fassung.groesse) beste = { karte, fassung }
+  }
+  return beste
+}
+
+/** Kept as a pure recommender: the card recommended for this much memory.
+    The onboarding reads it to name a first model for the machine. */
 export function stufeFuer(gigabyte) {
-  return EMPFEHLUNGEN.find((s) => gigabyte <= s.bis) ?? EMPFEHLUNGEN[EMPFEHLUNGEN.length - 1]
+  return empfehlungFuer(gigabyte)?.karte ?? null
 }

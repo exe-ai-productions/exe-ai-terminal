@@ -1,47 +1,44 @@
 <script>
-  /* Local models: what is running on this machine, and how it is set.
+  /* Local models: what runs on this machine, and how it is set.
 
-     Its own window because local is the normal case, not a special one. It
-     shares nothing with the cloud window except the parameter panel — there
-     is no key here, no catalogue to tick, nothing to download yet.
+     Its own window because local is the normal case. The left column shows
+     what runs now as tiles, then a "Set up" pair — the catalogue, where a
+     model comes from, and the model server, where one is started. The right
+     column shows the server (its status card and form, or the first-run
+     steps), or the parameters of a model clicked on the left.
 
-     Getting a model belongs here too, next to the running ones — as the
-     last entry on the left, because it is the answer for a machine where
-     the left list is still empty. What it cannot do yet is start one: that
-     is the runner, and it does not exist. */
+     Getting a model is no longer a row here: the catalogue is its own
+     window, opened by its tile. The red "server offline" tile is gone; an
+     empty list is one honest sentence. */
   import Fenster from './Fenster.svelte'
   import Standpille from './Standpille.svelte'
   import Schalter from './Schalter.svelte'
   import Parametertafel from './Parametertafel.svelte'
-  import Modellsuche from './Modellsuche.svelte'
   import Modellserver from './Modellserver.svelte'
   import Schriftzug from './Schriftzug.svelte'
+  import Kachel from './Kachel.svelte'
+  import Leuchtpunkt from './Leuchtpunkt.svelte'
+  import Hauszeichen from './Hauszeichen.svelte'
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
   import { zustand } from '../lib/zustand.svelte.js'
   import { modellwahl, auswahlLaden, istAn, schalten, lokale } from '../lib/modelle.svelte.js'
-  import { stufeFuer } from '../lib/modellempfehlungen.js'
 
   let { offen = $bindable(false) } = $props()
 
-  /* Which model the right half shows. Clicking left changes only the right
-     half — it does NOT change what you are chatting with. Mixing the two
-     would mean every glance at a setting silently switched models. */
-  let gezeigt = $state(null)
-
-  /* Not a model id and never colliding with one: an id always carries a
-     provider or a path. */
-  const HOLEN = 'holen'
+  /* Which the right half shows: the server, or a clicked model's
+     parameters. Clicking left never changes what you are chatting with. */
   const SERVER = 'server'
+  let gezeigt = $state(SERVER)
 
   const modelle = $derived(lokale())
-  const modell = $derived(modelle.find((m) => m.id === gezeigt) ?? modelle[0] ?? null)
+  const modell = $derived(modelle.find((m) => m.id === gezeigt) ?? null)
   const anzahlAn = $derived(modelle.filter((m) => istAn(m.id)).length)
+  const reise = $derived(modelle.length === 0)
 
   $effect(() => {
     if (!offen) return
     if (!modellwahl.geladen) auswahlLaden()
-    if (gezeigt === null) gezeigt = zustand.modellId || modelle[0]?.id || null
   })
 
   function kurz(zahl) {
@@ -51,15 +48,15 @@
     return (k >= 100 ? Math.round(k) : Math.round(k * 10) / 10) + 'k'
   }
 
-  /* Engine names are names and stay untranslated; only the paraphrase for
-     "anything speaking OpenAI's interface" is a sentence and goes through
-     the catalogue. */
-  /* The runner's report feeds the head and the journey: machine total,
-     whether the server program is there, which files lie in the folder.
-     Polled gently while the window is open, so a finished download moves
-     the journey along without a reopen. */
+  /* The runner's report feeds the head and the action tiles: machine total,
+     whether the server runs, on which port, with which speed module. */
   let auskunft = $state(null)
   const maschineGb = $derived(auskunft?.speicher_gb ?? null)
+  const laeuft = $derived(Boolean(auskunft?.laeuft))
+  /* A fresh machine has nothing in the folder; a machine with files but no
+     running server is a different, quieter state. The two get different
+     words below. */
+  const ordnerLeer = $derived((auskunft?.modelle?.length ?? 0) === 0)
   $effect(() => {
     if (!offen) return
     const holen = () => api.runnerAuskunft().then((a) => (auskunft = a)).catch(() => {})
@@ -68,16 +65,12 @@
     return () => clearInterval(takt)
   })
 
-  /* The journey shows while nothing local answers: three stations from
-     bare machine to running model. Each station reads its state from the
-     report — done, up next, or waiting its turn. */
-  const reise = $derived(modelle.length === 0)
-  const serverDa = $derived(Boolean(auskunft?.programm))
-  const dateienDa = $derived((auskunft?.modelle?.length ?? 0) > 0)
-  const vorschlag = $derived(maschineGb ? (stufeFuer(maschineGb)?.modelle[0] ?? null) : null)
-
   const dialektName = (d) =>
     d === 'openai' ? t('modell.eigener_unter') : ({ llama_cpp: 'llama.cpp', mlx: 'MLX' }[d] ?? d)
+
+  /* The running server carries the blue speed-module bolt when a module is
+     active — blue is the house colour for running. */
+  const mtpAktiv = (m) => m.anbieter === 'runner' && Boolean(auskunft?.drafter)
 </script>
 
 <Fenster bind:offen art="liste">
@@ -114,129 +107,71 @@
 
   <div class="zwei">
     <div class="links">
-      {#if !reise}
-        <div class="haus"><span class="hname">{t('modell.laeuft_gerade')}</span></div>
-      {/if}
+      <h4 class="abschnitt">{t('modell.laeuft_gerade')}</h4>
       {#if reise}
-        <!-- The same tile a model will sit in: when the server comes up,
-             only the lettering changes — the shape stays put. -->
-        <div class="zeile stumm">
-          <span class="lpunkt"></span>
-          <div class="wer"><div class="mname">{t('modell.server_offline')}</div></div>
-        </div>
-      {/if}
-      {#each modelle as m (m.id)}
-        <div
-          class="zeile"
-          class:gewaehlt={m.id === modell?.id}
-          class:aus={!istAn(m.id)}
-          role="button"
-          tabindex="0"
-          onclick={() => (gezeigt = m.id)}
-          onkeydown={(e) => { if (e.key === 'Enter') gezeigt = m.id }}
-        >
-          <span class="punkt" class:tot={!m.erreichbar}></span>
-          <div class="wer">
-            <div class="mname">{m.name}</div>
-            <div class="mtut">
-              {#if m.context_tokens}{kurz(m.context_tokens)} · {/if}
-              {dialektName(m.dialekt)}
-            </div>
+        <p class="leerzeile">{t(ordnerLeer ? 'modell.kein_modell_satz' : 'modell.nichts_laeuft')}</p>
+      {:else}
+        {#each modelle as m (m.id)}
+          <div class="kachelzeile">
+            <Kachel
+              titel={m.name}
+              gewaehlt={m.id === gezeigt}
+              onclick={() => (gezeigt = m.id)}
+              ariaLabel={m.name}
+            >
+              {#snippet marke()}
+                <Leuchtpunkt farbe={m.erreichbar ? 'gruen' : 'still'} groesse={8} />
+              {/snippet}
+              {#snippet unter()}
+                {#if m.context_tokens}{kurz(m.context_tokens)} · {/if}{dialektName(m.dialekt)}
+                {#if mtpAktiv(m)}
+                  <span class="mtp" title={t('modell.mtp_aktiv')}><Hauszeichen zeichen="blitz" groesse={12} /></span>
+                {/if}
+              {/snippet}
+              {#snippet rechts()}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+                  <Schalter an={istAn(m.id)} beschriftung={m.name} onschalten={(an) => schalten(m.id, an)} />
+                </span>
+              {/snippet}
+            </Kachel>
           </div>
-          <Schalter
-            an={istAn(m.id)}
-            beschriftung={m.name}
-            onschalten={(an) => schalten(m.id, an)}
-          />
-        </div>
-      {/each}
+        {/each}
+      {/if}
 
-      <!-- Last on the left, and reachable even when nothing runs: on a fresh
-           machine this is the only entry that leads anywhere. -->
-      <div
-        class="zeile holen"
-        class:gewaehlt={gezeigt === HOLEN}
-        role="button"
-        tabindex="0"
-        onclick={() => (gezeigt = HOLEN)}
-        onkeydown={(e) => { if (e.key === 'Enter') gezeigt = HOLEN }}
-      >
-        <span class="plus" aria-hidden="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.5" stroke-linecap="round"><path d="M12 5 V19 M5 12 H19" /></svg>
-        </span>
-        <div class="wer"><div class="mname">{t('modell.holen')}</div></div>
+      <h4 class="abschnitt zweit">{t('modell.einrichten')}</h4>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('modell.katalog')}
+          onclick={() => { offen = false; zustand.katalogOffen = true }}
+          ariaLabel={t('modell.katalog')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="raster" groesse={17} />{/snippet}
+          {#snippet unter()}
+            {ordnerLeer && maschineGb ? t('modell.katalog_unter_erst', { gb: maschineGb }) : t('modell.katalog_unter')}
+          {/snippet}
+          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
+        </Kachel>
       </div>
-      <div
-        class="zeile holen"
-        class:gewaehlt={gezeigt === SERVER}
-        role="button"
-        tabindex="0"
-        onclick={() => (gezeigt = SERVER)}
-        onkeydown={(e) => { if (e.key === 'Enter') gezeigt = SERVER }}
-      >
-        <span class="plus" aria-hidden="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 L15 12 L9 18" /></svg>
-        </span>
-        <div class="wer"><div class="mname">{t('modell.server')}</div></div>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('modell.server')}
+          gewaehlt={gezeigt === SERVER}
+          onclick={() => (gezeigt = SERVER)}
+          ariaLabel={t('modell.server')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="server" groesse={17} />{/snippet}
+          {#snippet unter()}
+            <Leuchtpunkt farbe={laeuft ? 'gruen' : 'still'} groesse={6} />
+            {laeuft ? t('modell.server_unter_an', { port: auskunft.port }) : t('modell.server_unter_aus')}
+          {/snippet}
+          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
+        </Kachel>
       </div>
     </div>
 
     <div class="rechts">
-      {#if gezeigt === HOLEN}
-        <Modellsuche />
-      {:else if gezeigt === SERVER}
-        <Modellserver />
-      {:else if reise}
-        <div class="reise">
-          <div class="station" class:fertig={serverDa} class:dran={!serverDa}>
-            <div class="nr">{#if serverDa}✓{:else}1{/if}</div>
-            <div>
-              <h3>{t('modell.server_holen')}</h3>
-              <div class="satz">{t('modell.reise_server_satz')}</div>
-            </div>
-            <div class="tat">
-              {#if serverDa}
-                <span class="haken">{t('modell.reise_da')}</span>
-              {:else}
-                <button class="rknopf" onclick={() => (gezeigt = SERVER)}>{t('modell.server_holen')}</button>
-              {/if}
-            </div>
-          </div>
-
-          <div class="station" class:fertig={dateienDa} class:dran={serverDa && !dateienDa} class:wartet={!serverDa}>
-            <div class="nr">{#if dateienDa}✓{:else}2{/if}</div>
-            <div>
-              <h3>{t('modell.holen')}</h3>
-              <div class="satz">{t('modell.reise_modell_satz').replace('{gb}', maschineGb ?? '…')}</div>
-            </div>
-            <div class="tat">
-              <button class="rknopf" class:still={!serverDa || dateienDa} onclick={() => (gezeigt = HOLEN)}>{t('modell.reise_stoebern')}</button>
-            </div>
-            {#if vorschlag && !dateienDa}
-              <div class="vorschlag">
-                <div>
-                  <div class="v-name">{vorschlag.name}</div>
-                  <div class="v-warum">{t('modell.' + vorschlag.warum)}</div>
-                </div>
-                <div class="v-gb">{vorschlag.groesse} GB</div>
-              </div>
-            {/if}
-          </div>
-
-          <div class="station" class:dran={dateienDa} class:wartet={!dateienDa}>
-            <div class="nr">3</div>
-            <div>
-              <h3>{t('modell.reise_start')}</h3>
-              <div class="satz">{t('modell.reise_start_satz')}</div>
-            </div>
-            <div class="tat">
-              <button class="rknopf" class:still={!dateienDa} onclick={() => (gezeigt = SERVER)}>{t('modell.server')}</button>
-            </div>
-          </div>
-        </div>
-      {:else if modell}
+      {#if modell}
         <div class="kopfkarte">
           <div class="min">
             <div class="gross">{modell.name}</div>
@@ -251,16 +186,13 @@
         </div>
         <Parametertafel {modell} />
       {:else}
-        <p class="leer">{t('fehler.kein_modell_verfuegbar')}</p>
+        <Modellserver />
       {/if}
     </div>
   </div>
 </Fenster>
 
 <style>
-  /* The head carries the drawn mark: terminal sign, stroke lettering, and
-     the one sentence that says what Local means. The memory readout keeps
-     its place on the right shoulder. */
   .markenkopf {
     display: flex;
     align-items: flex-end;
@@ -279,153 +211,6 @@
     font-size: 13.5px;
     margin-top: 9px;
   }
-
-  /* The honest lamp: red is the state "no server", the same ringed dot the
-     menu bar wears. */
-  /* The same ringed dot the menu bar wears — one lamp, one look. */
-  .lpunkt {
-    flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 99px;
-    background: var(--rot);
-    box-shadow: 0 0 0 1.5px var(--text);
-    margin: 0 1px;
-  }
-  /* A statement, not a control: the tile keeps the shape of its future
-     tenant and answers no clicks until one moves in. */
-  .zeile.stumm {
-    cursor: default;
-    margin-bottom: 4px;
-  }
-  .zeile.stumm:hover {
-    background: none;
-  }
-
-  /* The guided journey: three stations on one thread. Green means done,
-     blue means up next, dimness means not your turn yet. */
-  .reise {
-    padding: 12px 8px 4px;
-  }
-  .station {
-    display: grid;
-    grid-template-columns: 36px 1fr auto;
-    gap: 0 18px;
-    position: relative;
-    padding-bottom: 34px;
-  }
-  .station:last-child {
-    padding-bottom: 2px;
-  }
-  .station::before {
-    content: '';
-    position: absolute;
-    left: 16.5px;
-    top: 38px;
-    bottom: 4px;
-    width: 1px;
-    background: var(--linie-stark);
-  }
-  .station:last-child::before {
-    display: none;
-  }
-  .nr {
-    width: 34px;
-    height: 34px;
-    border-radius: 99px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1.5px solid var(--linie-stark);
-    color: var(--text-still);
-    font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace;
-    background: var(--bg);
-    position: relative;
-    z-index: 1;
-  }
-  .station.fertig .nr {
-    border-color: var(--gruen);
-    color: var(--gruen);
-  }
-  .station.dran .nr {
-    border-color: var(--blau);
-    color: var(--blau);
-  }
-  .station h3 {
-    font-size: 15.5px;
-    font-weight: 600;
-    margin: 0;
-    padding-top: 6px;
-  }
-  .station.wartet h3,
-  .station.wartet .satz {
-    color: var(--text-still);
-  }
-  .satz {
-    grid-column: 2;
-    color: var(--text-leise);
-    font-size: 13.5px;
-    line-height: 1.55;
-    margin-top: 4px;
-    max-width: 460px;
-  }
-  .tat {
-    padding-top: 3px;
-  }
-  .haken {
-    display: inline-flex;
-    align-items: center;
-    color: var(--gruen);
-    font-size: 12.5px;
-    font-weight: 600;
-    padding-top: 9px;
-  }
-  .rknopf {
-    font: 600 12.5px inherit;
-    font-family: inherit;
-    color: var(--bg);
-    background: var(--text);
-    border: none;
-    border-radius: 9px;
-    padding: 8px 14px;
-    cursor: pointer;
-  }
-  .rknopf.still {
-    background: none;
-    color: var(--text-leise);
-    border: 1px solid var(--linie-stark);
-  }
-  .vorschlag {
-    grid-column: 2;
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border: 1px solid var(--linie);
-    border-radius: 12px;
-    padding: 11px 14px;
-    background: color-mix(in srgb, var(--blau) 7%, var(--bg));
-    max-width: 430px;
-  }
-  .v-name {
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .v-warum {
-    font-size: 12px;
-    color: var(--text-leise);
-    margin-top: 1px;
-  }
-  .v-gb {
-    margin-left: auto;
-    font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace;
-    color: var(--text-leise);
-    white-space: nowrap;
-  }
-
-  /* The readout sits on the shoulder of the inner box, right-aligned: a
-     loud label outside, the bare number in a stroked pill — the same
-     stroke-on-dark look the tool chips in the chat wear. */
   .vramzeile {
     display: flex;
     justify-content: flex-end;
@@ -441,37 +226,21 @@
   .vramwort + .vramwert {
     margin-right: 10px;
   }
-  .vramzeile .vramwort:first-child {
-    margin-left: 0;
-  }
   .vramwert {
     border: 1px solid var(--linie-stark);
     border-radius: 9px;
     padding: 4px 10px;
-    font: 500 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 500 12.5px/1.2 var(--schrift-fest);
     color: var(--text);
     white-space: nowrap;
   }
 
-  .zaehler { font-size: 11.5px; color: var(--text-still); margin: -6px 0 10px; }
-  /* The way out of an empty list. Marked off by a line above rather than a
-     colour: it is a different kind of entry, not a different state. */
-  .zeile.holen {
-    color: var(--text-leise);
+  .zaehler {
+    font-size: 11.5px;
+    color: var(--text-still);
+    margin: -6px 0 10px;
   }
-  /* One line above the pair, not between them: they belong together — get a
-     model, then start it. */
-  .zeile.holen:first-of-type,
-  .liste > .zeile.holen:nth-last-child(2) {
-    margin-top: 6px;
-    padding-top: 11px;
-    border-top: 1px solid var(--linie);
-  }
-  .plus { display: inline-flex; flex: none; color: var(--text-still); }
-  /* The height comes from the window kind (Fenster.svelte) — it used to
-     stand in three files at once, which is how the settings window drifted
-     away from the other three. Here the two halves only fill what the body
-     gives them and scroll inside; the bars are invisible house-wide. */
+
   .zwei {
     display: flex;
     gap: 0;
@@ -489,49 +258,41 @@
     padding: 10px 8px;
     overflow-y: auto;
   }
-  .haus { display: flex; align-items: center; gap: 8px; margin: 2px 8px 5px; }
-  .hname {
+  .abschnitt {
     font-size: 10.5px;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--text-still);
     font-weight: 600;
+    margin: 2px 4px 8px;
   }
-  .zeile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 9px;
-    border-radius: 9px;
-    cursor: pointer;
-    transition: background 0.12s;
+  .abschnitt.zweit {
+    margin-top: 16px;
   }
-  .zeile:hover, .zeile.gewaehlt { background: var(--linie); }
-  .wer { flex: 1; min-width: 0; }
-  .mname {
-    font-size: 12.5px;
-    font-weight: 600;
-    font-family: var(--schrift-fest);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .kachelzeile {
+    margin: 0 2px 7px;
   }
-  .mtut {
-    font-size: 11px;
+  .leerzeile {
+    font-size: 12px;
     color: var(--text-still);
-    margin-top: 1px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 4px 6px 8px;
+    line-height: 1.5;
   }
-  /* Switched off stays visible, only quiet — you should see that it exists. */
-  .zeile.aus .mname, .zeile.aus .mtut { opacity: 0.42; }
+  .mtp {
+    display: inline-flex;
+    color: var(--blau);
+  }
+  .pfeil {
+    color: var(--text-still);
+    font-size: 12px;
+  }
 
-  /* Green means the server answers. It is a state, so it may carry colour. */
-  .punkt { width: 7px; height: 7px; border-radius: 50%; background: var(--gruen); flex: none; }
-  .punkt.tot { background: var(--linie-stark); }
-
-  .rechts { flex: 1; padding: 14px 18px; min-width: 0; overflow-y: auto; }
+  .rechts {
+    flex: 1;
+    padding: 14px 18px;
+    min-width: 0;
+    overflow-y: auto;
+  }
   .kopfkarte {
     display: flex;
     align-items: center;
@@ -539,7 +300,10 @@
     padding-bottom: 12px;
     border-bottom: 1px solid var(--linie);
   }
-  .min { flex: 1; min-width: 0; }
+  .min {
+    flex: 1;
+    min-width: 0;
+  }
   .gross {
     font-size: 14px;
     font-weight: 600;
@@ -548,11 +312,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .unter { font-size: 11.5px; color: var(--text-still); margin-top: 2px; }
-  .leer { color: var(--text-still); font-size: 13px; padding: 6px 4px; }
+  .unter {
+    font-size: 11.5px;
+    color: var(--text-still);
+    margin-top: 2px;
+  }
 
   @media (max-width: 720px) {
-    .zwei { flex-direction: column; flex: none; }
-    .links { width: 100%; border-right: none; border-bottom: 1px solid var(--linie); }
+    .zwei {
+      flex-direction: column;
+      flex: none;
+    }
+    .links {
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid var(--linie);
+    }
   }
 </style>

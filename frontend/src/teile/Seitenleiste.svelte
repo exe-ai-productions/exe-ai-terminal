@@ -131,6 +131,8 @@
   class="seitenleiste"
   class:offen={zustand.seitenleisteOffen}
   class:eingeklappt={zustand.seitenleisteEingeklappt}
+  class:zieht={zustand.seitenZieht}
+  style:width={zustand.seitenleisteEingeklappt ? null : zustand.seitenBreite + 'px'}
 >
   <!-- The section switch (6.5, variant A): same construction as the segment
        in the settings. The yellow dot shows waiting jobs even when you are
@@ -449,8 +451,8 @@
   }
 
   .seitenleiste {
-    /* 15 percent wider than the 248 it started with — titles were
-       truncating earlier than the free space around them justified. */
+    /* The starting width; from then on the seam's drag handle writes the
+       width inline and remembers it. */
     width: 285px;
     flex: none;
     display: flex;
@@ -458,6 +460,11 @@
     background: var(--bg-seite);
     border-right: 1px solid var(--linie);
     transition: width 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+  /* While the hand drags the seam, the edge must sit under it — an easing
+     that trails behind the pointer reads as lag, not as polish. */
+  .seitenleiste.zieht {
+    transition: none;
   }
   /* Collapsed it goes away completely. It used to leave a 50 px rail behind
      because the toggle lived inside it and the way back would otherwise have

@@ -50,7 +50,7 @@ from app.generationen import Generierung, Generierungsverwaltung
 from app.i18n import t
 from app.providers import ChatNachricht, Generierungsanfrage, ProviderFehler
 from app.tools import WerkzeugRegistry, WerkzeugVerboten
-from app import gedaechtnis, grundprompt, skills, skillwahl, werkzeugwahl
+from app import anrede, gedaechtnis, grundprompt, skills, skillwahl, werkzeugwahl
 
 log = logging.getLogger(__name__)
 
@@ -303,12 +303,15 @@ def _system_bauen(request, repositories, chat, zustand, gewaehlt: str = "") -> s
     )
     # The user's prompt is the only part `prompt_aus` suspends.
     benutzer = "" if chat.prompt_aus else config.system_prompt_lesen()
-    return skills.anhaengen(
-        gedaechtnis.anhaengen(
-            grundprompt.mit_benutzerprompt(grund, benutzer),
-            config.memory_lesen() if gedaechtnis_da else "",
+    return anrede.anhaengen(
+        skills.anhaengen(
+            gedaechtnis.anhaengen(
+                grundprompt.mit_benutzerprompt(grund, benutzer),
+                config.memory_lesen() if gedaechtnis_da else "",
+            ),
+            gewaehlte_skill,
         ),
-        gewaehlte_skill,
+        anrede.lesen(repositories),
     )
 
 

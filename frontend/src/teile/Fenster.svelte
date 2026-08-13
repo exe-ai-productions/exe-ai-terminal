@@ -47,7 +47,11 @@
      body and scrolling inside — the bars are invisible house-wide — every
      window of one kind is the same, whether three rows stand in it or
      thirty. */
-  const BREITE = { frage: '460px', liste: '900px', vorschau: '1200px' }
+  /* galerie: the model catalogue. Wider than a list window so a three-up
+     card grid breathes, and a touch taller — a gallery is looked at, not
+     scanned down a side list. Still capped to the app area by the same
+     min()/clamp() as the others. */
+  const BREITE = { frage: '460px', liste: '900px', vorschau: '1200px', galerie: '1100px' }
 
   let {
     offen = $bindable(false), titel = '', art = 'frage', symbol, children,
@@ -59,6 +63,7 @@
   <div class="schleier" class:weit={art === 'vorschau'} transition:fade={{ duration: 150 }}
        onclick={(e) => { if (e.target === e.currentTarget) offen = false }}>
     <div class="popup" class:liste={art === 'liste'} class:vorschau={art === 'vorschau'}
+         class:galerie={art === 'galerie'}
          style="width:min({BREITE[art] ?? BREITE.frage}, 92vw)"
          transition:scale={{ duration: 190, start: 0.97 }}>
       <!-- A window whose body carries its own drawn heading passes an
@@ -86,9 +91,13 @@
   }
   .popup {
     background: var(--bg-erhoben);
-    border: 1px solid var(--linie-stark);
     border-radius: 16px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+    /* The window's outer frame is the house's vector stroke — the same
+       2px ring the notifications wear, hung off var(--text) so it is light
+       in the dark and black in the light. A ring ON the edge (box-shadow),
+       not a border, so the window keeps its exact size. */
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 70%, transparent),
+      0 24px 60px rgba(0, 0, 0, 0.3);
     padding: 16px 18px 14px;
   }
   h3 {
@@ -127,10 +136,21 @@
     min-height: 0;
   }
 
+  /* The gallery body: one fixed height so the catalogue keeps its measure
+     whether four cards stand in it or twelve. The ceiling of 720 matches
+     the kind's intended size; the grid scrolls inside, bars invisible. */
+  .popup.galerie .leib {
+    height: clamp(480px, 74vh, 720px);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   /* On a narrow screen the fixed body would push everything into a
      letterbox — there the window may grow and the page scrolls. */
   @media (max-width: 720px) {
     .popup.liste .leib { height: auto; }
     .popup.vorschau .leib { height: clamp(320px, 70vh, 560px); }
+    .popup.galerie .leib { height: auto; }
   }
 </style>

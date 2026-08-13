@@ -16,6 +16,10 @@
   import Standpille from './Standpille.svelte'
   import Schalter from './Schalter.svelte'
   import Ankreuzliste from './Ankreuzliste.svelte'
+  import Leuchtpunkt from './Leuchtpunkt.svelte'
+  import Werkzeugzeichen from './Werkzeugzeichen.svelte'
+  import { LOGOS } from '../lib/logos.js'
+  import { rollfade } from '../lib/rollfade.js'
   import { t } from '../lib/texte.svelte.js'
   import { melde } from '../lib/zustand.svelte.js'
   import {
@@ -83,59 +87,75 @@
   </div>
 
   <div class="zwei">
-    <div class="links">
+    <div class="links" use:rollfade>
       {#each listen as quelle (quelle.id)}
-        <div
-          class="quelle"
-          class:gewaehlt={quelle.id === gewaehlteQuelle?.id && !gewaehltesWerkzeug}
-          role="button"
-          tabindex="0"
-          onclick={() => (gezeigt = quelle.id)}
-          onkeydown={(e) => { if (e.key === 'Enter') gezeigt = quelle.id }}
-        >
-          <span class="punkt" class:tot={!quelle.laeuft}></span>
-          <div class="wer">
-            <div class="qname">{quellenName(quelle)}</div>
-            <div class="qtut" class:wartet={stand(quelle) === 'ausgeschaltet'}>
-              {#if stand(quelle)}
-                {t(`werkzeuge.${stand(quelle)}`)}
+        <!-- A source and its tools in one raised box, like a settings group:
+             the source carries the sign, name and its ringed status; each
+             tool below it a name and a switch. -->
+        <div class="qbox">
+          <button
+            class="qeintrag"
+            class:gewaehlt={quelle.id === gewaehlteQuelle?.id && !gewaehltesWerkzeug}
+            onclick={() => (gezeigt = quelle.id)}
+          >
+            <span class="qzeichen">
+              {#if LOGOS[quelle.id]}
+                <svg viewBox={LOGOS[quelle.id].vb} width="18" height="18">{@html LOGOS[quelle.id].html}</svg>
               {:else}
-                {t('werkzeuge.von_zahl')
-                  .replace('{an}', quelle.werkzeuge.filter((w) => istAn(w.name)).length)
-                  .replace('{gesamt}', quelle.eingebaut
-                    ? quelle.werkzeuge.length
-                    : quelle.katalog.length)}
+                <Werkzeugzeichen server={quelle.id} />
               {/if}
+            </span>
+            <div class="qmitte">
+              <div class="qname">{quellenName(quelle)}</div>
+              <div class="qsatz">
+                {#if stand(quelle)}
+                  {t(`werkzeuge.${stand(quelle)}`)}
+                {:else}
+                  {t('werkzeuge.von_zahl')
+                    .replace('{an}', quelle.werkzeuge.filter((w) => istAn(w.name)).length)
+                    .replace('{gesamt}', quelle.eingebaut
+                      ? quelle.werkzeuge.length
+                      : quelle.katalog.length)}
+                {/if}
+              </div>
             </div>
-          </div>
-        </div>
+            <Leuchtpunkt
+              farbe={quelle.laeuft ? 'gruen' : stand(quelle) === 'ausgeschaltet' ? 'gelb' : 'still'}
+              groesse={7}
+            />
+          </button>
 
-        {#if quelle.laeuft}
-          {#each quelle.werkzeuge as werkzeug (werkzeug.name)}
-            <div
-              class="zeile"
-              class:gewaehlt={werkzeug.name === gewaehltesWerkzeug?.name}
-              class:aus={!istAn(werkzeug.name)}
-              role="button"
-              tabindex="0"
-              onclick={() => (gezeigt = werkzeug.name)}
-              onkeydown={(e) => { if (e.key === 'Enter') gezeigt = werkzeug.name }}
-            >
-              <div class="wer"><div class="mname">{werkzeug.name}</div></div>
-              <Schalter
-                an={istAn(werkzeug.name)}
-                beschriftung={werkzeug.name}
-                onschalten={(an) => schalten(werkzeug.name, an)}
-              />
-            </div>
-          {/each}
-        {/if}
+          {#if quelle.laeuft}
+            {#each quelle.werkzeuge as werkzeug (werkzeug.name)}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="weintrag"
+                class:gewaehlt={werkzeug.name === gewaehltesWerkzeug?.name}
+                class:aus={!istAn(werkzeug.name)}
+                role="button"
+                tabindex="0"
+                onclick={() => (gezeigt = werkzeug.name)}
+                onkeydown={(e) => { if (e.key === 'Enter') gezeigt = werkzeug.name }}
+              >
+                <span class="wname">{werkzeug.name}</span>
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+                  <Schalter
+                    an={istAn(werkzeug.name)}
+                    beschriftung={werkzeug.name}
+                    onschalten={(an) => schalten(werkzeug.name, an)}
+                  />
+                </span>
+              </div>
+            {/each}
+          {/if}
+        </div>
       {:else}
         <p class="leer">{t('werkzeuge.keine_quelle')}</p>
       {/each}
     </div>
 
-    <div class="rechts">
+    <div class="rechts" use:rollfade>
       {#if gewaehltesWerkzeug}
         <div class="kopfkarte">
           <div class="min">
@@ -243,45 +263,79 @@
     overflow-y: auto;
   }
 
-  .quelle {
+  /* Each source is a raised box; its tools sit inside it, divided by a line
+     — the same shape the settings groups wear. */
+  .qbox {
+    border: 1px solid var(--linie);
+    border-radius: 12px;
+    background: var(--bg-erhoben);
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .qbox:first-child { margin-top: 0; }
+  .qeintrag {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 9px;
-    margin-top: 6px;
-    border-radius: 9px;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    padding: 9px 11px;
     cursor: pointer;
     transition: background 0.12s;
   }
-  .quelle:first-child { margin-top: 0; }
-  .quelle:hover, .quelle.gewaehlt { background: var(--linie); }
-  .qname { font-size: 12.5px; font-weight: 600; }
-  .qtut { font-size: 11px; color: var(--text-still); margin-top: 1px; }
-  /* Yellow: the server is there but switched off — waiting, not broken. */
-  .qtut.wartet { color: var(--gelb); }
-
-  .zeile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 9px 7px 26px;
-    border-radius: 9px;
-    cursor: pointer;
-    transition: background 0.12s;
+  .qeintrag:hover, .qeintrag.gewaehlt { background: var(--linie); }
+  .qzeichen {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 8px;
+    border: 1px solid var(--linie);
+    display: grid;
+    place-items: center;
+    color: var(--text-leise);
   }
-  .zeile:hover, .zeile.gewaehlt { background: var(--linie); }
-  .wer { flex: 1; min-width: 0; }
-  .mname {
+  .qzeichen :global(svg) { width: 18px; height: 18px; }
+  .qmitte { flex: 1; min-width: 0; }
+  .qname {
     font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .qsatz {
+    font-size: 11px;
+    color: var(--text-still);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .weintrag {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 11px 7px 14px;
+    border-top: 1px solid var(--linie);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .weintrag:hover, .weintrag.gewaehlt { background: var(--linie); }
+  .wname {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
     font-family: var(--schrift-fest);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .zeile.aus .mname { opacity: 0.42; }
-
-  .punkt { width: 7px; height: 7px; border-radius: 50%; background: var(--gruen); flex: none; }
-  .punkt.tot { background: var(--linie-stark); }
+  .weintrag.aus .wname { opacity: 0.42; }
 
   .rechts { flex: 1; padding: 14px 18px; min-width: 0; overflow-y: auto; }
   .kopfkarte {
