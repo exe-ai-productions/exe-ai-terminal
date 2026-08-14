@@ -26,8 +26,64 @@ and nothing leaves your machine unless you set that up yourself.
 
 ![The empty chat greeting its user by name, with the wordmark and input centred](docs/chat.png)
 
+---
+
+<p align="center">
+  <img src="docs/eew.svg" width="132" alt="The Extended Workflow monogram">
+</p>
+
+<h2 align="center">Extended Workflow</h2>
+
+<p align="center">
+  <b>A tool call fails. A second model — yours, local, on its own port —
+  reads what went wrong and writes the corrected instruction.<br>
+  You read it, and it is one click away from being sent.</b>
+</p>
+
+Every agent harness fails the same way: a command misses a flag, a path is
+wrong, a file is not where the model thought — and the run stalls, or worse,
+carries on as if nothing happened. The usual answer is to ask the big model
+to fix its own mistake, which costs a full round trip and, on a cloud
+endpoint, sends the failed command and your released folders out of the
+house.
+
+Extended Workflow does it differently, and this is the part that is ours:
+
+- **Plain code spots the failure.** Not a model, not a heuristic dressed up
+  as one — the exit code, the stderr, the timeout. No tokens spent on
+  noticing.
+- **A small model of your own writes the fix.** It runs on its own port,
+  loads only while the feature is on, and answers in a window sized to the
+  question. **It never asks the chat's model, and never a cloud endpoint** —
+  not as a preference, but as a branch in the code with no fallback.
+- **You decide.** The suggestion stands in the rail with the finding beside
+  it. One click sends it, one click drops it. Nothing runs behind your back.
+
+That is the whole promise of this program in one feature: the machine does
+the noticing and the drafting, and the person keeps the decision — with
+nothing leaving the PC on the way.
+
+Shipped switched on. The switch sits in the module head and in the settings,
+and both draw the same fact from the same place.
+
+---
+
 ## What it does
 
+- **Extended Workflow** (above): a failed tool call gets a corrected
+  instruction, written by a small local model on its own port, offered one
+  click away from being sent.
+- **Pictures, drawn on this machine.** stable-diffusion.cpp draws them one
+  at a time behind a memory gate that answers honestly before it starts —
+  size, steps, sampler and scheduler from the shipped binary's own lists, a
+  stackable LoRA list, a starting image with a brush for the part to redraw.
+  A machine without the generator fetches it in one click, the same way the
+  model server has always been fetchable. Nothing leaves the PC.
+- **Long documents stop overrunning the context.** Past a threshold a
+  document is cut into overlapping sections, each carries a vector from a
+  local embedding model, and a question brings along only the passages that
+  fit it — with the section numbers named, so the answer can be checked
+  against the source.
 - **It knows who it works for.** The first start grows a small welcome
   window straight out of the wordmark: what to call you (your system
   already suggests it), your language, light or dark. From then on the
@@ -62,9 +118,10 @@ and nothing leaves your machine unless you set that up yourself.
   orders — a web page cannot re-instruct the assistant — and do what was
   asked, not more. Your own system prompt sits on top and shapes tone and
   character; it never has to fight the machinery.
-- **Documents and images.** PDF/TXT/MD upload into the conversation,
-  image input for vision models, image generation through ComfyUI or an
-  OpenAI-compatible image endpoint.
+- **Documents and images.** PDF/TXT/MD upload into the conversation and
+  image input for vision models. Pictures are drawn locally (above); a
+  ComfyUI instance or an OpenAI-compatible image endpoint can be used
+  instead when you have one.
 - **An interface that stays out of the way.** Windows take turns instead
   of stacking, lists melt at their edges instead of cutting rows, and the
   sidebar seam drags to the width you like — and remembers it.
