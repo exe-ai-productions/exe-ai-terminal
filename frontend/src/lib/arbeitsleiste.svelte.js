@@ -34,7 +34,14 @@ export const leiste = $state({
      after a restart, not have to fetch it back every time. */
   offen: localStorage.getItem('leiste') === 'auf',
   modul: localStorage.getItem('leistenmodul') || 'terminal',
-  breite: Number(localStorage.getItem('leistenbreite')) || 440,
+  /* The narrowest the content is allowed to be, and the width it opens at.
+     Not a taste: the rail plus its strip is 312, the chat list on the left
+     is 286, and at those numbers the input below the wordmark sits 13 px
+     off the middle of the window — under one percent, which the eye does
+     not find. The old 440 put it 103 px off, and that one the eye finds
+     immediately: the conversation looked pushed aside by its own panel.
+     Wider is one drag away and is remembered. */
+  breite: Number(localStorage.getItem('leistenbreite')) || BREITE_MIN,
   zieht: false,
   /* Which module the user closed the rail on. It stays closed for that one
      until its next fresh occasion — a rail that pops back up is a rail
