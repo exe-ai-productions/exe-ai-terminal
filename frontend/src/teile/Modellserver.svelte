@@ -21,6 +21,7 @@
   import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
   import { speicherSchaetzung } from '../lib/speicherschaetzung.js'
   import { empfehlungFuer } from '../lib/modellempfehlungen.js'
+  import { FEINEINSTELLUNGEN } from '../lib/feineinstellungen.js'
   import Auswahlfeld from './Auswahlfeld.svelte'
   import Modulzeichen from './Modulzeichen.svelte'
   import { eew, modellWaehlen as eewModellWaehlen } from '../lib/eew.svelte.js'
@@ -178,6 +179,50 @@
     moe_schichten: moeSchichten || null,
   })
 
+  /* The levers used to live only here, in this form. Reloading the window
+     put every one of them back to its default while the server kept running
+     with what it was given — so the drawer said f16 about a server holding
+     q4_0, and the next start went out without the settings that were the
+     only reason the model fitted at all.
+
+     Loaded once: the running server first, the stored choice otherwise. */
+  let feinGeladen = $state(false)
+
+  function feinUebernehmen(daten) {
+    fein = {
+      kv_cache: daten.kv_cache ?? fein.kv_cache,
+      flash_attention: daten.flash_attention ?? fein.flash_attention,
+      moe_auf_cpu: Boolean(daten.moe_auf_cpu),
+      festnageln: Boolean(daten.festnageln),
+    }
+    faeden = daten.faeden || 0
+    moeSchichten = daten.moe_schichten || 0
+    feinGeladen = true
+  }
+
+  async function feinLaden() {
+    try {
+      const antwort = await api.einstellungAufgeloest(FEINEINSTELLUNGEN)
+      if (antwort?.wert && typeof antwort.wert === 'object') feinUebernehmen(antwort.wert)
+    } catch {
+      /* Nothing stored yet is the normal first case, not an error. */
+    } finally {
+      feinGeladen = true
+    }
+  }
+
+  /* Written when the levers come to rest, not on every click — and never
+     before they were read, or the first poll would store the defaults over
+     whatever was there. */
+  $effect(() => {
+    const _ = JSON.stringify(feindaten)
+    if (!feinGeladen) return
+    const uhr = setTimeout(() => {
+      api.einstellungSetzen('global', FEINEINSTELLUNGEN, feindaten).catch(() => {})
+    }, 600)
+    return () => clearTimeout(uhr)
+  })
+
   /* What the panel is doing, as the head card's one line: the facts that
      used to be spread over a status card, joined by the same separator the
      rest of the house uses. The speed module is named here too — it is the
@@ -223,7 +268,12 @@
         schichten = auskunft.schichten
         port = auskunft.port
         drafter = auskunft.drafter || ''
+        /* What the running server was actually started with beats what was
+           once chosen — and it is taken only once, because this runs every
+           two seconds and would otherwise fight the hand in the drawer. */
+        if (!feinGeladen && auskunft.fein) feinUebernehmen(auskunft.fein)
       }
+      if (!feinGeladen && !auskunft.laeuft) await feinLaden()
       if (protokollOffen || auskunft.laeuft) protokoll = await api.runnerProtokoll()
       if (!auskunft.programm) {
         programmStand = await api.serverProgrammStand()

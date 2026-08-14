@@ -219,6 +219,11 @@ class Lauf:
     # The draft model for speculative decoding, when one was chosen — a
     # small model guesses ahead, the big one only checks.
     drafter: str | None = None
+    # The engine levers this server was started with. Kept because they are
+    # otherwise unreadable afterwards: they leave no trace in the answer, and
+    # a form that cannot show them makes the user set them again from
+    # scratch — or, worse, believe the defaults are what is running.
+    fein: Feineinstellungen | None = None
 
 
 class Modellrunner:
@@ -431,7 +436,12 @@ class Modellrunner:
                 start_new_session=True,
             )
             self._lauf = Lauf(
-                modell=modell, kontext=kontext, schichten=schichten, port=port, drafter=drafter
+                modell=modell,
+                kontext=kontext,
+                schichten=schichten,
+                port=port,
+                drafter=drafter,
+                fein=fein,
             )
             self._pid_merken(self._prozess.pid)
             threading.Thread(target=self._mitlesen, daemon=True).start()

@@ -22,6 +22,8 @@ from app.anrede import SCHLUESSEL as ANREDE
 from app.anrede import schalter_pruefen as anrede_pruefen
 from app.bildvorgabenwahl import SCHLUESSEL as BILD_VORGABEN
 from app.bildvorgabenwahl import wahl_pruefen as bild_vorgaben_pruefen
+from app.feineinstellungenwahl import SCHLUESSEL as FEINEINSTELLUNGEN
+from app.feineinstellungenwahl import wahl_pruefen as feineinstellungen_pruefen
 from app.gedaechtnis import SCHLUESSEL as GEDAECHTNIS
 from app.gedaechtnis import schalter_pruefen
 from app.klangwahl import SCHLUESSEL as KLAENGE
@@ -54,6 +56,7 @@ PRUEFER = {
     WAECHTER: waechter_pruefen,
     EINBETTUNG: einbettung_pruefen,
     BILD_VORGABEN: bild_vorgaben_pruefen,
+    FEINEINSTELLUNGEN: feineinstellungen_pruefen,
 }
 
 
