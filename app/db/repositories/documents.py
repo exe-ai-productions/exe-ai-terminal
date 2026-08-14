@@ -79,6 +79,28 @@ class DocumentRepository(Repository):
             (text, document_id),
         )
 
+    def gekuerzt_merken(self, document_id: str) -> None:
+        """Mark a document as cut WITHOUT touching the text it still holds.
+
+        The sibling above throws the rest away, which is right when a
+        document was taken in whole for a search that then could not be
+        built: what stays has to fit.
+
+        This one is for the other case — the text is still complete on disk
+        and worth keeping, but what travelled to the model this time was cut
+        to fit the context. The card has to say so, because a card that
+        claims a document is complete while the answer was built on its
+        first eight pages is the most expensive kind of wrong: it reads as
+        an answer about the whole file.
+
+        Switching the section search back on makes the full text travel
+        again, so throwing it away here would turn a temporary cut into a
+        permanent one.
+        """
+        self.verbindung.execute(
+            "UPDATE documents SET truncated = 1 WHERE id = ?", (document_id,)
+        )
+
     def loeschen(self, document_id: str) -> bool:
         cursor = self.verbindung.execute(
             "DELETE FROM documents WHERE id = ?", (document_id,)

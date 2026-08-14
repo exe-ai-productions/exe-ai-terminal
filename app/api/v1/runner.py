@@ -81,6 +81,10 @@ class Auskunft(BaseModel):
     schichten: int | None = None
     port: int | None = None
     drafter: str | None = None
+    # The engine levers the running server was started with, so the drawer
+    # can show what is actually in force instead of its own defaults. None
+    # while nothing runs — then the form falls back to the stored choice.
+    fein: dict | None = None
     # The declared bond of each model to its companions, read from the folder
     # manifest and filtered to files that are still there. Keyed by model
     # file name; each value carries the projector and the draft, or null. The
@@ -153,6 +157,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         schichten=lauf.schichten if lauf else None,
         port=lauf.port if lauf else None,
         drafter=lauf.drafter if lauf else None,
+        fein=lauf.fein.als_daten() if lauf and lauf.fein else None,
         zuordnung=_zuordnung(runner),
     )
 

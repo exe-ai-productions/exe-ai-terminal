@@ -406,12 +406,34 @@ def _verlauf_bauen(
                     # the fact (switch flipped off, program gone, model
                     # moved), and it would put a hundred thousand tokens
                     # into a request that has room for eight.
-                    volltext = (dokument.extracted_text or "")[:VOLLTEXT_GRENZE]
-                    inhalt = (
-                        f'[Attached document "{dokument.filename}"]\n'
-                        f"{volltext}\n"
-                        f"[End of document]\n\n{inhalt}"
-                    )
+                    ganz = dokument.extracted_text or ""
+                    volltext = ganz[:VOLLTEXT_GRENZE]
+                    if len(ganz) > VOLLTEXT_GRENZE:
+                        # Said out loud, in both directions.
+                        #
+                        # To the model, with numbers: a model that is handed
+                        # the first eight pages of a hundred and is not told
+                        # so answers a question about page sixty as though
+                        # the page were not there. It has no way to know.
+                        #
+                        # And to the user, by marking the document: the card
+                        # said "complete" while the answer was built on a
+                        # fraction. The stored text is left alone — the cut
+                        # belongs to this request, not to the file.
+                        kopf = (
+                            f'[Attached document "{dokument.filename}" — '
+                            f"TRUNCATED: the first {len(volltext)} of "
+                            f"{len(ganz)} characters. The rest was not sent. "
+                            f"Say so rather than answering as if you had the "
+                            f"whole document.]"
+                        )
+                        fuss = "[End of truncated document]"
+                        if not dokument.truncated:
+                            repositories.documents.gekuerzt_merken(dokument.id)
+                    else:
+                        kopf = f'[Attached document "{dokument.filename}"]'
+                        fuss = "[End of document]"
+                    inhalt = f"{kopf}\n{volltext}\n{fuss}\n\n{inhalt}"
         nachrichten.append(
             ChatNachricht(
                 role=gespeichert.role,
