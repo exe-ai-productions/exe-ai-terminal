@@ -152,3 +152,39 @@ def test_ohne_automatische_skills_steht_nichts_davon_drin():
     """Skills the user has to name cost nothing — that is the whole reason
     the switch is worth having."""
     assert "skill_load" not in grundprompt.bauen(werkzeuge=True)
+
+
+# --- The blocks that came with the new tools --------------------------------
+
+
+def test_die_dateiwerkzeuge_bekommen_ihren_satz_nur_wenn_sie_da_sind():
+    """A sentence about a tool that is switched off costs attention on the
+    smallest local model and buys nothing."""
+    ohne = grundprompt.bauen(werkzeuge=True)
+    mit = grundprompt.bauen(werkzeuge=True, dateiwerkzeuge=True)
+    assert "read_file" not in ohne
+    assert "read_file" in mit
+    # The parameter is named as the tool schema spells it, so the model does
+    # not have to guess a name for it.
+    assert "background=true" in mit
+
+
+def test_der_fragen_baustein_haengt_am_werkzeug():
+    ohne = grundprompt.bauen(werkzeuge=True)
+    mit = grundprompt.bauen(werkzeuge=True, fragen=True)
+    assert "ask_user" not in ohne
+    assert "ask_user" in mit
+
+
+def test_die_vorschau_wird_nur_erwaehnt_wenn_es_sie_gibt():
+    ohne = grundprompt.bauen(werkzeuge=True)
+    mit = grundprompt.bauen(werkzeuge=True, vorschau=True)
+    assert "beside the chat" not in ohne
+    assert "beside the chat" in mit
+
+
+def test_ohne_werkzeuge_bleibt_der_prompt_wie_er_war():
+    """The blocks belong to the tools. Without them nothing new appears."""
+    schlicht = grundprompt.bauen()
+    assert "read_file" not in schlicht
+    assert "ask_user" not in schlicht

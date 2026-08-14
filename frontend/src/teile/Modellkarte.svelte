@@ -79,7 +79,7 @@
 
   <div class="zeichenreihe">
     {#each karte.faehigkeiten as f (f)}
-      <span class="zeichen" title={t(KANN[f])}><Hauszeichen zeichen={f} groesse={17} /></span>
+      <span class="zeichen" title={t(KANN[f])}><Hauszeichen zeichen={f} groesse="mittel" /></span>
     {/each}
   </div>
 

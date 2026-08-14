@@ -6,20 +6,64 @@ from pathlib import Path
 
 import pytest
 import yaml
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.config import Config, config_laden
 
 
 def test_mitgelieferte_config_ist_gueltig():
-    """The versioned config.yaml must always be loadable."""
+    """The config in place must always be loadable.
+
+    The port is checked for being a port, not for being one particular
+    number: config.yaml is not versioned, it belongs to whoever runs the
+    program, and moving the service to another port is their business. What
+    the number should be on a fresh install is asserted one test below, on
+    the template — that file IS versioned, so a claim about it holds.
+    """
     config = config_laden()
-    assert config.app.port == 8090
+    assert 1 <= config.app.port <= 65535
     assert config.app.language in {"de", "en"}
     # Deliberately NOT "there has to be an endpoint": a fresh installation
     # has none. Providers are added in the cloud window, and a shipped file
     # that already named one would be somebody else's setup.
     assert isinstance(config.endpoints, list)
+
+
+def test_die_vorlage_liefert_den_hausport():
+    """What a fresh installation starts on, checked where it is versioned."""
+    vorlage = Path(__file__).resolve().parent.parent / "config.example.yaml"
+    daten = yaml.safe_load(vorlage.read_text(encoding="utf-8"))
+    assert Config.model_validate(daten).app.port == 8090
+
+
+def test_die_vorlage_kennt_jeden_schluessel_des_schemas():
+    """The template is the target state, like schema.sql is for the database.
+
+    An existing config.yaml is grown from this file (app/configwanderung.py),
+    so a setting that only the schema knows about would never reach anybody's
+    file: it would work, and nobody could find it. Whoever adds a field to
+    the model writes it in here too, with the sentence that explains it.
+    """
+    vorlage = Path(__file__).resolve().parent.parent / "config.example.yaml"
+    daten = yaml.safe_load(vorlage.read_text(encoding="utf-8"))
+
+    fehlend: list[str] = []
+    for abschnitt, feld in Config.model_fields.items():
+        if abschnitt not in daten:
+            fehlend.append(abschnitt)
+            continue
+        unter = feld.annotation
+        if not (isinstance(unter, type) and issubclass(unter, BaseModel)):
+            continue
+        for name in unter.model_fields:
+            if name not in (daten[abschnitt] or {}):
+                fehlend.append(f"{abschnitt}.{name}")
+
+    assert not fehlend, (
+        "In config.example.yaml fehlen: "
+        + ", ".join(fehlend)
+        + " — jeder neue Schlüssel gehört mit erklärendem Kommentar in die Vorlage."
+    )
 
 
 def test_endpunkt_kennungen_sind_eindeutig():

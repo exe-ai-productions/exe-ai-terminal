@@ -1,5 +1,6 @@
 <script>
   import { fly } from 'svelte/transition'
+  import Leuchtpunkt from './Leuchtpunkt.svelte'
   import { t } from '../lib/texte.svelte.js'
   import { api } from '../lib/api.js'
   import {
@@ -200,8 +201,10 @@
       <span class="blickwert">{serverBlick.belegt} GB</span>
     {/if}
     <span class="blickwort">{t('modell.server_status_label')}:</span>
-    <span class="blickpunkt" class:an={serverBlick.laeuft} role="img"
-          aria-label={serverBlick.laeuft ? t('status.erreichbar') : t('modell.server_aus')}></span>
+    <span class="blickpunkt" role="img"
+          aria-label={serverBlick.laeuft ? t('status.erreichbar') : t('modell.server_aus')}>
+      <Leuchtpunkt farbe={serverBlick.laeuft ? 'gruen' : 'still'} groesse={7} />
+    </span>
   </span>
 
   <button
@@ -307,27 +310,16 @@
   .blickwort + .blickwort {
     margin-left: 6px;
   }
-  /* The dot wears the finished-chat ring and breathes only while the
-     server actually runs. Green and red are exactly the two states the
-     colour rules reserve them for. */
+  /* The house's status dot, nothing built by hand. Green while the server
+     runs, grey while it does not: "off" is a fact about the machine, not a
+     failure, and the colour table reserves red for something having gone
+     wrong. The model server's own tile says the same fact in the same
+     colour, so the two never contradict each other. */
   .blickpunkt {
     flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 99px;
-    background: var(--rot);
-    box-shadow: 0 0 0 1.5px var(--text);
-    margin: 0 4px 0 1px;
-  }
-  .blickpunkt.an {
-    background: var(--gruen);
-    animation: blickpuls 1.6s ease-in-out infinite;
-  }
-  @keyframes blickpuls {
-    50% { opacity: 0.5; transform: scale(0.85); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .blickpunkt.an { animation: none; }
+    display: inline-flex;
+    align-items: center;
+    margin: 0 2px 0 0;
   }
   .hilfe {
     margin-left: 10px;

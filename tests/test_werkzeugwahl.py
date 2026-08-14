@@ -124,6 +124,23 @@ def test_das_eingebaute_werkzeug_laesst_sich_ebenso_abschalten():
         for w in registry.als_openai_werkzeuge()
     )
     registry.abgeschaltet = {shell.WERKZEUG_NAME}
+    assert all(
+        w["function"]["name"] != shell.WERKZEUG_NAME
+        for w in registry.als_openai_werkzeuge()
+    )
+
+
+def test_die_dateiwerkzeuge_lassen_sich_einzeln_abschalten():
+    """Switch writing off and a read-only agent is left — that is the point
+    of splitting the one shell tool into five."""
+    from app.tools import dateiwerkzeuge, shell
+
+    registry = WerkzeugRegistry([], shell_an=True)
+    registry.abgeschaltet = {shell.WERKZEUG_NAME, "write_file", "edit_file", "ask_user"}
+    namen = sorted(w["function"]["name"] for w in registry.als_openai_werkzeuge())
+    assert namen == ["list_dir", "read_file"]
+
+    registry.abgeschaltet = {shell.WERKZEUG_NAME, "ask_user", *dateiwerkzeuge.NAMEN}
     assert registry.als_openai_werkzeuge() == []
 
 

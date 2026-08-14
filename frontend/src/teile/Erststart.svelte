@@ -6,6 +6,7 @@
      dialog, its own mark comes toward you. Shown once per installation;
      everything it asks lives in the settings afterwards. */
   import { t, texte, spracheWaehlen } from '../lib/texte.svelte.js'
+  import Wortmarke from './Wortmarke.svelte'
   import {
     begruessung, anredeSpeichern, erststartNoetig, erststartErledigt,
   } from '../lib/begruessung.svelte.js'
@@ -53,7 +54,7 @@
   <div class="schleier" class:da={phase === 'auf'}>
     <div class="fenster" class:klein={phase !== 'auf'}>
       <div class="kopf">
-        <div class="zeichen">&gt;_</div>
+        <Wortmarke hoehe={40} mitText={false} />
         <div class="titel">{t('erststart.titel')}</div>
         <p class="satz">{t('erststart.satz')}</p>
       </div>
@@ -120,10 +121,6 @@
     transition: transform 0.5s cubic-bezier(0.6, 0, 0.8, 0.4), opacity 0.34s 0.14s ease;
   }
   .kopf { display: flex; flex-direction: column; align-items: center; gap: 7px; margin-bottom: 16px; }
-  .zeichen {
-    width: 46px; height: 36px; border: 2px solid var(--text); border-radius: 9px;
-    display: grid; place-items: center; font: 700 15px var(--schrift-fest); color: var(--text);
-  }
   .titel { font: 700 15px var(--schrift-fest); letter-spacing: 0.22em; }
   .satz { color: var(--text-still); font-size: 12.5px; margin: 0; }
   .kachel {

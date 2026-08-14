@@ -43,7 +43,10 @@ class StummerRunner:
     def protokoll(self):
         return []
 
-    def starten(self, modell, *, kontext=8192, schichten=99, port=8080, drafter=None):
+    def starten(self, modell, *, kontext=8192, schichten=99, port=8080, drafter=None,
+                fein=None):
+        # The advanced settings are kept so a test can look at what arrived.
+        self.fein = fein
         self._lauf = Lauf(modell=modell, kontext=kontext, schichten=schichten, port=port)
         return self._lauf
 

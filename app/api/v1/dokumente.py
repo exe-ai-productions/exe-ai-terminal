@@ -14,6 +14,7 @@ silently: the ``gekuerzt`` flag travels all the way into the chat bubble.
 
 from __future__ import annotations
 
+import asyncio
 import io
 from pathlib import PurePosixPath, PureWindowsPath
 
@@ -23,6 +24,7 @@ from pydantic import BaseModel
 from app.api.abhaengigkeiten import hole_repositories, hole_sprache
 from app.db import Repositories
 from app.i18n import t
+from app import dokumentabschnitte, einbettungwahl
 
 router = APIRouter(tags=["dokumente"])
 
@@ -36,6 +38,13 @@ MAX_BYTES = 20 * 1024 * 1024
 # bubble (decision: truncate instead of reject). The limit protects the
 # context window of the local models.
 TEXT_GRENZE = 24_000
+# The ceiling for a document that is going to be CUT UP instead of sent
+# whole. The limit above exists to protect the context window — which is
+# exactly the job the section search takes over, so it has no business
+# applying to a document that will never travel whole. This one is a
+# storage ceiling, not a context one: a book still has to fit in a database
+# row and be embeddable in one call.
+TEXT_GRENZE_ZERLEGT = 400_000
 
 
 def _anzeigename(roh: str) -> str:
@@ -118,9 +127,14 @@ async def dokument_hochladen(
             status.HTTP_422_UNPROCESSABLE_ENTITY, t("fehler.dokument_unlesbar", sprache)
         )
 
-    gekuerzt = len(text) > TEXT_GRENZE
+    # Which ceiling applies depends on where this document is heading. Long
+    # enough for the section search, it is taken in whole for now — if the
+    # search then cannot be built, it is cut back below.
+    zerlegen = einbettungwahl.zerlegt(repositories, chat=chat.id)
+    grenze = TEXT_GRENZE_ZERLEGT if zerlegen else TEXT_GRENZE
+    gekuerzt = len(text) > grenze
     if gekuerzt:
-        text = text[:TEXT_GRENZE]
+        text = text[:grenze]
 
     dokument = repositories.documents.speichern(
         chat_id=chat.id,
@@ -131,6 +145,27 @@ async def dokument_hochladen(
         pages=seiten,
         truncated=gekuerzt,
     )
+    # Past the threshold the document is cut up right away: the sections
+    # and their vectors are computed once, here, while the user is still
+    # looking at the upload — not on the first question, where the wait
+    # would land in the middle of an answer. A machine without the
+    # embedding program simply gets nothing back and the document keeps
+    # travelling whole.
+    if zerlegen:
+        abschnitte = await asyncio.to_thread(
+            dokumentabschnitte.einbetten,
+            request.app.state.config,
+            getattr(request.app.state, "modellrunner", None),
+            repositories,
+            dokument,
+            getattr(request.app.state, "einbettungsrunner", None),
+        )
+        # No sections and a text past the old limit: the search did not come
+        # about — no program, no model, a failed run — and the document has
+        # to go back to a length that can travel whole.
+        if not abschnitte and len(text) > TEXT_GRENZE:
+            repositories.documents.text_kuerzen(dokument.id, text[:TEXT_GRENZE])
+            dokument = repositories.documents.holen(dokument.id)
     return DokumentHochgeladen(dokument=meta_bauen(dokument))
 
 

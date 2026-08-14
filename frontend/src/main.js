@@ -2,6 +2,7 @@ import { mount } from 'svelte'
 import App from './App.svelte'
 import { texteLaden } from './lib/texte.svelte.js'
 import './stil/global.css'
+import './stil/codefarben.css'
 
 /* Texts first, then the window.
 

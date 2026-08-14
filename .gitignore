@@ -10,6 +10,8 @@ htmlcov/
 # Runtime data — does not belong in the repository
 data/
 logs/
+# The copy the config migration puts aside before it writes.
+config.yaml.sicherung
 *.db
 *.db-wal
 *.db-shm
@@ -68,10 +70,13 @@ build/
 
 # Assistant working files — session-local, never part of the program.
 
-# The command-line client is private for now — its own README says it
-# does not belong in any release. The starter next to it is dead without it.
-cli/
-exe
+# Internal reports and reviews. They describe how the program was built and
+# what was found while building it, which is not what a release ships; the
+# snapshot push carries the whole tree, so an untracked file is the only
+# reliable way to keep one out.
+LABOR_BERICHT*.md
+BERICHT*.md
+PRUEFBERICHT*.md
 
 # The window shell builds its own artifacts; only its sources travel.
 fenster/target/

@@ -8,13 +8,19 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     anbieter,
+    arbeitsordner,
+    befehle,
+    bild,
     bilder,
+    bildprompt,
     dateien,
     dateisystem,
     auftraege,
     chats,
     dokumente,
     erzeugnisse,
+    eewserver,
+    einbettungsserver,
     einstellungen,
     gedaechtnis,
     generierung,
@@ -24,9 +30,11 @@ from app.api.v1 import (
     modelldateien,
     modelle,
     modellsuche,
+    notizen,
     runner,
     skills,
     systemprompt,
+    waechter,
     werkzeuge,
 )
 
@@ -40,6 +48,8 @@ router.include_router(modellsuche.router)
 router.include_router(modelldateien.router)
 router.include_router(hf_token.router)
 router.include_router(runner.router)
+router.include_router(einbettungsserver.router)
+router.include_router(eewserver.router)
 router.include_router(werkzeuge.router)
 router.include_router(dateien.router)
 router.include_router(dateisystem.router)
@@ -47,10 +57,16 @@ router.include_router(systemprompt.router)
 router.include_router(gedaechtnis.router)
 router.include_router(skills.router)
 router.include_router(bilder.router)
+router.include_router(bild.router)
+router.include_router(bildprompt.router)
 router.include_router(dokumente.router)
 router.include_router(erzeugnisse.router)
 router.include_router(chats.router)
 router.include_router(generierung.router)
+router.include_router(befehle.router)
+router.include_router(arbeitsordner.router)
+router.include_router(notizen.router)
 router.include_router(auftraege.router)
+router.include_router(waechter.router)
 
 __all__ = ["router"]

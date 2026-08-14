@@ -1,11 +1,12 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   import { slide } from 'svelte/transition'
   import { rendern } from '../lib/markdown.js'
   import { api } from '../lib/api.js'
-  import { melde } from '../lib/zustand.svelte.js'
+  import { melde, zustand } from '../lib/zustand.svelte.js'
   import { t } from '../lib/texte.svelte.js'
   import { skillAmAnfang } from '../lib/skills.svelte.js'
-  import { dateiZeigen } from '../lib/dateivorschau.svelte.js'
+  import { tabOeffnen } from '../lib/vorschautabs.svelte.js'
   import { bildZeigen } from '../lib/bildschau.svelte.js'
   import Werkzeugzeichen from './Werkzeugzeichen.svelte'
   import Wartezeile from './Wartezeile.svelte'
@@ -99,9 +100,14 @@
      like measurement equipment, not like a footnote under an answer. */
   const zahl = (wert) => Number(wert).toFixed(1)
 
+  /* The speed is NOT here. It stands live in the input bar, where it can be
+     watched, and stays standing there after the run — under a finished
+     answer it was a number nobody could act on, and it pushed the one
+     figure that IS worth keeping, the wait for the first token, into second
+     place. `tokens_pro_sekunde` keeps being measured and stored; the
+     display up there is what reads it. */
   const messwerte = $derived(
     [
-      stats.tokens_pro_sekunde ? `${zahl(stats.tokens_pro_sekunde)} tps` : null,
       stats.erstes_token_nach_sekunden
         ? t('nachricht.wartezeit_kurz', { zahl: zahl(stats.erstes_token_nach_sekunden) })
         : null,
@@ -137,7 +143,10 @@
   function dateiOeffnen(ereignis) {
     const kasten = ereignis.target.closest?.('.dateikasten')
     if (!kasten) return
-    dateiZeigen({
+    /* Into the rail beside the chat, as a tab — not into a window over the
+       whole program. Building a page means looking at it while the
+       conversation goes on. */
+    tabOeffnen(zustand.aktiverChat, {
       name: kasten.dataset.name || '',
       art: kasten.dataset.art || '',
       inhalt: kasten.querySelector('code')?.textContent || '',
@@ -285,7 +294,7 @@
         {#if werkzeug.fehlgeschlagen}<span class="wz-marke">{t('werkzeug.marke_fehlgeschlagen')}</span>{/if}
       </button>
       {#if offeneWerkzeuge.has(i)}
-        <div class="gedanke-text werkzeug-text" transition:slide={{ duration: 200 }}>
+        <div class="gedanke-text werkzeug-text" use:rollfade transition:slide={{ duration: 200 }}>
           {#if Object.keys(werkzeug.argumente ?? {}).length}
             <dl class="wz-argumente">
               {#each Object.entries(werkzeug.argumente) as [schluessel, wert] (schluessel)}
@@ -751,7 +760,7 @@
   }
   .antwort :global(.codeblock) {
     margin: 0 0 0.95em; border: 1px solid var(--linie); border-radius: 12px;
-    overflow: hidden; background: var(--code-bg);
+    overflow: hidden; background: var(--code-grund);
   }
   .antwort :global(.code-kopf) {
     display: flex; align-items: center; justify-content: space-between; padding: 6px 12px;
@@ -762,9 +771,29 @@
     cursor: pointer; padding: 2px 6px; border-radius: 5px;
   }
   .antwort :global(.code-kopieren:hover) { background: var(--linie); color: var(--text); }
-  .antwort :global(.codeblock pre) { margin: 0; padding: 13px 15px; overflow-x: auto; }
+  /* Numbers and code side by side, the numbers in a column of their own so
+     a selection cannot pick them up. */
+  .antwort :global(.codeblock pre) {
+    margin: 0; padding: 13px 15px; overflow-x: auto;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .antwort :global(.code-nummern) {
+    flex: none;
+    user-select: none;
+    -webkit-user-select: none;
+    text-align: right;
+    padding-right: 12px;
+    border-right: 1px solid var(--linie);
+    color: var(--text-still);
+    font-family: var(--schrift-fest);
+    font-size: 12.8px;
+    line-height: 1.6;
+    white-space: pre;
+  }
+  .antwort :global(.codeblock pre code) { flex: 1; min-width: 0; }
   .antwort :global(.codeblock code) {
-    background: none; padding: 0; border-radius: 0; font-size: 12.8px; line-height: 1.6; color: var(--code-text);
+    background: none; padding: 0; border-radius: 0; font-size: 12.8px; line-height: 1.6;
+    color: var(--code-vordergrund);
   }
   /* The file box.
 
@@ -820,9 +849,7 @@
   }
   .antwort :global(.datei-knopf:hover .datei-hinweis) { color: var(--text-leise); }
 
-  .antwort :global(.sx-schl) { color: var(--sx-schl); }
-  .antwort :global(.sx-text) { color: var(--sx-text); }
-  .antwort :global(.sx-komm) { color: var(--sx-komm); font-style: italic; }
-  .antwort :global(.sx-zahl) { color: var(--sx-zahl); }
-  .antwort :global(.sx-ruf) { color: var(--sx-ruf); }
+  /* The colours themselves live in stil/codefarben.css — one set of rules
+     for every place that shows code, so the chat and the tool prompt can
+     never drift apart. */
 </style>

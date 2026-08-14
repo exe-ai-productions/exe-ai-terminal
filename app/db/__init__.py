@@ -9,6 +9,7 @@ from app.config import Config
 from app.db.connection import Database
 from app.db.repositories.auftraege import AuftragRepository
 from app.db.repositories.chats import ChatRepository
+from app.db.repositories.abschnitte import AbschnittRepository
 from app.db.repositories.documents import DocumentRepository
 from app.db.repositories.einstellungen import EinstellungenRepository
 from app.db.repositories.messages import MessageRepository
@@ -22,6 +23,7 @@ class Repositories:
     chats: ChatRepository
     messages: MessageRepository
     documents: DocumentRepository
+    abschnitte: AbschnittRepository
     auftraege: AuftragRepository
     einstellungen: EinstellungenRepository
 
@@ -32,6 +34,7 @@ def repositories_erstellen(db: Database) -> Repositories:
         chats=ChatRepository(db),
         messages=MessageRepository(db),
         documents=DocumentRepository(db),
+        abschnitte=AbschnittRepository(db),
         auftraege=AuftragRepository(db),
         einstellungen=EinstellungenRepository(db),
     )

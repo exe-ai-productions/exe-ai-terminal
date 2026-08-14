@@ -29,12 +29,13 @@ import json
 import os
 import secrets
 import shutil
-import signal
 import socket
 import subprocess
 import threading
 
 from app import modellzuordnung
+from app import prozessstopp
+from app.feineinstellungen import Feineinstellungen, flags as feinflags
 from app.modellprofil import startflags
 from app.prozessspeicher import rss_gb
 from collections import deque
@@ -223,11 +224,40 @@ class Lauf:
 class Modellrunner:
     """One model server, started and stopped from the program."""
 
-    def __init__(self, modelle_ordner: Path, programm: str | None = None) -> None:
+    def __init__(
+        self,
+        modelle_ordner: Path,
+        programm: str | None = None,
+        *,
+        port: int = 8080,
+        pid_datei: str = PID_DATEI,
+        schluessel_variable: str = SCHLUESSEL_VARIABLE,
+        zusatzflags: tuple[str, ...] = (),
+        sampling_flags: bool = True,
+    ) -> None:
+        """One server of one kind.
+
+        Everything that could collide between two of these is a parameter:
+        the port, the note that finds an orphan again, the environment
+        variable carrying the key, and the flags that make the difference
+        between a chat server and an embedding server. The first build had
+        them as module constants, and a second server would have taken the
+        first one's port and overwritten its key on start.
+        """
         self._ordner = Path(modelle_ordner).expanduser()
         self._programm_vorgabe = programm
+        self._port = port
+        self._pid_datei = pid_datei
+        self._schluessel_variable = schluessel_variable
+        self._zusatzflags = tuple(zusatzflags)
+        self._sampling_flags = sampling_flags
         self._prozess: subprocess.Popen | None = None
         self._lauf: Lauf | None = None
+        # The key this server was started with. Kept here as well as in the
+        # environment: the environment is one namespace for the whole
+        # process, and whoever wants to talk to THIS server should ask THIS
+        # runner rather than a global.
+        self._schluessel: str | None = None
         self._protokoll: deque[str] = deque(maxlen=PROTOKOLL_ZEILEN)
         self._schloss = threading.Lock()
 
@@ -240,6 +270,15 @@ class Modellrunner:
     @property
     def ordner(self) -> Path:
         return self._ordner
+
+    @property
+    def port_vorgabe(self) -> int:
+        return self._port
+
+    @property
+    def schluessel(self) -> str | None:
+        """The key this server signs with, or nothing while it is down."""
+        return self._schluessel if self.laeuft() else None
 
     def modelle(self) -> list[Modelldatei]:
         return modelle_auflisten(self._ordner)
@@ -266,6 +305,7 @@ class Modellrunner:
         schichten: int,
         port: int,
         drafter: str | None = None,
+        fein: Feineinstellungen | None = None,
     ) -> list[str]:
         """The command as it will be run — the same list, shown and executed.
 
@@ -281,8 +321,16 @@ class Modellrunner:
             "--port", str(port),
         ]
         # --jinja plus the family's published sampling lore — without these
-        # a model's tool calls arrive in a language it was never taught.
-        zeile += startflags(modell)
+        # a model's tool calls arrive in a language it was never taught. An
+        # embedding server has no sampling and no tools, so it gets none of
+        # it; what it needs instead is in `zusatzflags`.
+        if self._sampling_flags:
+            zeile += startflags(modell)
+        zeile += list(self._zusatzflags)
+        # The advanced section's levers. They say nothing where they agree
+        # with the engine, so a command with none of them set looks exactly
+        # as it did before the section existed.
+        zeile += feinflags(fein)
         if drafter:
             zeile += ["--model-draft", str(self._ordner / drafter)]
             # A prediction module needs its own mode; fed into the plain
@@ -327,7 +375,9 @@ class Modellrunner:
             return rss_gb(self._prozess.pid)
 
     def starten(self, modell: str, *, kontext: int = 8192, schichten: int = 99,
-                port: int = 8080, drafter: str | None = None) -> Lauf:
+                port: int | None = None, drafter: str | None = None,
+                fein: Feineinstellungen | None = None) -> Lauf:
+        port = self._port if port is None else port
         with self._schloss:
             if self.laeuft():
                 raise RunnerFehler("laeuft_schon")
@@ -367,9 +417,10 @@ class Modellrunner:
             # A fresh key per start; the service keeps it in its own
             # environment, where the provider picks it up to sign requests.
             schluessel = secrets.token_urlsafe(24)
-            os.environ[SCHLUESSEL_VARIABLE] = schluessel
+            os.environ[self._schluessel_variable] = schluessel
+            self._schluessel = schluessel
             self._prozess = subprocess.Popen(
-                self.befehl(modell, kontext, schichten, port, drafter),
+                self.befehl(modell, kontext, schichten, port, drafter, fein),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -398,20 +449,18 @@ class Modellrunner:
         with self._schloss:
             if not self.laeuft() or self._prozess is None:
                 return False
-            try:
-                # The whole group: llama-server starts helpers of its own, and
-                # a signal to the parent alone leaves them holding the port.
-                os.killpg(os.getpgid(self._prozess.pid), signal.SIGTERM)
-                self._prozess.wait(timeout=10)
-            except (ProcessLookupError, PermissionError):
-                pass
-            except subprocess.TimeoutExpired:
-                os.killpg(os.getpgid(self._prozess.pid), signal.SIGKILL)
+            # The whole tree: llama-server starts helpers of its own, and a
+            # signal to the parent alone leaves them holding the port. How
+            # that is reached differs per system, which is why it lives in
+            # its own module.
+            prozessstopp.beenden(self._prozess)
             self._prozess = None
             self._lauf = None
             self._pid_vergessen()
-            # The key dies with the server it belonged to.
-            os.environ.pop(SCHLUESSEL_VARIABLE, None)
+            # The key dies with the server it belonged to — this runner's key,
+            # not the module constant: three runners share this class, and
+            # each carries the name of its own variable.
+            os.environ.pop(self._schluessel_variable, None)
             return True
 
     # --- The orphan after a service restart --------------------------------
@@ -419,7 +468,7 @@ class Modellrunner:
     def _pid_merken(self, pid: int) -> None:
         try:
             self._ordner.mkdir(parents=True, exist_ok=True)
-            (self._ordner / PID_DATEI).write_text(
+            (self._ordner / self._pid_datei).write_text(
                 json.dumps({"pid": pid}), encoding="utf-8"
             )
         except OSError:
@@ -428,7 +477,7 @@ class Modellrunner:
             pass
 
     def _pid_vergessen(self) -> None:
-        (self._ordner / PID_DATEI).unlink(missing_ok=True)
+        (self._ordner / self._pid_datei).unlink(missing_ok=True)
 
     def aufraeumen(self, ist_unserer=_ist_llama_server) -> bool:
         """Ends the server a previous service run left behind.
@@ -439,7 +488,7 @@ class Modellrunner:
         service start this reads the note, makes sure the process really is
         a llama-server (ids get recycled), and ends it.
         """
-        datei = self._ordner / PID_DATEI
+        datei = self._ordner / self._pid_datei
         try:
             pid = int(json.loads(datei.read_text(encoding="utf-8"))["pid"])
         except (OSError, ValueError, KeyError, TypeError):
@@ -447,11 +496,7 @@ class Modellrunner:
         self._pid_vergessen()
         if not ist_unserer(pid):
             return False
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
-            return False
-        return True
+        return prozessstopp.beenden_nach_pid(pid)
 
 
 class RunnerFehler(Exception):

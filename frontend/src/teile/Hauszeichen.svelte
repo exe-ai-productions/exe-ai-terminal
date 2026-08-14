@@ -23,14 +23,31 @@
        erscheinung appearance           person     an agent
        paket      Hugging Face          schluessel a stored key
        dokument   a config file         dokument_pfeil  a raw list file
-       ordner     the model folder */
-  let { zeichen = '', groesse = 17 } = $props()
+       ordner     the model folder      bild       a picture server
+       einbettung an embedding server
+
+     The three server kinds used to share the rack sign, which said "a
+     server" three times and which of the three never. Now the rack stays
+     with the model server alone, the picture server wears the framed
+     picture the chat menu already uses for making one, and the embedding
+     server gets a sign of its own: three points held together by fine
+     lines — a vector space small enough to fit in a tile. */
+  /* Three sizes, no loose numbers. Callers name a step instead of passing
+     pixels, so the whole house can grow or shrink from this one table —
+     the old way spread eleven hand-picked numbers over six files, and the
+     same sign ended up in three different sizes depending on where it
+     stood. A bare number still works where one truly has to differ. */
+  const STUFEN = { klein: 15, mittel: 19, gross: 23 }
+
+  let { zeichen = '', groesse = 'mittel' } = $props()
+
+  const kante = $derived(STUFEN[groesse] ?? groesse)
 </script>
 
 <svg
   viewBox="0 0 24 24"
-  width={groesse}
-  height={groesse}
+  width={kante}
+  height={kante}
   fill="none"
   stroke="currentColor"
   stroke-width="2"
@@ -89,6 +106,16 @@
     <path d="M10 12.5 l2.2 2.2-2.2 2.2" />
   {:else if zeichen === 'ordner'}
     <path d="M3 7 a2 2 0 0 1 2-2 h4 l2 2.5 h8 a2 2 0 0 1 2 2 V17 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 Z" />
+  {:else if zeichen === 'bild'}
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="8.5" cy="9.5" r="1.6" />
+    <path d="M4 17l4.5-5 3.5 4 3-2.5L20 17" />
+  {:else if zeichen === 'einbettung'}
+    <!-- The web first, the points on top of it: the lines carry less weight
+         than what they connect, which is what makes it read as three things
+         in a relation rather than as a triangle. -->
+    <path d="M5.5 17.5 L12 5.5 L18.5 14.5 Z" stroke-width="1.4" />
+    <path d="M5.5 17.5 h.01 M12 5.5 h.01 M18.5 14.5 h.01" stroke-width="4.2" />
   {/if}
 </svg>
 

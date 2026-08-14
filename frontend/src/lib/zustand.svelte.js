@@ -8,7 +8,11 @@
 */
 
 import { api } from './api.js'
+import { ohneWeg } from './fensterweg.svelte.js'
+import { klingen } from './klaenge.svelte.js'
 import { t } from './texte.svelte.js'
+import { befundeVergessen } from './waechter.svelte.js'
+import { leeren as warteschlangeLeeren } from './warteschlange.svelte.js'
 
 export const zustand = $state({
   chats: [],
@@ -38,6 +42,9 @@ export const zustand = $state({
   // Look of the speech bubbles: filled or outline only (3.11).
   kontur: localStorage.getItem('kontur') === 'an',
   schrift: localStorage.getItem('schrift') || 'standard',
+  oberflaeche: localStorage.getItem('oberflaeche') || 'standard',
+  /* Which colour pack the code blocks wear: exe | tokyo | onelight. */
+  codefarben: localStorage.getItem('codefarben') || 'exe',
   blasenfarbe: localStorage.getItem('blasenfarbe') || '',
   // Pending confirmation before a tool runs (1.6). At most one at a time:
   // the server waits as long as it stands.
@@ -56,6 +63,8 @@ export const zustand = $state({
   // Chats with a finished answer nobody has looked at yet — the sidebar
   // shows the pulsing dot for them.
   fertigeChats: [],
+  /* The model asked something and is waiting (ask_user). */
+  benutzerfrage: null,
   // Which section fills the sidebar and the main area (6.5, variant A):
   // 'chats' or 'auftraege'. Deliberately not in localStorage — after
   // opening, you usually want to chat, not see yesterday's job list.
@@ -84,6 +93,10 @@ export const zustand = $state({
    the others. Without this, a second window lands behind the first one's
    veil and the menu click looks dead. */
 export function menueFensterOeffnen(name) {
+  /* A window reached from the menu bar stands on its own — whatever detour
+     was remembered before is over, and an arrow pointing back into it would
+     point somewhere the hand never was. */
+  ohneWeg()
   zustand.lokalOffen = name === 'lokal'
   zustand.cloudOffen = name === 'cloud'
   zustand.katalogOffen = name === 'katalog'
@@ -100,6 +113,7 @@ export function menueFensterOeffnen(name) {
    The bare confirm()/prompt() boxes of the browser are off-limits from
    here on — they were the last foreign body in the interface. */
 export function frage(text, { eingabe = null, okSchluessel = 'app.ok' } = {}) {
+  klingen('wartet')
   return new Promise((aufloesen) => {
     zustand.frage = { text, eingabe, okSchluessel, aufloesen }
   })
@@ -115,7 +129,10 @@ export function frageBeantworten(wert) {
 /* Chats whose answer finished while the user was looking elsewhere. The
    sidebar marks them with the pulsing dot until they are opened. */
 export function chatFertigMerken(id) {
-  if (id && !zustand.fertigeChats.includes(id)) zustand.fertigeChats.push(id)
+  if (id && !zustand.fertigeChats.includes(id)) {
+    zustand.fertigeChats.push(id)
+    klingen('fertig')
+  }
 }
 
 export function chatFertigGesehen(id) {
@@ -143,6 +160,20 @@ export function werkzeugImmerErlauben(chatId, name) {
    has been given, leaving it up would invite a second click. If reporting
    it fails, the server runs into the rejection on its own after its
    timeout; hence only a notice, no restoring. */
+/* The model's own question (ask_user). Same place above the input field as
+   the tool confirmation, and answered through the same route — a click
+   sends the label, typing sends what was typed. */
+export async function benutzerfrageBeantworten(antwort) {
+  const frage = zustand.benutzerfrage
+  if (!frage) return
+  zustand.benutzerfrage = null
+  try {
+    await api.werkzeugBestaetigen(frage.generationId, frage.aufrufId, true, antwort)
+  } catch {
+    melde(t('werkzeug.antwort_kam_nicht_an'), 'fehler')
+  }
+}
+
 export async function werkzeugfrageBeantworten(erlaubt, immer = false) {
   const frage = zustand.werkzeugfrage
   if (!frage) return
@@ -176,6 +207,9 @@ const uhren = new Map()
    can show the same icon as the line in the chat — one icon, one
    language. */
 export function melde(text, art = 'hinweis', { dauerhaft = false, werkzeug = '' } = {}) {
+  /* Only failures make a sound. A hint that something worked is what the
+     screen is for. */
+  if (art === 'fehler') klingen('fehler')
   const id = ++naechsteMeldung
   meldungen.liste.push({ id, text, art, werkzeug })
   if (meldungen.liste.length > 3) schliesseMeldung(meldungen.liste[0].id)
@@ -253,6 +287,31 @@ export function schriftSetzen(stufe) {
   else document.documentElement.removeAttribute('data-schrift')
 }
 schriftSetzen(zustand.schrift)
+
+/* Size of the interface itself, three steps — menu bar, sidebar, windows,
+   signs, lines and spacing at once. Deliberately not a hundred hand-tuned
+   numbers: the interface is measured in pixels throughout, so one zoom on
+   the root scales every one of them in the same proportion and nothing can
+   be forgotten. Separate from the chat text size, because wanting large
+   reading type is not the same as wanting a large interface. */
+export function oberflaecheSetzen(stufe) {
+  zustand.oberflaeche = stufe
+  localStorage.setItem('oberflaeche', stufe)
+  if (stufe && stufe !== 'standard') document.documentElement.setAttribute('data-oberflaeche', stufe)
+  else document.documentElement.removeAttribute('data-oberflaeche')
+}
+oberflaecheSetzen(zustand.oberflaeche)
+
+/* The colour pack for code. `exe` is the house pack and follows light and
+   dark; the other two bring their own ground, which is the point of them —
+   an editor pack that adapts to the app is not that pack anymore. */
+export function codefarbenSetzen(paket) {
+  zustand.codefarben = paket || 'exe'
+  localStorage.setItem('codefarben', zustand.codefarben)
+  if (zustand.codefarben === 'exe') document.documentElement.removeAttribute('data-codefarben')
+  else document.documentElement.setAttribute('data-codefarben', zustand.codefarben)
+}
+codefarbenSetzen(zustand.codefarben)
 
 /* The user's own bubble colour. Only that one surface — replies, tool
    chips and everything else keep the house palette. The text inside flips
@@ -374,6 +433,10 @@ export async function chatAendern(id, daten) {
 
 export async function chatLoeschen(id) {
   await api.chatLoeschen(id)
+  /* The queue belongs to the chat and goes with it. Left behind, its
+     entries would wait for a conversation that no longer exists. */
+  warteschlangeLeeren(id)
+  befundeVergessen(id)
   if (zustand.aktiverChat === id) neuerChat()
   await chatsLaden()
 }

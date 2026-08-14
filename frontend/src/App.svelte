@@ -1,9 +1,13 @@
 <script>
+  import { rollfade } from './lib/rollfade.js'
+  import { untrack } from 'svelte'
   import { fly } from 'svelte/transition'
   import { backOut } from 'svelte/easing'
   import Menueleiste from './teile/Menueleiste.svelte'
   import Seitenleiste from './teile/Seitenleiste.svelte'
   import Seitengriff from './teile/Seitengriff.svelte'
+  import Arbeitsleiste from './teile/Arbeitsleiste.svelte'
+  import Modulrand from './teile/Modulrand.svelte'
   import Erststart from './teile/Erststart.svelte'
   import Begruessungsecke from './teile/Begruessungsecke.svelte'
   import Nachricht from './teile/Nachricht.svelte'
@@ -14,10 +18,7 @@
   import ModelleCloud from './teile/ModelleCloud.svelte'
   import Werkzeuge from './teile/Werkzeuge.svelte'
   import Frage from './teile/Frage.svelte'
-  import Vorschaufenster from './teile/Vorschaufenster.svelte'
   import Bildschau from './teile/Bildschau.svelte'
-  import { vorschau } from './lib/dateivorschau.svelte.js'
-  import { ordnerListe } from './lib/arbeitsordner.svelte.js'
   import Meldungen from './teile/Meldungen.svelte'
   import Wortmarke from './teile/Wortmarke.svelte'
   import Ordnerpillen from './teile/Ordnerpillen.svelte'
@@ -39,17 +40,59 @@
   })
   import {
     zustand, melde, aktualisiereMeldung, modelleLaden, featuresLaden, chatsLaden, aktuellerChat, neuerChat,
-    werkzeugfrageBeantworten, werkzeugImmerErlaubt, frageBeantworten, seitenleisteSchalten,
+    werkzeugfrageBeantworten, benutzerfrageBeantworten, werkzeugImmerErlaubt, frageBeantworten, seitenleisteSchalten,
     chatFertigMerken, chatFertigGesehen, menueFensterOeffnen,
   } from './lib/zustand.svelte.js'
   import { begruessung, begruessungLaden, grussSchluessel } from './lib/begruessung.svelte.js'
+  import { verbinden as terminalVerbinden } from './lib/terminalfenster.svelte.js'
+  import { klangwahlLaden, klingen } from './lib/klaenge.svelte.js'
+  import { dateienAus } from './lib/markdown.js'
+  import { standLaden as eewStandLaden } from './lib/eew.svelte.js'
+  import { dockLaden, notizenLaden } from './lib/notizen.svelte.js'
+  import { tabOeffnen } from './lib/vorschautabs.svelte.js'
+  import { leiste, schalten as leisteSchalten } from './lib/arbeitsleiste.svelte.js'
+  import Warteblasen from './teile/Warteblasen.svelte'
+  import { anhalten, ausreihen, entfernen, haelt, loesen } from './lib/warteschlange.svelte.js'
+  import { chatFehlerGesehen, chatFehlerMerken } from './lib/chatringe.svelte.js'
+  import { befundSetzen, befundeLaden, befundeVergessen } from './lib/waechter.svelte.js'
+
+  /* The terminal listens to the open chat: its runs, its lines. */
+  $effect(() => {
+    terminalVerbinden(zustand.aktiverChat)
+  })
 
   /* Coming back to the window counts as seeing the open chat — its dot,
      if it earned one meanwhile, has said its piece. */
   $effect(() => {
-    const zurueck = () => chatFertigGesehen(zustand.aktiverChat)
+    const zurueck = () => {
+      chatFertigGesehen(zustand.aktiverChat)
+      chatFehlerGesehen(zustand.aktiverChat)
+    }
     window.addEventListener('focus', zurueck)
     return () => window.removeEventListener('focus', zurueck)
+  })
+
+  /* A run may have ended while this chat was closed. Fetched once on
+     opening — from there the stream keeps the panel current. */
+  $effect(() => {
+    befundeLaden(zustand.aktiverChat)
+  })
+
+  /* Opening a chat is looking at it: whatever its row was reporting has
+     been reported. The green mark is cleared where the chat is opened
+     (`chatOeffnen`); the red one lives one module further out and is
+     cleared here, so the state module does not have to know about it.
+
+     The clearing runs untracked, and that is not a detail. Reading the
+     list of red chats inside the effect would make the effect depend on
+     it — so a run that fails in the OPEN chat would mark the row, wake
+     this effect, and have the mark wiped again in the same breath. The
+     red dot would then never appear for the chat one is sitting in, which
+     is precisely the chat one wants to be told about. Only the switch of
+     chats may trigger this. */
+  $effect(() => {
+    const chatId = zustand.aktiverChat
+    untrack(() => chatFehlerGesehen(chatId))
   })
 
   /* The mode lives here since the buttons moved from the menu bar into
@@ -145,6 +188,13 @@
   }
 
   async function senden(inhalt, anhang = null, dokumentDatei = null, denken = null, skill = null) {
+    /* A question from the model is waiting: then what was typed IS the
+       answer, not a new message. Free text always counts — the buttons are
+       an offer, not a cage. */
+    if (zustand.benutzerfrage && inhalt?.trim()) {
+      await benutzerfrageBeantworten(inhalt.trim())
+      return
+    }
     if (!zustand.modellId) {
       melde(t('fehler.kein_modell_verfuegbar'), 'fehler')
       return
@@ -258,10 +308,63 @@
     }
   }
 
+  /* A picture made on this machine, from the click to the frame.
+
+     The window is already gone by the time this runs — it shrank away, and
+     the work continues here where it can be seen and stopped. The waiting
+     message is the SAME one the picture server's mode uses: one waiting
+     mark for pictures, whoever draws them.
+
+     The pair in the history is written by the server, so when the picture
+     lands there is nothing to assemble — only to catch up. */
+  let bildLokalLaeuft = $state(false)
+
+  async function bildLokalZeichnen(wunsch) {
+    if (bildLokalLaeuft) return
+    const chatId = wunsch.chat_id
+    zustand.nachrichten.push({ id: 'eigen-' + Date.now(), role: 'user', content: wunsch.prompt })
+    /* IMPORTANT: fetch the object back OUT of the list after the push —
+       only the list's copy is reactive. Whoever keeps the raw object writes
+       into the void, which is the bug where the picture only appeared after
+       switching chats. */
+    zustand.nachrichten.push({
+      id: null, role: 'assistant', content: '', bildLaeuft: true, stats: {}, werkzeuge: [],
+    })
+    const platzhalter = zustand.nachrichten[zustand.nachrichten.length - 1]
+    runter(true)
+    bildLokalLaeuft = true
+    try {
+      await api.bildZeichnen(wunsch)
+      /* Whoever switched chats meanwhile is looking at a foreign list —
+         then touch nothing. The pair lives on the server and shows itself
+         the next time the chat is opened. */
+      if (zustand.aktiverChat !== chatId) return
+      zustand.nachrichten = await api.nachrichten(chatId)
+      runter(true)
+      await chatsLaden()
+    } catch (fehler) {
+      if (zustand.aktiverChat === chatId) {
+        const stelle = zustand.nachrichten.indexOf(platzhalter)
+        if (stelle !== -1) zustand.nachrichten.splice(stelle, 1)
+      }
+      /* A stopped picture is not an error. It is what was just asked for,
+         and the working message disappearing IS the answer. */
+      if (fehler.status !== 499) melde(String(fehler.message || fehler), 'fehler')
+    } finally {
+      bildLokalLaeuft = false
+    }
+  }
+
   /* The stop button of image generation: tells the server, which
      interrupts the generator — the waiting request above resolves itself
      as a result. */
   function bildStoppen() {
+    /* One button, whichever picture is running: the one from the picture
+       server, or the one from this machine. */
+    if (bildLokalLaeuft) {
+      api.bildZeichnenStoppen().catch(() => {})
+      return
+    }
     if (bildGenerationId) api.bildStoppen(bildGenerationId).catch(() => {})
   }
 
@@ -281,6 +384,38 @@
     const stelle = zustand.nachrichten.findIndex((n) => n.id === messageId)
     if (stelle !== -1) zustand.nachrichten.splice(stelle, 1)
     await antwortHolen(null)
+  }
+
+  /* The queue moves on: whenever nothing is running, the open chat gets
+     the next message waiting in it.
+
+     Deliberately NOT awaited by its caller: the next send starts a run of
+     its own, and awaiting it would nest one run inside the last one's
+     stack for as long as the queue is.
+
+     It always asks about the OPEN chat, never about the one whose run just
+     ended. `senden` writes into the open history, so firing into a
+     conversation nobody is looking at would put the bubble in the wrong
+     place — and asking about the finished chat instead would leave a queue
+     standing forever in the case that matters most: a run started in one
+     chat, a message typed in another, and no switch afterwards to wake
+     anything up. */
+  function warteschlangeWeiter() {
+    const chatId = zustand.aktiverChat
+    if (!chatId || zustand.laeuft || haelt(chatId)) return
+    const eintrag = ausreihen(chatId)
+    if (!eintrag) return
+    senden(eintrag.inhalt, eintrag.bild, eintrag.dokument, eintrag.denken, eintrag.skill)
+  }
+
+  /* The button on a held bubble. Sending by hand is also the answer to
+     "and now?": the hold is lifted, and from here the line runs by itself
+     again. */
+  function warteschlangeLosschicken(eintrag) {
+    if (zustand.laeuft) return
+    entfernen(eintrag.id)
+    loesen(eintrag.chatId)
+    senden(eintrag.inhalt, eintrag.bild, eintrag.dokument, eintrag.denken, eintrag.skill)
   }
 
   async function antwortHolen(inhalt, bild = null, dokument = null, denken = null, skill = null) {
@@ -308,6 +443,11 @@
     let inhaltAngekommen = false
     let erstesHaeppchen = 0
     let abgebrochen = false
+    /* Whether this run ended cleanly decides whether the queue moves on.
+       A stream-level error counts as failed even when text had already
+       arrived: what comes after it is half an answer, and the next message
+       would be asked against a state nobody has looked at. */
+    let gescheitert = false
     const messen = () => {
       const jetzt = Date.now()
       while (zeiten.length && jetzt - zeiten[0] > FENSTER_S * 1000) zeiten.shift()
@@ -361,6 +501,10 @@
             /* The server halts and waits. No toast for this — the box above
                the input field is conspicuous enough, and two notices for
                the same thing is one too many. */
+            /* The program is waiting for an answer — the one case where a
+               sound is worth it, because nothing moves until somebody
+               comes back. */
+            klingen('wartet')
             zustand.werkzeugfrage = {
               generationId: zustand.laeuft?.generationId,
               aufrufId: ereignis.aufruf_id,
@@ -370,7 +514,21 @@
               // Why this call is being asked about — empty when the tool is
               // simply configured to always ask.
               grund: ereignis.grund || '',
+              grundWert: ereignis.grund_wert || '',
             }
+          }
+        } else if (ereignis.typ === 'user_ask') {
+          /* The model wants a decision that belongs to the user. The run
+             stands still until it gets one. */
+          klingen('wartet')
+          zustand.benutzerfrage = {
+            generationId: zustand.laeuft?.generationId,
+            aufrufId: ereignis.aufruf_id,
+            frage: ereignis.frage,
+            optionen: ereignis.optionen || [],
+            // Which conversation is asking — the sidebar lights the right
+            // row by it, and only that one.
+            chatId: zustand.aktiverChat,
           }
         } else if (ereignis.typ === 'tool_call') {
           /* Stays up until the result is in — then the same notification
@@ -416,7 +574,25 @@
               art: ereignis.fehlgeschlagen ? 'fehler' : 'erfolg',
             })
           }
+        } else if (ereignis.typ === 'waechter') {
+          /* A step failed and the guardian has something to say about it.
+             Arrives twice for the same finding — bare when it happened,
+             again with the suggestion once the model wrote one — which is
+             why the store replaces by id instead of appending.
+
+             The rail is NOT pushed forward for this. A suggestion is an
+             offer; taking over the screen for an offer, in the middle of
+             an answer one is reading, would be the guardian acting after
+             all. The yellow dot on the strip is the whole announcement. */
+          befundSetzen(zustand.laeuft?.chatId ?? zustand.aktiverChat, {
+            id: ereignis.id,
+            art: ereignis.art,
+            werkzeug: ereignis.werkzeug,
+            ergebnis: ereignis.ergebnis,
+            vorschlag: ereignis.vorschlag ?? null,
+          })
         } else if (ereignis.typ === 'error') {
+          gescheitert = true
           melde(ereignis.text, 'fehler')
         } else if (ereignis.typ === 'stats') {
           platzhalter.stats = ereignis.daten || {}
@@ -424,6 +600,7 @@
       }
     } catch (fehler) {
       abgebrochen = fehler.name === 'AbortError'
+      gescheitert = !abgebrochen
       if (!abgebrochen) melde(String(fehler.message || fehler), 'fehler')
     } finally {
       // If the answer aborts while the confirmation stands, nobody is
@@ -431,6 +608,14 @@
       // into the void.
       clearInterval(taktgeber)
       zustand.werkzeugfrage = null
+      zustand.benutzerfrage = null
+      /* A document in the answer opens as a tab in the rail by itself —
+         that is what the panel is for. The source is read out of the
+         answer, not out of the page: the text is the truth, the rendered
+         message only a picture of it. */
+      for (const datei of dateienAus(platzhalter.content)) {
+        tabOeffnen(zustand.laeuft?.chatId ?? zustand.aktiverChat, datei)
+      }
       /* The finished dot: only when nobody was watching — someone sitting
          in this chat with the window in front saw the answer arrive, and
          whoever hit stop is not waiting for anything. */
@@ -440,11 +625,20 @@
         fertigerChat &&
         (fertigerChat !== zustand.aktiverChat || !document.hasFocus())
       ) {
-        chatFertigMerken(fertigerChat)
+        /* A run that fell over earns the same afterglow as one that came
+           through, in the other colour: the list should say WHICH of the
+           two happened over there, not merely that something did. */
+        if (gescheitert) chatFehlerMerken(fertigerChat)
+        else chatFertigMerken(fertigerChat)
       }
       zustand.laeuft = null
       tempo = { zustand: 'bereit', wert: null }
       await chatsLaden()
+      /* A clean end lets the line move; a failed or stopped run holds it
+         and says so at the bubble. Nobody fires the next message into a
+         state that has just gone wrong. */
+      if (fertigerChat && (abgebrochen || gescheitert)) anhalten(fertigerChat)
+      warteschlangeWeiter()
     }
   }
 
@@ -471,6 +665,10 @@
       // not exist for anyone who never brushes the seam.
       ereignis.preventDefault()
       seitenleisteSchalten()
+    } else if (halte && ereignis.key === 'j') {
+      // The mirror of ⌘B: the work rail on the right.
+      ereignis.preventDefault()
+      leisteSchalten()
     } else if (halte && ereignis.key === 'k') {
       ereignis.preventDefault()
       document.getElementById('suchfeld')?.focus()
@@ -489,6 +687,12 @@
     modelleLaden()
     featuresLaden()
     chatsLaden()
+    klangwahlLaden()
+    notizenLaden()
+    dockLaden()
+    /* The rail draws Extended Workflow's state from the first frame, so it
+       has to be known before anybody opens the settings. */
+    eewStandLaden()
     const uhr = setInterval(modelleLaden, 30000)
     return () => clearInterval(uhr)
   })
@@ -497,6 +701,19 @@
   $effect(() => {
     zustand.aktiverChat
     runter(true)
+  })
+
+  /* Two moments put the line in motion: switching into a chat that has
+     somebody waiting, and a run coming to an end. Both are watched here,
+     so neither has to remember to call the other.
+
+     Everything else is read untracked on purpose. Firing takes the entry
+     OUT of the queue, so an effect that also watched the queue would be
+     woken by its own write — the classic self-feeding loop. */
+  $effect(() => {
+    void zustand.aktiverChat
+    void zustand.laeuft
+    untrack(warteschlangeWeiter)
   })
 </script>
 
@@ -564,7 +781,7 @@
 
       <Begruessungsecke sichtbar={nochLeer} />
 
-      <div class="verlauf" bind:this={verlauf} onscroll={scrollGeprueft}
+      <div class="verlauf" use:rollfade bind:this={verlauf} onscroll={scrollGeprueft}
            onwheel={radGedreht} ontouchstart={beruehrungBeginnt} ontouchmove={beruehrungZieht}>
         <div class="spur">
           {#each zustand.nachrichten as nachricht, i (nachricht.id ?? i)}
@@ -581,6 +798,9 @@
               />
             </div>
           {/each}
+          <!-- What has been typed but not yet said. Sits at the end of the
+               track, exactly where it will land once the line moves on. -->
+          <Warteblasen losschicken={warteschlangeLosschicken} />
         </div>
       </div>
 
@@ -592,13 +812,20 @@
         <div class="marke" class:weg={!nochLeer}>
           <Wortmarke hoehe={55} zentriert />
         </div>
-        <Eingabeleiste bind:this={eingabe} {senden} {abbrechen} {bildErzeugen} {bildStoppen} {tempo} schlank={nochLeer}
+        <Eingabeleiste bind:this={eingabe} {senden} {abbrechen} {bildErzeugen} {bildStoppen} bildZeichnen={bildLokalZeichnen} {bildLokalLaeuft} {tempo} schlank={nochLeer}
           gruss={nochLeer && begruessung.an && begruessung.name ? t(grussSchluessel(true), { name: begruessung.name }) : null} />
       </div>
 
       <div class="unterraum" class:zu={!nochLeer}></div>
       {/if}
     </main>
+
+    <!-- The work rail beside the chat: terminal, CLI, preview, note. Comes
+         forward by itself when one of them has something to show. -->
+    <Arbeitsleiste senden={(text) => senden(text)} />
+    <!-- Its signs, at the very edge and always visible — panel open or
+         shut. That strip is how the rail is found at all. -->
+    <Modulrand />
   </div>
 </div>
 
@@ -623,19 +850,9 @@
   }}
 />
 
-<!-- A file from an answer, shown in full. It hangs here and not inside the
-     message that owns it: a window covers the whole program, and fixed
-     positioning only reaches that far when nothing above it holds it. -->
-<Vorschaufenster
-  bind:offen={vorschau.offen}
-  name={vorschau.name}
-  art={vorschau.art}
-  inhalt={vorschau.inhalt}
-  chatId={zustand.aktiverChat}
-  ordner={ordnerListe()}
-/>
-
-<!-- A picture at full size. Same reason it hangs here as the window above. -->
+<!-- A picture at full size. It hangs here and not inside the message that
+     owns it: a window covers the whole program, and fixed positioning only
+     reaches that far when nothing above it holds it. -->
 <Bildschau />
 
 <!-- The house's prompt dialog — lies above everything, even the windows. -->
@@ -644,7 +861,12 @@
 <!-- Version and credit, quiet in the corner. The version comes from the
      service, so the corner can never disagree with /meta. -->
 {#if zustand.version}
-  <div class="signatur" aria-hidden="true">
+  <div
+    class="signatur"
+    aria-hidden="true"
+    style="left: {zustand.seitenleisteEingeklappt ? 0 : zustand.seitenBreite}px;
+           right: {(leiste.offen ? leiste.breite : 0) + 42}px"
+  >
     V {zustand.version} · Developed by Christian Brunner
   </div>
 {/if}
@@ -674,13 +896,16 @@
      apart while moving. */
   .markenplatz {
     flex: none;
-    width: 230px;
+    /* Two pixels wider than the block edge below it: measured against the
+       sidebar seam, the first chip reads as aligned only slightly to the
+       right of it, not flush on it. */
+    width: 232px;
     display: flex;
     align-items: center;
     transition: width 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
   }
   .markenplatz.schmal {
-    width: 168px;
+    width: 170px;
   }
   @media (prefers-reduced-motion: reduce) {
     .markenplatz { transition: none; }
@@ -800,15 +1025,22 @@
 
   /* Version and credit. Fixed to the window corner, under everything that
      can be clicked — a signature, not a control. */
+  /* Centred under the CHAT column, not under the window: the column's
+     middle travels with the sidebar and the work rail, so the line stays
+     centred while both open and close instead of drifting into the corner.
+     Fixed to the bottom edge, so it never scrolls with the conversation. */
   .signatur {
     position: fixed;
-    right: 12px;
     bottom: 7px;
-    z-index: 5;
+    text-align: center;
+    /* Above the windows (70), because it must not disappear under one — and
+       harmless up there: it takes no clicks and is quiet enough to read
+       past. */
+    z-index: 80;
     font-size: 10.5px;
     letter-spacing: 0.02em;
     color: var(--text-still);
-    opacity: 0.8;
+    opacity: 0.5;
     pointer-events: none;
     user-select: none;
   }

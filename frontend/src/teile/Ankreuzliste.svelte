@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* A catalogue to tick off: search field, one line per entry, a cross.
 
      Its own component because it is not the cloud window's business how a
@@ -31,7 +32,7 @@
   <input bind:value={suche} placeholder={t('app.suchen')} aria-label={t('app.suchen')} />
 </div>
 
-<div class="liste">
+<div class="liste" use:rollfade>
   {#each gefiltert as eintrag (eintrag.id)}
     <button
       class="zeile"

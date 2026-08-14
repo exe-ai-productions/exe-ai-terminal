@@ -50,6 +50,73 @@ export const api = {
   meta: () => ruf('/meta'),
   uebersetzungen: (sprache) => ruf(`/translations/${sprache}`),
   werkzeuge: () => ruf('/tools'),
+  /* The command runs of a chat, and the stream that keeps them current. */
+  laeufe: (chatId) => ruf(`/laeufe/${chatId}`),
+  /* The notes and the document dock — the user's own pad beside the chat.
+     Both live in the data folder, so they outlive a cleared browser. */
+  /* The offline picture generator. `bildmodelle` looks at the data folder,
+     `bildZeichnen` blocks for as long as the picture takes — half a minute
+     is normal, so no caller may treat a slow answer as a hang. */
+  bildmodelle: () => ruf('/bild/modelle'),
+  bildordnerOeffnen: () => ruf('/bild/folder', { method: 'POST' }),
+  bildZeichnenStoppen: () => ruf('/bild/stop', { method: 'POST' }),
+  loraOrdnerOeffnen: () => ruf('/bild/lora-folder', { method: 'POST' }),
+  /* The generator program itself — fetched once on machines without one. */
+  bildProgrammHolen: () => ruf('/bild/programm', { method: 'POST' }),
+  bildProgrammStand: () => ruf('/bild/programm'),
+  /* Asks the loaded LANGUAGE model to rewrite a picture prompt in English.
+     Nothing to do with the generator — it only happens to serve the same
+     window. */
+  bildPromptVerbessern: (prompt, endpointId) =>
+    ruf('/bild/prompt', { method: 'POST', body: alsText({ prompt, endpoint_id: endpointId || null }) }),
+
+  /* The embedding server: its own port, its own folder, its own buttons.
+     Started and stopped independently of the language model's server —
+     sharing either was the whole reason the first build collided. */
+  einbettungAuskunft: () => ruf('/einbettungsserver'),
+  einbettungProtokoll: () => ruf('/einbettungsserver/log'),
+  einbettungStarten: (modell, port) =>
+    ruf('/einbettungsserver/start', { method: 'POST', body: alsText({ modell, port: port ?? null }) }),
+  einbettungStoppen: () => ruf('/einbettungsserver/stop', { method: 'POST' }),
+  einbettungOrdnerOeffnen: () => ruf('/einbettungsserver/folder', { method: 'POST' }),
+
+  /* Extended Workflow: the guardian's own small model. Its own routes for
+     the same reason the embedding server has its own — two servers that
+     must start independently. */
+  eewAuskunft: () => ruf('/eew'),
+  eewStarten: (modell) => ruf('/eew/start', { method: 'POST', body: alsText({ modell }) }),
+  eewStoppen: () => ruf('/eew/stop', { method: 'POST' }),
+  bildZeichnen: (daten) => ruf('/bild', { method: 'POST', body: alsText(daten) }),
+
+  /* The guardian's findings for one chat. Nothing is created through
+     here — findings arise in the run and arrive over the stream; this only
+     fetches what is standing and throws one away. */
+  befunde: (chatId) => ruf(`/guardian/${chatId}`),
+  befundVerwerfen: (chatId, id) => ruf(`/guardian/${chatId}/${id}`, { method: 'DELETE' }),
+  notizen: () => ruf('/notizen'),
+  notizAnlegen: (daten) => ruf('/notizen', { method: 'POST', body: alsText(daten) }),
+  notizAendern: (id, daten) => ruf(`/notizen/${id}`, { method: 'PUT', body: alsText(daten) }),
+  notizLoeschen: (id) => ruf(`/notizen/${id}`, { method: 'DELETE' }),
+  dockAlle: () => ruf('/notizen/dock/alle'),
+  /* Raw bytes with the name as a parameter — same shape as the image and
+     document uploads. */
+  dockAblegen: (datei) =>
+    ruf(`/notizen/dock?name=${encodeURIComponent(datei.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': datei.type || 'application/octet-stream' },
+      body: datei,
+    }),
+  dockEntfernen: (id) => ruf(`/notizen/dock/${id}`, { method: 'DELETE' }),
+  dockAdresse: (id) => `${BASIS}/notizen/dock/${id}`,
+
+  /* Shows a shared working folder in the file manager. */
+  ordnerOeffnen: (chatId, pfad) =>
+    ruf('/ordner/oeffnen', { method: 'POST', body: alsText({ chat_id: chatId, pfad }) }),
+  laeufeStrom: (chatId) => `${BASIS}/laeufe/${chatId}/stream`,
+  /* One command from the CLI module — same runner, folders and limits as
+     the model's. */
+  befehlAusfuehren: (chatId, command) =>
+    ruf(`/laeufe/${chatId}/befehl`, { method: 'POST', body: alsText({ command }) }),
   skills: () => ruf('/skills'),
   skillsVerwaltung: () => ruf('/skills/verwaltung'),
   skillSchreiben: (name, inhalt) =>
@@ -181,10 +248,17 @@ export const api = {
   /* Answer to the confirmation prompt before a tool runs. Goes over its own
      connection — the event stream is one-way only, nothing can be sent back
      through it. */
-  werkzeugBestaetigen: (generationId, aufrufId, erlaubt) =>
+  /* Answers a waiting tool call: the yes or no before a tool runs, or —
+     with `antwort` — what the user replied to the model's own question. */
+  werkzeugBestaetigen: (generationId, aufrufId, erlaubt, antwort = null) =>
     ruf('/chat/confirm', {
       method: 'POST',
-      body: alsText({ generation_id: generationId, aufruf_id: aufrufId, erlaubt }),
+      body: alsText({
+        generation_id: generationId,
+        aufruf_id: aufrufId,
+        erlaubt,
+        ...(antwort === null ? {} : { antwort }),
+      }),
     }),
 
   /* Agents and jobs (6.5/6.6). `agentDateien` also lists broken ones —

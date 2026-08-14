@@ -66,6 +66,19 @@ class DocumentRepository(Repository):
         ).fetchall()
         return [Document.aus_zeile(zeile) for zeile in zeilen]
 
+    def text_kuerzen(self, document_id: str, text: str) -> None:
+        """Shorten a stored document's text and mark it as cut.
+
+        Used when a document was taken in at full length for the section
+        search and the search then could not be built: what stays behind
+        must be small enough to travel whole, or the context it was meant to
+        protect would be overrun after all.
+        """
+        self.verbindung.execute(
+            "UPDATE documents SET extracted_text = ?, truncated = 1 WHERE id = ?",
+            (text, document_id),
+        )
+
     def loeschen(self, document_id: str) -> bool:
         cursor = self.verbindung.execute(
             "DELETE FROM documents WHERE id = ?", (document_id,)

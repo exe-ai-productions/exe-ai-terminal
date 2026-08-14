@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* Cloud providers: key, catalogue, parameters.
 
      One rule holds this window and the local one together: left the list,
@@ -10,6 +11,7 @@
      most of them for speech, images or embeddings; a preselection would be a
      list nobody ordered. */
   import Fenster from './Fenster.svelte'
+  import Leuchtpunkt from './Leuchtpunkt.svelte'
   import Standpille from './Standpille.svelte'
   import Schalter from './Schalter.svelte'
   import Parametertafel from './Parametertafel.svelte'
@@ -60,7 +62,11 @@
           onclick={() => (gezeigt = haus.id)}
           onkeydown={(e) => { if (e.key === 'Enter') gezeigt = haus.id }}
         >
-          <span class="punkt" class:tot={!haus.erreichbar}></span>
+          <!-- Grey and not the empty dot: a provider that does not answer is
+               a fact about this row, so it keeps the same disc size as one
+               that does. The empty dot is a size smaller, and two sizes down
+               one list read as two kinds of thing. -->
+          <span class="punkt"><Leuchtpunkt farbe={haus.erreichbar ? 'gruen' : 'still'} groesse={7} /></span>
           <div class="wer">
             <div class="aname">{haus.name}</div>
             <div class="atut" class:fehlt={haus.schluessel_env && !haus.schluessel_gesetzt}>
@@ -117,7 +123,7 @@
       {/if}
     </div>
 
-    <div class="rechts">
+    <div class="rechts" use:rollfade>
       {#if gewaehltesModell}
         <div class="kopfkarte">
           <div class="min">
@@ -151,7 +157,7 @@
                connections gallery: a missing key does not resolve by waiting,
                somebody has to put it in the .env. -->
           <div class="schluessel" class:fehlt={!gewaehltesHaus.schluessel_gesetzt}>
-            <span class="ampel"></span>
+            <span class="ampel"><Leuchtpunkt farbe={gewaehltesHaus.schluessel_gesetzt ? 'gruen' : 'rot'} groesse={7} /></span>
             <code>{gewaehltesHaus.schluessel_env}</code>
             <span class="stand">
               {gewaehltesHaus.schluessel_gesetzt
@@ -291,8 +297,7 @@
   }
   .zeile.aus .mname { opacity: 0.42; }
 
-  .punkt { width: 7px; height: 7px; border-radius: 50%; background: var(--gruen); flex: none; }
-  .punkt.tot { background: var(--linie-stark); }
+  .punkt { flex: none; display: inline-flex; align-items: center; }
 
   .rechts { flex: 1; padding: 14px 18px; min-width: 0; overflow-y: auto; }
   .kopfkarte {
@@ -332,14 +337,7 @@
     font-size: 12.5px;
   }
   .schluessel code { font-family: var(--schrift-fest); font-size: 12px; color: var(--text-leise); }
-  .ampel {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--gruen);
-    flex: none;
-  }
-  .schluessel.fehlt .ampel { background: var(--rot); }
+  .ampel { flex: none; display: inline-flex; align-items: center; }
   .stand { margin-left: auto; font-size: 11px; color: var(--gruen); }
   .schluessel.fehlt .stand { color: var(--rot); }
 

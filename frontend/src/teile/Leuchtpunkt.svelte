@@ -1,12 +1,14 @@
 <script>
-  /* A status dot with a ring — the house's one glowing point.
+  /* A status dot: one filled disc, standing still.
 
-     Drawn as a vector: a filled disc for the state, a stroked circle for
-     the ring around it. A real stroke, not a box-shadow — at these small
-     sizes a shadow ring cants and frays on a sharp screen; a vector stroke
-     stays clean and sits in its own box, so it never bleeds into a
-     neighbour or drops a row out of line. The stroke reaches a hair inside
-     the disc so no dark seam shows between the two.
+     It used to wear a stroked ring and, in the chat list, three little
+     performances — breathing, flashing, trading brightness with its ring.
+     In the running program none of that survived the distance to the
+     screen: the ring ate the disc's diameter, and the motion made the
+     colour harder to read rather than easier. So the dot is now the
+     simplest thing that can carry a state — a full disc in the state's own
+     colour, big enough to be read at arm's length, with a fine standing
+     glow and nothing that moves.
 
      `farbe` follows the house rule: colour means state, never decoration.
 
@@ -15,30 +17,34 @@
        gelb   waiting, and caution
        rot    failed, off, unreachable, dangerous
        still  no state worth a colour — a fact, not a state
+       leer   nothing to report. A small quiet disc, not an empty ring:
+              it holds a row's geometry without claiming to be a state.
 
-     `an` lets the dot breathe while something is truly live, the same
-     pulse the menu-bar lamp wears. `groesse` is the disc diameter in px;
-     the ring adds two pixels around it. */
-  let { farbe = 'gruen', an = false, groesse = 8 } = $props()
+     `groesse` is the caller's old number and keeps its meaning for layout:
+     the box around the dot stays exactly as wide as it always was, so no
+     row moves. What grew is the disc inside it. */
+  let { farbe = 'gruen', groesse = 8 } = $props()
 
+  /* The box is what the layout sees, and it is unchanged from the days of
+     the ring — the ring's two pixels of air simply became disc. */
   const kasten = $derived(groesse + 4)
   const mitte = $derived(kasten / 2)
-  const rScheibe = $derived(groesse / 2)
-  // The stroke centre sits so its inner edge falls just inside the disc —
-  // flush, with no seam — and its outer edge stays inside the box.
-  const rRing = $derived(groesse / 2 + 0.35)
+
+  /* One step larger than before, except for the dot that says nothing: a
+     row with nothing to report should not weigh as much as one that has
+     something to say. */
+  const scheibe = $derived(farbe === 'leer' ? groesse : groesse + 2)
 </script>
 
 <svg
   class="lp"
-  class:an
+  data-farbe={farbe}
   width={kasten}
   height={kasten}
   viewBox="0 0 {kasten} {kasten}"
   aria-hidden="true"
 >
-  <circle class="scheibe" data-farbe={farbe} cx={mitte} cy={mitte} r={rScheibe} />
-  <circle cx={mitte} cy={mitte} r={rRing} fill="none" stroke="var(--text)" stroke-width="1.4" />
+  <circle class="scheibe" data-farbe={farbe} cx={mitte} cy={mitte} r={scheibe / 2} />
 </svg>
 
 <style>
@@ -46,23 +52,36 @@
     display: inline-block;
     flex: none;
     vertical-align: middle;
+    /* Without this the glow never leaves the box: an SVG viewport clips its
+       own content, and there is one pixel of air around the disc. */
+    overflow: visible;
+  }
+  /* The glow hangs off the whole drawing and not off the circle inside it.
+     On the circle it was clipped twice over — once by the SVG viewport and
+     once by the filter region, which defaults to a tenth of the shape's own
+     box and so cut a 2.5px blur down to well under a pixel. */
+  .lp[data-farbe='gruen'] {
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--gruen) 55%, transparent));
+  }
+  .lp[data-farbe='blau'] {
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--blau) 55%, transparent));
+  }
+  .lp[data-farbe='gelb'] {
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--gelb) 55%, transparent));
+  }
+  .lp[data-farbe='rot'] {
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--rot) 55%, transparent));
+  }
+  .scheibe {
+    /* The dot changes state more often than anything else in the bar, and a
+       colour that snaps reads as a redraw rather than as a change. */
+    transition: fill 0.3s;
   }
   .scheibe[data-farbe='gruen'] { fill: var(--gruen); }
   .scheibe[data-farbe='blau'] { fill: var(--blau); }
   .scheibe[data-farbe='gelb'] { fill: var(--gelb); }
   .scheibe[data-farbe='rot'] { fill: var(--rot); }
+  /* A fact, not a state — and so no glow either. */
   .scheibe[data-farbe='still'] { fill: var(--text-still); }
-
-  /* Breathes only while something actually runs — the same timing as the
-     menu-bar lamp, so the two never tick against one another. */
-  .lp.an {
-    transform-origin: center;
-    animation: lppuls 1.6s ease-in-out infinite;
-  }
-  @keyframes lppuls {
-    50% { opacity: 0.5; transform: scale(0.85); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .lp.an { animation: none; }
-  }
+  .scheibe[data-farbe='leer'] { fill: var(--linie-stark); }
 </style>

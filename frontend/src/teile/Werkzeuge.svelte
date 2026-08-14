@@ -94,13 +94,15 @@
     <div class="links" use:rollfade>
       {#each listen as quelle (quelle.id)}
         <!-- A source and its tools in one raised box, like a settings group:
-             the source carries the sign, name and its ringed status; each
+             the source carries the sign, name and its dotted status; each
              tool below it a name and a switch. -->
         <div class="qbox">
-          <div class="qkopf">
+          <div
+            class="qkopf"
+            class:gewaehlt={quelle.id === gewaehlteQuelle?.id && !gewaehltesWerkzeug}
+          >
           <button
             class="qeintrag"
-            class:gewaehlt={quelle.id === gewaehlteQuelle?.id && !gewaehltesWerkzeug}
             onclick={() => (gezeigt = quelle.id)}
           >
             <span class="qzeichen">
@@ -305,7 +307,6 @@
     cursor: pointer;
     transition: background 0.12s;
   }
-  .qeintrag:hover, .qeintrag.gewaehlt { background: var(--linie); }
   .qzeichen {
     width: 28px;
     height: 28px;
@@ -421,10 +422,15 @@
   /* The fold control sits beside the source entry, never inside it — a
      button in a button is not a thing, and the entry keeps its whole face
      for choosing the source. */
+  /* The highlight belongs to the whole head, not to the entry alone —
+     otherwise the fold control keeps the raised colour and shows up as a
+     darker rectangle beside the chosen source. */
   .qkopf {
     display: flex;
     align-items: stretch;
+    transition: background 0.12s;
   }
+  .qkopf:hover, .qkopf.gewaehlt { background: var(--linie); }
   .qkopf :global(.qeintrag) {
     flex: 1;
     min-width: 0;

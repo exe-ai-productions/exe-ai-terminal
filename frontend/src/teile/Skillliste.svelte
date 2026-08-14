@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The slash list above the input field. Opens when a slash is the FIRST
      character — mid-sentence a slash stays a slash. Two lines per entry:
      the name to type and the one line that says when it applies. */
@@ -15,7 +16,7 @@
   })
 </script>
 
-<div class="skillliste" bind:this={kasten} role="listbox" tabindex="-1">
+<div class="skillliste" bind:this={kasten} role="listbox" tabindex="-1" use:rollfade>
   {#each eintraege as eintrag, i (eintrag.name)}
     <button
       type="button"
