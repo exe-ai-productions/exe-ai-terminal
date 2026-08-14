@@ -68,8 +68,6 @@ build/
 .env.*
 !.env.example
 
-# Assistant working files — session-local, never part of the program.
-
 # Internal reports and reviews. They describe how the program was built and
 # what was found while building it, which is not what a release ships; the
 # snapshot push carries the whole tree, so an untracked file is the only
