@@ -19,6 +19,7 @@ from typing import Literal
 
 import yaml
 
+from app.configwanderung import wandern
 from app.paketierung import aufloesen
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
@@ -138,6 +139,18 @@ class AppConfig(BaseModel):
     # PATH first, because whoever put it somewhere of their own meant it.
     modelle_verzeichnis: str = "./data/modelle"
     runner_programm: str | None = None
+    # Models that are not language models get folders of their own, and the
+    # FOLDER is what says which kind a file is. Telling them apart by name
+    # ("embed" somewhere in it) worked for one night and failed as soon as
+    # somebody looked: an embedding model turned up in the language model's
+    # picker, its start collided with the port the language server holds,
+    # and "open model folder" led somewhere else than the file it was about.
+    # A folder cannot be guessed wrong.
+    einbettungsmodelle_verzeichnis: str = "./data/einbettungsmodelle"
+    bildmodelle_verzeichnis: str = "./data/bildmodelle"
+    # The embedding server is a small llama-server of its own, so it needs a
+    # port of its own — the whole reason the first build collided.
+    einbettung_port: int = 8081
     # Used when neither the request nor the chat specifies a response length.
     #
     # Without this value the model server's default applies, and for
@@ -457,6 +470,13 @@ def config_laden(pfad: str | Path | None = None) -> Config:
             f"Konfigurationsdatei nicht gefunden: {quelle}. "
             "Vorlage liegt als config.example.yaml im Projektverzeichnis."
         )
+
+    # Then the other direction: an existing file gets whatever the program
+    # has learned since it was written. A setting only the schema knows about
+    # is a setting nobody can find - see app/configwanderung.py. Runs before
+    # the file is read, so the additions take effect the same start; it never
+    # changes a value that is already there and never raises.
+    wandern(quelle, aufloesen("config.example.yaml"), Config)
 
     rohdaten = yaml.safe_load(quelle.read_text(encoding="utf-8")) or {}
     return Config.model_validate(_umgebung_anwenden(rohdaten))

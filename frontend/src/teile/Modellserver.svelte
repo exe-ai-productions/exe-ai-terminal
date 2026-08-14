@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The model server — switched from here instead of from a terminal.
 
      One truth on top: a status card that says whether the server runs,
@@ -16,11 +17,17 @@
      31B model. */
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
+  import { ausFenster } from '../lib/fensterweg.svelte.js'
   import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
   import { speicherSchaetzung } from '../lib/speicherschaetzung.js'
   import { empfehlungFuer } from '../lib/modellempfehlungen.js'
+  import Auswahlfeld from './Auswahlfeld.svelte'
+  import Modulzeichen from './Modulzeichen.svelte'
+  import { eew, modellWaehlen as eewModellWaehlen } from '../lib/eew.svelte.js'
+  import Schalter from './Schalter.svelte'
+  import Schieberegler from './Schieberegler.svelte'
+  import Servertafel from './Servertafel.svelte'
   import Zahlenfeld from './Zahlenfeld.svelte'
-  import Hauszeichen from './Hauszeichen.svelte'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
 
   let auskunft = $state(null)
@@ -126,6 +133,83 @@
 
   const kurzK = (n) => (n ? Math.round(n / 1024) + 'k' : '')
 
+  /* The steps a context really comes in. Below 4096 there is no conversation
+     worth having, and above that the engine only understands these numbers —
+     a field that silently accepts 33000 and then behaves like 32768 teaches
+     nobody anything.
+
+     What a given model can actually hold is not asked here, because nothing
+     in the program knows it yet: it stands in the model file's own header,
+     and reading that is a job of its own. Until then the list is the same
+     everywhere, and a model that cannot hold the chosen size says so when it
+     starts — which is where it said so before as well. */
+  const kontextstufen = [4096, 8192, 16384, 32768, 65536, 131072]
+  /* 99 is llama.cpp's own way of saying "all of them", and the right-hand
+     stop of the slider says the same thing in words. */
+  const MAX_SCHICHTEN = 99
+
+  /* The advanced section. Shut on start: somebody who does not know what a
+     KV cache is should never have to find out. */
+  let erweitertOffen = $state(false)
+  let fein = $state({
+    kv_cache: 'f16',
+    flash_attention: 'auto',
+    moe_auf_cpu: false,
+    festnageln: false,
+  })
+  /* Kept as plain numbers here because the number field speaks numbers; 0
+     means "let the engine decide" and travels as nothing. */
+  let faeden = $state(0)
+  let moeSchichten = $state(0)
+
+  const kvauswahl = $derived([
+    { wert: 'f16', text: t('modell.kv_f16') },
+    { wert: 'q8_0', text: t('modell.kv_q8_0') },
+    { wert: 'q4_0', text: t('modell.kv_q4_0') },
+  ])
+  const flashauswahl = $derived([
+    { wert: 'auto', text: t('modell.flash_auto') },
+    { wert: 'on', text: t('modell.flash_on') },
+    { wert: 'off', text: t('modell.flash_off') },
+  ])
+  const feindaten = $derived({
+    ...fein,
+    faeden: faeden || null,
+    moe_schichten: moeSchichten || null,
+  })
+
+  /* What the panel is doing, as the head card's one line: the facts that
+     used to be spread over a status card, joined by the same separator the
+     rest of the house uses. The speed module is named here too — it is the
+     one running fact the form below does not repeat while locked. */
+  const laufzeile = $derived.by(() => {
+    if (!laeuft) return modell || t('modell.server_aus')
+    const teile = [
+      auskunft.modell,
+      t('modell.laeuft_port', { port: auskunft.port }),
+      t('modell.kontext_kurz', { n: kurzK(auskunft.kontext) }),
+    ]
+    if (auskunft.drafter) teile.push(`${t('modell.mtp_label')}: ${auskunft.drafter}`)
+    if (auskunft.belegt_gb) teile.push(t('modell.im_speicher', { gb: auskunft.belegt_gb }))
+    return teile.join(' · ')
+  })
+
+  /* The same folder the chat model comes from — a small model is a model.
+     The list is not narrowed by size: what counts as small enough is a
+     judgement the measurements made, not one a filter can make. */
+  const eewauswahl = $derived(
+    (auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
+  )
+
+  const drafterauswahl = $derived([
+    { wert: '', text: t('modell.drafter_keiner') },
+    ...drafterKandidaten.map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
+  ])
+
+  const modellauswahl = $derived(
+    (auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
+  )
+
   async function laden() {
     try {
       auskunft = await api.runnerAuskunft()
@@ -170,7 +254,9 @@
   async function starten() {
     arbeitet = true
     try {
-      auskunft = await api.runnerStarten({ modell, kontext, schichten, port, drafter: drafter || null })
+      auskunft = await api.runnerStarten({
+        modell, kontext, schichten, port, drafter: drafter || null, fein: feindaten,
+      })
       protokollOffen = true
       await modelleLaden(true)
     } catch (fehler) {
@@ -200,8 +286,8 @@
   }
 </script>
 
-<div class="tafel">
-  {#if erststart}
+{#if erststart}
+  <div class="erstetafel">
     <!-- The three steps to a first model: fetch the engine, pick a model,
          start it. The status card above says honestly where one stands. -->
     <div class="statuskarte">
@@ -239,7 +325,10 @@
             ? t('modell.reise_modell_satz').replace('{gb}', maschineGb)
             : t('modell.reise_modell_satz_neutral')}
         </div>
-        <button class="knopf wichtig" disabled={!hatProgramm} onclick={() => (zustand.katalogOffen = true)}>
+        <button class="knopf wichtig" disabled={!hatProgramm} onclick={() => ausFenster(
+          () => { zustand.lokalOffen = false; zustand.katalogOffen = true },
+          () => { zustand.katalogOffen = false; zustand.lokalOffen = true },
+        )}>
           {t('modell.katalog_oeffnen')}
         </button>
       </div>
@@ -251,106 +340,173 @@
         <span class="knopf still gesperrt">{t('modell.server_starten_kurz')}</span>
       </div>
     </div>
-  {:else}
-    <!-- The one truth: is it up, which model, which speed module, how much
-         memory. Colour here means state — green runs, grey is off. -->
-    <div class="statuskarte">
-      <Leuchtpunkt farbe={laeuft ? 'gruen' : 'still'} an={laeuft} groesse={9} />
-      <div class="skmitte">
-        <div class="sktitel">{laeuft ? auskunft.modell : modell || t('modell.server_aus')}</div>
-        <div class="skdetails">
-          {#if laeuft}
-            <span>{t('modell.laeuft_port', { port: auskunft.port })}</span>
-            <span>{t('modell.kontext_kurz', { n: kurzK(auskunft.kontext) })}</span>
-            {#if auskunft.drafter}
-              <span class="mtpzeile">
-                <span class="blitz"><Hauszeichen zeichen="blitz" groesse={13} /></span>
-                {t('modell.mtp_label')}: {auskunft.drafter}
-              </span>
+  </div>
+{:else}
+    <!-- The house's server shape, shared with the embedding and picture
+         panels: head card, one sentence, the model, then what only this
+         server needs, then the foot. What used to stand in a status card of
+         its own — the running port, the context, the memory in use — is the
+         head card's second line now, and the start button moved down to the
+         foot where the other two panels keep theirs. -->
+    <Servertafel
+      titel={t('modell.server')}
+      unter={laufzeile}
+      standfarbe={laeuft ? 'gruen' : 'still'}
+      standtext={laeuft ? t('status.erreichbar') : t('status.nicht_erreichbar')}
+      wofuer={t('modell.server_wofuer')}
+      modelle={modellauswahl}
+      bind:gewaehlt={modell}
+      modellBeschriftung={t('modell.feld_modell')}
+      modellGesperrt={laeuft}
+      modellGeaendert={modellGewaehlt}
+      ordnerOeffnen={ordnerOeffnen}
+      tatText={laeuft ? t('modell.server_anhalten_kurz') : t('modell.server_starten_kurz')}
+      tatPunkt={laeuft ? 'gruen' : 'still'}
+      tatGesperrt={arbeitet || (!laeuft && !modell)}
+      onTat={laeuft ? anhalten : starten}
+    >
+      {#snippet mitte()}
+        <div class="gruppe">
+          <div class="gruppenname">{t('modell.gruppe_tempo')}</div>
+          <div class="regler">
+            <label for="rs-drafter">{t('modell.feld_speedmodul')}<span>{t('modell.feld_speedmodul_hilfe')}</span></label>
+            <Auswahlfeld
+              id="rs-drafter"
+              bind:wert={drafter}
+              eintraege={drafterauswahl}
+              gesperrt={laeuft}
+              beschriftung={t('modell.feld_speedmodul')}
+            />
+
+            <!-- The third row, and deliberately no tile of its own: which
+                 small model Extended Workflow uses is a model choice like
+                 the two above it, and a fourth tile under SET UP would
+                 promise a page that has nothing else on it. The sign is the
+                 module's own, so the eye finds the connection. -->
+            <label for="rs-eew">
+              <span class="eewzeichen"><Modulzeichen modul="waechter" groesse={13} /></span>
+              {t('modell.feld_eew')}<span>{t('modell.feld_eew_hilfe')}</span>
+            </label>
+            <Auswahlfeld
+              id="rs-eew"
+              wert={eew.modell}
+              eintraege={eewauswahl}
+              beschriftung={t('modell.feld_eew')}
+              gewaehlt={eewModellWaehlen}
+            />
+          </div>
+        </div>
+
+        <div class="gruppe">
+          <div class="gruppenname">{t('modell.gruppe_speicher')}</div>
+          <div class="regler">
+            <label for="rs-kontext">{t('modell.feld_kontext')}<span>{t('modell.feld_kontext_hilfe')}</span></label>
+            <!-- Dragged, not typed: the engine only understands these steps,
+                 and a field that silently accepts 33000 teaches nobody that. -->
+            <Schieberegler
+              id="rs-kontext"
+              bind:wert={kontext}
+              stufen={kontextstufen}
+              gesperrt={laeuft}
+              beschriftung={t('modell.feld_kontext')}
+              anzeige={kurzK}
+            />
+
+            <label for="rs-schichten">{t('modell.feld_schichten')}<span>{t('modell.feld_schichten_hilfe')}</span></label>
+            <Schieberegler
+              id="rs-schichten"
+              bind:wert={schichten}
+              min={0}
+              max={MAX_SCHICHTEN}
+              gesperrt={laeuft}
+              beschriftung={t('modell.feld_schichten')}
+              endtext={t('modell.schichten_alle')}
+            />
+
+            {#if schaetzung && maschineGb}
+              <span class="schaetz">{t('modell.schaetz_zeile', { plan: schaetzung.gesamt.toFixed(1), gesamt: maschineGb })}</span>
             {/if}
-            {#if auskunft.belegt_gb}
-              <span>{t('modell.im_speicher', { gb: auskunft.belegt_gb })}</span>
-            {/if}
-          {:else}
-            <span>{t('modell.server_aus')}</span>
+          </div>
+        </div>
+
+        <!-- Shut by default, and that is the whole point: somebody who does
+             not know what a KV cache is never has to find out. -->
+        <div class="gruppe">
+          <button class="klappkopf" onclick={() => (erweitertOffen = !erweitertOffen)}
+                  aria-expanded={erweitertOffen}>
+            <span class="winkel" class:auf={erweitertOffen}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </span>
+            {t('modell.gruppe_erweitert')}
+            <span class="klapphilfe">{t('modell.erweitert_hilfe')}</span>
+          </button>
+          {#if erweitertOffen}
+            <div class="regler">
+              <label for="rs-kv">{t('modell.feld_kv')}<span>{t('modell.feld_kv_hilfe')}</span></label>
+              <Auswahlfeld id="rs-kv" bind:wert={fein.kv_cache} eintraege={kvauswahl}
+                           gesperrt={laeuft} beschriftung={t('modell.feld_kv')} />
+
+              <label for="rs-flash">{t('modell.feld_flash')}<span>{t('modell.feld_flash_hilfe')}</span></label>
+              <Auswahlfeld id="rs-flash" bind:wert={fein.flash_attention} eintraege={flashauswahl}
+                           gesperrt={laeuft} beschriftung={t('modell.feld_flash')} />
+
+              <label for="rs-faeden">{t('modell.feld_faeden')}<span>{t('modell.feld_faeden_hilfe')}</span></label>
+              <Zahlenfeld id="rs-faeden" bind:wert={faeden} gesperrt={laeuft} min={0} max={256} />
+
+              <label>{t('modell.feld_moe')}<span>{t('modell.feld_moe_hilfe')}</span></label>
+              <Schalter an={fein.moe_auf_cpu} gesperrt={laeuft}
+                        beschriftung={t('modell.feld_moe')}
+                        onschalten={() => (fein.moe_auf_cpu = !fein.moe_auf_cpu)} />
+
+              {#if fein.moe_auf_cpu}
+                <label for="rs-moe-n">{t('modell.feld_moe_schichten')}<span>{t('modell.feld_moe_schichten_hilfe')}</span></label>
+                <Zahlenfeld id="rs-moe-n" bind:wert={moeSchichten} gesperrt={laeuft} min={0} max={999} />
+              {/if}
+
+              <label>{t('modell.feld_mlock')}<span>{t('modell.feld_mlock_hilfe')}</span></label>
+              <Schalter an={fein.festnageln} gesperrt={laeuft}
+                        beschriftung={t('modell.feld_mlock')}
+                        onschalten={() => (fein.festnageln = !fein.festnageln)} />
+            </div>
           {/if}
         </div>
-      </div>
-      <div class="skrechts">
-        {#if laeuft}
-          <button class="knopf" onclick={anhalten} disabled={arbeitet}>{t('modell.server_anhalten_kurz')}</button>
-        {:else}
-          <button class="knopf wichtig" onclick={starten} disabled={arbeitet || !modell}>{t('modell.server_starten_kurz')}</button>
+
+        <div class="gruppe">
+          <div class="gruppenname">{t('modell.gruppe_netz')}</div>
+          <div class="regler">
+            <label for="rs-port">{t('modell.feld_port')}<span>{t('modell.feld_port_hilfe')}</span></label>
+            <Zahlenfeld id="rs-port" bind:wert={port} gesperrt={laeuft} min={1024} max={65535} />
+          </div>
+        </div>
+      {/snippet}
+
+      {#snippet unten()}
+        <!-- The log is not an action, so it does not sit in the foot row
+             with the one that is. -->
+        <div class="protokollzeile">
+          <button class="klapper" onclick={() => (protokollOffen = !protokollOffen)}>
+            {t('modell.protokoll')} {protokollOffen ? '▾' : '▸'}
+          </button>
+        </div>
+        {#if protokollOffen}
+          <pre class="protokoll" use:rollfade bind:this={protokollKasten}>{protokoll.join('\n') || '—'}</pre>
         {/if}
-      </div>
-    </div>
-
-    <div class="gruppe">
-      <div class="gruppenname">{t('modell.gruppe_modell_tempo')}</div>
-      <div class="regler">
-        <label for="rs-modell">{t('modell.feld_modell')}<span>{t('modell.feld_modell_hilfe')}</span></label>
-        <select id="rs-modell" class="wert" bind:value={modell} onchange={modellGewaehlt} disabled={laeuft}>
-          {#each auskunft?.modelle ?? [] as m}
-            <option value={m.name}>{m.name} · {m.groesse_gb} GB</option>
-          {/each}
-        </select>
-
-        <label for="rs-drafter">{t('modell.feld_speedmodul')}<span>{t('modell.feld_speedmodul_hilfe')}</span></label>
-        <select id="rs-drafter" class="wert" bind:value={drafter} disabled={laeuft}>
-          <option value="">{t('modell.drafter_keiner')}</option>
-          {#each drafterKandidaten as m}
-            <option value={m.name}>{m.name} · {m.groesse_gb} GB</option>
-          {/each}
-        </select>
-      </div>
-    </div>
-
-    <div class="gruppe">
-      <div class="gruppenname">{t('modell.gruppe_speicher')}</div>
-      <div class="regler">
-        <label for="rs-kontext">{t('modell.feld_kontext')}<span>{t('modell.feld_kontext_hilfe')}</span></label>
-        <Zahlenfeld id="rs-kontext" bind:wert={kontext} gesperrt={laeuft} min={512} max={1048576} schritt={1024} />
-
-        <label for="rs-schichten">{t('modell.feld_schichten')}<span>{t('modell.feld_schichten_hilfe')}</span></label>
-        <Zahlenfeld id="rs-schichten" bind:wert={schichten} gesperrt={laeuft} min={0} max={999} />
-
-        {#if schaetzung && maschineGb}
-          <span class="schaetz">{t('modell.schaetz_zeile', { plan: schaetzung.gesamt.toFixed(1), gesamt: maschineGb })}</span>
-        {/if}
-      </div>
-    </div>
-
-    <div class="gruppe">
-      <div class="gruppenname">{t('modell.gruppe_netz')}</div>
-      <div class="regler">
-        <label for="rs-port">{t('modell.feld_port')}<span>{t('modell.feld_port_hilfe')}</span></label>
-        <Zahlenfeld id="rs-port" bind:wert={port} gesperrt={laeuft} min={1024} max={65535} />
-      </div>
-    </div>
-
-    <div class="serverfuss">
-      <button class="ordnerknopf" onclick={ordnerOeffnen}>
-        <Hauszeichen zeichen="ordner" groesse={15} />
-        {t('modell.ordner_oeffnen')}
-      </button>
-      <button class="klapper" onclick={() => (protokollOffen = !protokollOffen)}>
-        {t('modell.protokoll')} {protokollOffen ? '▾' : '▸'}
-      </button>
-    </div>
-
-    {#if protokollOffen}
-      <pre class="protokoll" bind:this={protokollKasten}>{protokoll.join('\n') || '—'}</pre>
-    {/if}
-  {/if}
-</div>
+      {/snippet}
+    </Servertafel>
+{/if}
 
 <style>
-  .tafel {
+  /* Only the first-run journey still brings its own frame; the panel proper
+     stands in the shared one. */
+  .erstetafel {
     display: flex;
     flex-direction: column;
   }
 
-  /* The one truth on top. */
+  /* Where one stands on the way to a first model. */
   .statuskarte {
     display: flex;
     align-items: center;
@@ -380,19 +536,37 @@
     flex-wrap: wrap;
     align-items: center;
   }
-  .mtpzeile {
-    display: inline-flex;
+
+  /* The section's head is a row you press, not a title with a button in it:
+     the whole line is the target, which is what a shut drawer wants. */
+  .klappkopf {
+    display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
+    width: 100%;
+    border: none;
+    background: none;
+    padding: 0 0 8px;
+    cursor: pointer;
+    font: 600 11px var(--schrift);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-leise);
   }
-  /* Blue is the house colour for a running speed module. */
-  .blitz {
+  .klappkopf:hover { color: var(--text); }
+  .winkel {
     display: inline-flex;
-    color: var(--blau);
+    transition: transform 0.15s;
   }
-  .skrechts {
-    margin-left: auto;
-    flex: none;
+  .winkel.auf { transform: rotate(90deg); }
+  .klapphilfe {
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-still);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .winkel { transition: none; }
   }
 
   .gruppe {
@@ -428,21 +602,13 @@
     font-size: 11.5px;
     color: var(--text-still);
   }
-  .wert {
-    width: 100%;
-    height: 32px;
-    border: 1px solid var(--linie-stark);
-    border-radius: 8px;
-    background: var(--bg);
-    color: var(--text);
-    font: 400 12.5px/1.2 var(--schrift-fest);
-    padding: 6px 10px;
-  }
-  .wert:disabled {
+  /* The sign rides in the label, in the label's own quiet colour: it marks
+     which module the row belongs to, it does not announce it. */
+  .eewzeichen {
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-right: 6px;
     color: var(--text-still);
-  }
-  select.wert {
-    text-align: left;
   }
   .schaetz {
     grid-column: 2;
@@ -450,28 +616,11 @@
     color: var(--text-leise);
   }
 
-  .serverfuss {
+  .protokollzeile {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-  }
-  .ordnerknopf {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: none;
-    background: none;
-    color: var(--text-still);
-    font: 12px var(--schrift);
-    padding: 6px 2px;
-    cursor: pointer;
-  }
-  .ordnerknopf:hover {
-    color: var(--text);
+    justify-content: flex-end;
   }
   .klapper {
-    margin-left: auto;
     border: none;
     background: none;
     color: var(--text-still);

@@ -48,9 +48,13 @@ from app.discovery import Discovery
 from app.events import Ereignisse, bus
 from app.generationen import Generierung, Generierungsverwaltung
 from app.i18n import t
+from app import denkschalter
 from app.providers import ChatNachricht, Generierungsanfrage, ProviderFehler
 from app.tools import WerkzeugRegistry, WerkzeugVerboten
+from app.tools import dateiwerkzeuge, frage_werkzeug
 from app import anrede, gedaechtnis, grundprompt, skills, skillwahl, werkzeugwahl
+from app import eewserver, waechter, waechter_ausloeser, waechterwahl
+from app import dokumentabschnitte
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +65,14 @@ router = APIRouter(prefix="/chat", tags=["generierung"])
 # 10 instead of 5: a real research run burned three
 # rounds on pages that only delivered their menu, and then got cut off.
 MAX_WERKZEUG_RUNDEN = 10
+
+# How much of a document may travel WHOLE in one request. The same number
+# the upload uses as its ceiling for documents that are not cut up
+# (app/api/v1/dokumente.py) — repeated as a limit here because this is the
+# last place before the request goes out, and a document may have been
+# taken in at full length for a section search that later could not be
+# built.
+VOLLTEXT_GRENZE = 24_000
 
 
 # From the best to the weakest origin of the speed figure. Across several
@@ -117,7 +129,7 @@ BESTAETIGUNG_PRUEFTAKT = 0.5
 
 async def _werkzeug_ausfuehren(
     registry: WerkzeugRegistry | None, aufruf, sprache: str, bild_senke=None,
-    ordner: list[str] | None = None,
+    ordner: list[str] | None = None, chat_id: str | None = None,
 ) -> tuple[str, bool]:
     """Executes a tool. Returns (result text, failed).
 
@@ -136,7 +148,7 @@ async def _werkzeug_ausfuehren(
     try:
         log.info("Werkzeug '%s' wird ausgeführt: %s", aufruf.name, aufruf.argumente)
         return await registry.ausfuehren(
-            aufruf.name, aufruf.argumente, bild_senke, ordner=ordner
+            aufruf.name, aufruf.argumente, bild_senke, ordner=ordner, chat_id=chat_id
         ), False
     except WerkzeugVerboten as fehler:
         log.warning("Abgelehnt: %s", fehler)
@@ -148,10 +160,11 @@ async def _werkzeug_ausfuehren(
 
 async def _auf_entscheidung_warten(
     generierung: Generierung, aufruf_id: str
-) -> bool | None:
-    """Waits for the yes or no on a tool.
+) -> bool | str | None:
+    """Waits for the yes or no on a tool — or for an answer to ask_user.
 
-    ``True``/``False`` is the user's decision. ``None`` means: none came —
+    ``True``/``False`` is the user's decision, a string their answer.
+    ``None`` means: none came —
     because the wait time is up, the run was cancelled, or nobody is hanging
     on the other end anymore. In all three cases nothing is executed.
 
@@ -280,6 +293,15 @@ def _system_bauen(request, repositories, chat, zustand, gewaehlt: str = "") -> s
     )
     gedaechtnis_da = gedaechtnis.mitschicken(repositories, zustand)
 
+    # Which of the new sentences apply: each one only when the tool it talks
+    # about is actually being offered to this model right now.
+    angeboten = {
+        w["function"]["name"]
+        for w in (registry.als_openai_werkzeuge() if werkzeuge_da else [])
+    }
+    dateiwerkzeuge_da = bool(angeboten & set(dateiwerkzeuge.NAMEN))
+    fragen_da = frage_werkzeug.WERKZEUG_NAME in angeboten
+
     # Only skills the model may reach for by itself, and only when the tools
     # exist to reach with — a catalogue without skill_load names doors that
     # cannot be opened.
@@ -300,6 +322,11 @@ def _system_bauen(request, repositories, chat, zustand, gewaehlt: str = "") -> s
         ordner=chat.working_dirs,
         gedaechtnis=gedaechtnis_da and bool(config.memory_lesen()),
         skills=skill_katalog,
+        dateiwerkzeuge=dateiwerkzeuge_da,
+        fragen=fragen_da,
+        # The rail beside the chat draws documents, always — it ships with
+        # the program rather than being a setting.
+        vorschau=True,
     )
     # The user's prompt is the only part `prompt_aus` suspends.
     benutzer = "" if chat.prompt_aus else config.system_prompt_lesen()
@@ -315,8 +342,26 @@ def _system_bauen(request, repositories, chat, zustand, gewaehlt: str = "") -> s
     )
 
 
+def _hat_zerlegtes_dokument(repositories: Repositories, chat: Chat) -> bool:
+    """Does this conversation hold a document that was cut into sections?
+
+    Asked before the embedding program is started at all. Most chats have
+    no document, and of those that do, most are small enough to travel
+    whole — paying for a model load on every message of every chat to serve
+    the rare one would be the wrong trade by a wide margin.
+    """
+    for dokument in repositories.documents.auflisten(chat_id=chat.id):
+        if repositories.abschnitte.anzahl(dokument.id):
+            return True
+    return False
+
+
 def _verlauf_bauen(
-    chat: Chat, repositories: Repositories, system_prompt: str, config=None
+    chat: Chat,
+    repositories: Repositories,
+    system_prompt: str,
+    config=None,
+    abschnitt_waehler=None,
 ) -> list[ChatNachricht]:
     """Builds the message list for a request.
 
@@ -345,11 +390,28 @@ def _verlauf_bauen(
             # the text.
             dokument = repositories.documents.holen(gespeichert.dokument)
             if dokument and dokument.extracted_text:
-                inhalt = (
-                    f'[Attached document "{dokument.filename}"]\n'
-                    f"{dokument.extracted_text}\n"
-                    f"[End of document]\n\n{inhalt}"
-                )
+                # A document too big to send whole travels as the handful of
+                # sections that fit the question (app/dokumentabschnitte.py).
+                # No selection means no sections were computed — then the
+                # whole text goes, exactly as before.
+                gewaehlt = abschnitt_waehler(dokument) if abschnitt_waehler else None
+                if gewaehlt:
+                    inhalt = f"{gewaehlt}\n\n{inhalt}"
+                else:
+                    # No selection: the document travels whole — and then it
+                    # has to obey the limit that protects the context. A
+                    # document taken in at full length FOR the section
+                    # search must never come through this branch unbounded;
+                    # that happens whenever the search cannot be built after
+                    # the fact (switch flipped off, program gone, model
+                    # moved), and it would put a hundred thousand tokens
+                    # into a request that has room for eight.
+                    volltext = (dokument.extracted_text or "")[:VOLLTEXT_GRENZE]
+                    inhalt = (
+                        f'[Attached document "{dokument.filename}"]\n'
+                        f"{volltext}\n"
+                        f"[End of document]\n\n{inhalt}"
+                    )
         nachrichten.append(
             ChatNachricht(
                 role=gespeichert.role,
@@ -360,26 +422,6 @@ def _verlauf_bauen(
             )
         )
     return nachrichten
-
-
-def _denkschalter_zusatz(thinking: bool | None, zustand) -> dict:
-    """Builds the chat_template_kwargs for the thinking switch (interface close-out A).
-
-    Only if the user has flipped the switch AND the endpoint demonstrably
-    supports switching (config entry wins, otherwise the discovery's native
-    detection). Everything else: empty — no guessing at the server.
-    """
-    if thinking is None:
-        return {}
-    caps = zustand.endpunkt.capabilities
-    schaltbar = (
-        caps.thinking
-        if caps.thinking is not None
-        else bool(getattr(zustand, "thinking_erkannt", False))
-    )
-    if not schaltbar:
-        return {}
-    return {"chat_template_kwargs": {"enable_thinking": thinking}}
 
 
 @router.post("/completions", summary="Antwort erzeugen (Server-Sent Events)")
@@ -449,6 +491,27 @@ async def completions(
         "parameter", modell=endpoint_id, chat=chat.id
     )
 
+    # Which passages of a large document travel with this question. The
+    # call runs an external program, so it goes into a thread — computed
+    # inline it would stop the whole service, every other stream with it,
+    # for as long as an embedding model takes to load.
+    #
+    # And it only runs when this conversation actually HAS a document that
+    # was cut up. Without that check every "hello" in every chat would pay
+    # for a model load.
+    abschnitt_waehler = None
+    if _hat_zerlegtes_dokument(repositories, chat):
+        abschnitt_waehler = await asyncio.to_thread(
+            dokumentabschnitte.kontext_waehler,
+            request.app.state.config,
+            getattr(request.app.state, "modellrunner", None),
+            repositories,
+            daten.content or "",
+            endpoint_id,
+            chat.id,
+            getattr(request.app.state, "einbettungsrunner", None),
+        )
+
     anfrage = Generierungsanfrage(
         nachrichten=_verlauf_bauen(
             chat,
@@ -462,6 +525,10 @@ async def completions(
             # does not apply would only dilute attention.
             _system_bauen(request, repositories, chat, zustand, daten.skill or ""),
             config=request.app.state.config,
+            # What the question is about decides which passages of a large
+            # document ride along. Computed above, once per request, and
+            # only when there is a cut-up document to choose from at all.
+            abschnitt_waehler=abschnitt_waehler,
         ),
         temperature=(
             daten.temperature if daten.temperature is not None else eingestellt.get("temperature")
@@ -486,7 +553,7 @@ async def completions(
         modell=modellname,
         # The thinking switch: only goes along if the endpoint demonstrably
         # supports switching — otherwise the server keeps its default.
-        zusatz=_denkschalter_zusatz(daten.thinking, zustand),
+        zusatz=denkschalter.zusatz(daten.thinking, zustand),
     )
 
     # Only offer tools if the feature is switched on and the endpoint can
@@ -506,6 +573,15 @@ async def completions(
         chat_id=chat.id, role="assistant", content=""
     )
 
+    # The guardian watches this request. Its allowance of suggestions counts
+    # per request from the user, so it starts over here — and what the user
+    # last asked for travels with every finding, because a correction that
+    # only knows the failed command can repair the command but not the
+    # intention behind it.
+    waechter_an = waechterwahl.wacht(repositories, modell=endpoint_id, chat=chat.id)
+    waechter.wache.neuer_auftrag(chat.id)
+    letzter_auftrag = (daten.content or "").strip()
+
     # The generator stays what it was — a sequence of events. What's new is
     # only who reads it: no longer the response to the browser, but the run.
     # That's why the generation now comes in as a parameter instead of from
@@ -515,6 +591,10 @@ async def completions(
         gedanke_text: list[str] = []
         messwerte: dict = {}
         werkzeugprotokoll: list[dict] = []
+        # The findings THIS run produced. The guardian works this list after
+        # the answer is stored, so a run that was stopped leaves nothing
+        # behind for the next one to pay for.
+        waechter_befunde: list = []
         abgebrochen = False
         fehlertext: str | None = None
         quelle = None
@@ -626,6 +706,9 @@ async def completions(
                                 if anlass
                                 else ""
                             ),
+                            # The bare value as well, so the window can set
+                            # the path in monospace inside the sentence.
+                            grund_wert=anlass[2] if anlass else "",
                             aufruf_id=aufruf.id,
                         )
                         entscheidung = await _auf_entscheidung_warten(
@@ -641,6 +724,63 @@ async def completions(
                         elif entscheidung is False:
                             log.info("Werkzeug '%s' wurde abgelehnt", aufruf.name)
                             abgelehnt = t("fehler.werkzeug_abgelehnt", sprache, name=aufruf.name)
+
+                    # ask_user is not executed but answered. The run holds
+                    # the call open the way it holds a confirmation open, and
+                    # what comes back — a clicked label or a typed sentence —
+                    # is the tool's result.
+                    if aufruf.name == frage_werkzeug.WERKZEUG_NAME and abgelehnt is None:
+                        try:
+                            frage_text, optionen = frage_werkzeug.gepruefte_frage(
+                                aufruf.argumente
+                            )
+                        except frage_werkzeug.FrageUngueltig as fehler:
+                            ergebnis, fehlgeschlagen = str(fehler), True
+                        else:
+                            yield _sse(
+                                "user_ask",
+                                frage=frage_text,
+                                optionen=optionen,
+                                aufruf_id=aufruf.id,
+                            )
+                            antwort = await _auf_entscheidung_warten(
+                                generierung, aufruf.id
+                            )
+                            if antwort is None and generierung.soll_abbrechen:
+                                abgebrochen = True
+                                break
+                            ergebnis = (
+                                antwort
+                                if isinstance(antwort, str) and antwort.strip()
+                                else frage_werkzeug.OHNE_ANTWORT
+                            )
+                            fehlgeschlagen = False
+                        werkzeugprotokoll.append(
+                            {
+                                "name": aufruf.name,
+                                "server": registry.server_von(aufruf.name) if registry else "",
+                                "argumente": aufruf.argumente,
+                                "fehlgeschlagen": fehlgeschlagen,
+                                "ergebnis": ergebnis[:2000],
+                                "bild": None,
+                            }
+                        )
+                        yield _sse(
+                            "tool_result",
+                            name=aufruf.name,
+                            aufruf_id=aufruf.id,
+                            fehlgeschlagen=fehlgeschlagen,
+                            text=ergebnis[:2000],
+                            bild=None,
+                        )
+                        anfrage.nachrichten.append(
+                            ChatNachricht(
+                                role="tool",
+                                content=ergebnis,
+                                werkzeugaufruf_id=aufruf.id,
+                            )
+                        )
+                        continue
 
                     # The server travels with the call: the UI picks the
                     # tool's mark by it, and unlike the tool name it is fixed
@@ -658,7 +798,7 @@ async def completions(
                         bilder_vorher = len(werkzeug_bilder)
                         ergebnis, fehlgeschlagen = await _werkzeug_ausfuehren(
                             registry, aufruf, sprache, bild_senke,
-                            ordner=chat.working_dirs,
+                            ordner=chat.working_dirs, chat_id=chat.id,
                         )
                     # Did THIS call save an image? Then the line in the stream
                     # and the log in the message carry it.
@@ -691,6 +831,34 @@ async def completions(
                         text=ergebnis[:2000],
                         bild=neues_bild,
                     )
+                    # Did this step fail in a way worth a second thought? The
+                    # finding is filed and reported RIGHT HERE, so the panel
+                    # lights up while the run is still going. What to do about
+                    # it is asked of the model afterwards — a local server has
+                    # one slot, and the guardian must not queue its question
+                    # in front of the user's own answer.
+                    if waechter_an:
+                        befund = waechter_ausloeser.pruefen(
+                            name=aufruf.name,
+                            ergebnis=ergebnis,
+                            fehlgeschlagen=fehlgeschlagen,
+                            abgelehnt=abgelehnt is not None,
+                            argumente=aufruf.argumente,
+                            auftrag=letzter_auftrag,
+                        )
+                        eintrag = (
+                            waechter.wache.aufnehmen(chat.id, befund)
+                            if befund is not None
+                            else None
+                        )
+                        if eintrag is not None:
+                            # Kept for THIS run. Asking the chat for all its
+                            # open findings later would sweep up leftovers
+                            # from runs that were stopped by hand — five of
+                            # those and the next good run owes ten model
+                            # calls before it may finish.
+                            waechter_befunde.append(eintrag)
+                            yield _sse("waechter", **eintrag.als_daten())
                     anfrage.nachrichten.append(
                         ChatNachricht(
                             role="tool",
@@ -746,6 +914,54 @@ async def completions(
                 stats=messwerte,
             )
 
+        # The guardian gets its turn only here — AFTER the answer is in the
+        # database and the run is deregistered. It asks the model again, and
+        # that call must never stand between a finished answer and its
+        # saving: a service that dies in those seconds would have streamed a
+        # whole answer and stored an empty one.
+        #
+        # A run stopped by hand is left alone: whoever hit stop is not
+        # waiting for advice. And the stop button keeps working through this
+        # phase, which is why the flag is read on every pass.
+        if waechter_an and not abgebrochen and waechter_befunde:
+            # Which model is asked is not a detail here, it is the whole
+            # point of the feature: the question goes to Extended Workflow's
+            # own server on localhost and to nothing else. `zustand` above is
+            # the CHAT's endpoint and may be a cloud provider — asking that
+            # one would post the failed command, its arguments and the
+            # folders this chat has released out of the house, at the very
+            # moment somebody switched on a local guardian to avoid exactly
+            # that.
+            wachzustand = wachmodell = None
+            hinweis: str | None = None
+            try:
+                wachzustand, wachmodell = await eewserver.wachzustand(
+                    getattr(request.app.state, "eewrunner", None)
+                )
+            except eewserver.NichtBereit as fehler:
+                # Said, not worked around. There is no second-best model for
+                # this question; a fallback to the chat's endpoint is the bug
+                # this branch exists to make impossible.
+                hinweis = fehler.grund
+                log.warning("Wächter ohne Server: %s", fehler.grund)
+            for eintrag in waechter_befunde:
+                if generierung.soll_abbrechen:
+                    break
+                if eintrag.vorschlag is not None:
+                    continue
+                if wachzustand is None:
+                    eintrag.vorschlag = ""
+                    eintrag.hinweis = hinweis
+                else:
+                    eintrag.vorschlag = await waechter.vorschlag_holen(
+                        wachzustand, wachmodell, eintrag.befund, chat.working_dirs
+                    )
+                # Reported even when nothing came back: the panel is showing
+                # "writing a suggestion" until it hears otherwise, and a
+                # spinner that never ends is worse than an honest
+                # "no suggestion".
+                yield _sse("waechter", **eintrag.als_daten())
+
         if fehlertext:
             yield _sse("error", text=fehlertext)
         yield _sse("stats", daten=messwerte)
@@ -793,7 +1009,7 @@ def bestaetigen(
     """
     return BestaetigungAntwort(
         zugestellt=generierungen.bestaetigen(
-            daten.generation_id, daten.aufruf_id, daten.erlaubt
+            daten.generation_id, daten.aufruf_id, daten.erlaubt, daten.antwort
         )
     )
 

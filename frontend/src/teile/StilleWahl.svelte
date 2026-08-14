@@ -13,6 +13,7 @@
 </script>
 
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* A quiet selection row — same construction as the model picker in
      the input bar: no frame, just the name and a
      chevron, and a dropdown with a check before the chosen one.
@@ -141,7 +142,7 @@
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => { if (e.key === 'Escape') offen = false }}
   >
-    <div class="liste">
+    <div class="liste" use:rollfade>
       {#if !eintraege.length}
         <p class="keins">{leerText}</p>
       {/if}

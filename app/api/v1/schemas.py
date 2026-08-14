@@ -19,6 +19,20 @@ class ChatAnlegen(BaseModel):
     endpoint_id: str | None = None
 
 
+class OrdnerOeffnen(BaseModel):
+    """Which chat, and which of its shared folders. Never a free path — the
+    handler only accepts one that is already in the chat's list."""
+
+    chat_id: str
+    pfad: str
+
+
+class BefehlAusfuehren(BaseModel):
+    """One command from the CLI module. The folders come from the chat."""
+
+    command: str = Field(max_length=10_000)
+
+
 class ChatAendern(BaseModel):
     title: str | None = Field(default=None, max_length=300)
     # Suspends the system prompt for this one chat. The prompt itself lives
@@ -162,11 +176,17 @@ class AbbruchAntwort(BaseModel):
 
 
 class BestaetigungAnfrage(BaseModel):
-    """The user's answer to the confirmation prompt before a tool."""
+    """The user's answer to a waiting tool call.
+
+    Two kinds travel this one route: the yes or no before a tool runs, and
+    the answer to ``ask_user``. ``antwort`` carries the latter — a clicked
+    label or whatever the user typed instead.
+    """
 
     generation_id: str
     aufruf_id: str
-    erlaubt: bool
+    erlaubt: bool = True
+    antwort: str | None = None
 
 
 class SystemPromptAntwort(BaseModel):

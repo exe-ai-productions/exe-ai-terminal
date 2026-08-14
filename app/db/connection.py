@@ -17,7 +17,7 @@ from typing import Iterator
 log = logging.getLogger(__name__)
 
 SCHEMA_DATEI = Path(__file__).resolve().parent / "schema.sql"
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 # Schema changes for databases that already exist.
 #
@@ -168,6 +168,19 @@ MIGRATIONEN: list[tuple[int, list[str]]] = [
             "ALTER TABLE chats DROP COLUMN max_tokens",
         ],
     ),
+    (
+        11,
+        [
+            # Which embedding model a vector came out of. Without it, sections
+            # written by one model are compared against a question embedded by
+            # another: the numbers line up, the similarities sort, and the
+            # answer is built from whichever sections happened to be stored
+            # first. Sections from before this step carry the empty name and
+            # are therefore never compared — they are recomputed on the next
+            # upload, which is cheaper than guessing which model wrote them.
+            "ALTER TABLE dokument_abschnitte ADD COLUMN modell TEXT NOT NULL DEFAULT ''",
+        ],
+    ),
 ]
 
 
@@ -289,16 +302,24 @@ class Database:
                 try:
                     verbindung.execute(anweisung)
                 except sqlite3.OperationalError as fehler:
-                    # A step that has already happened is not a failure. Two
-                    # ways that shows: the column an ADD wants is already
-                    # there, or the column a DROP wants is already gone. Both
-                    # mean the same thing — this migration ran before, or the
-                    # database was built from a schema that already has the
-                    # result. Everything else is a real error and goes up.
+                    # A step that has nothing left to do is not a failure.
+                    # Three ways that shows: the column an ADD wants is
+                    # already there, the column a DROP wants is already gone,
+                    # or the whole table is still missing.
+                    #
+                    # The last one is the case of a database older than the
+                    # table itself. Migrations run before schema.sql, so a
+                    # column added to a young table is asked for while the
+                    # table does not exist yet — and schema.sql, a moment
+                    # later, creates it with the column already in place.
+                    # Everything else is a real error and goes up.
                     text = str(fehler).lower()
-                    if "duplicate column" not in text and "no such column" not in text:
+                    if not any(
+                        satz in text
+                        for satz in ("duplicate column", "no such column", "no such table")
+                    ):
                         raise
-                    log.info("Migration %s war bereits angewendet", version)
+                    log.info("Migration %s hatte nichts zu tun", version)
             verbindung.execute(
                 "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
                 (version, jetzt_iso()),

@@ -280,7 +280,7 @@ def test_werkzeugschleife_im_chat(client, chat_id, monkeypatch):
         def bestaetigungsgrund(self, name, argumente=None, ordner=None):
             return ''
 
-        async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None):
+        async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None, chat_id=None):
             self.aufgerufen.append((name, argumente))
             return "42"
 
@@ -336,7 +336,7 @@ def test_werkzeugergebnis_geht_zurueck_ans_modell(client, chat_id):
         def bestaetigungsgrund(self, name, argumente=None, ordner=None):
             return ''
 
-        async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None):
+        async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None, chat_id=None):
             return "42"
 
     client.app.state.werkzeuge = FakeRegistry()
@@ -418,7 +418,7 @@ def test_verbotenes_werkzeug_wird_dem_modell_zurueckgemeldet(client, chat_id):
         def bestaetigungsgrund(self, name, argumente=None, ordner=None):
             return ''
 
-        async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None):
+        async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None, chat_id=None):
             raise WerkzeugVerboten(f"Werkzeug '{name}' ist nicht freigegeben.")
 
     client.app.state.werkzeuge = FakeRegistry()
@@ -482,7 +482,7 @@ class HeikleRegistry:
     def bestaetigungsgrund(self, name, argumente=None, ordner=None):
         return ''
 
-    async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None):
+    async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None, chat_id=None):
         self.aufgerufen.append((name, argumente))
         return "erledigt"
 

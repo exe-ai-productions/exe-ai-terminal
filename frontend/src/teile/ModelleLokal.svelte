@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* Local models: what runs on this machine, and how it is set.
 
      Its own window because local is the normal case. The left column shows
@@ -15,12 +16,15 @@
   import Schalter from './Schalter.svelte'
   import Parametertafel from './Parametertafel.svelte'
   import Modellserver from './Modellserver.svelte'
+  import Einbettungsserver from './Einbettungsserver.svelte'
+  import Bildserver from './Bildserver.svelte'
   import Schriftzug from './Schriftzug.svelte'
   import Kachel from './Kachel.svelte'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
   import Hauszeichen from './Hauszeichen.svelte'
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
+  import { ausFenster } from '../lib/fensterweg.svelte.js'
   import { zustand } from '../lib/zustand.svelte.js'
   import { modellwahl, auswahlLaden, istAn, schalten, lokale } from '../lib/modelle.svelte.js'
 
@@ -28,8 +32,26 @@
 
   /* Which the right half shows: the server, or a clicked model's
      parameters. Clicking left never changes what you are chatting with. */
+  /* The three kinds of server, each with its own tile, its own folder and
+     its own port. One tile for all of them was how an embedding model ended
+     up in the language model's picker and its start ran against a port that
+     was already taken. */
   const SERVER = 'server'
+  const EINBETTUNG = 'einbettung'
+  const BILD = 'bild'
   let gezeigt = $state(SERVER)
+
+  /* What the two new tiles report, fetched when the window opens. The
+     panels behind them fetch for themselves; the tiles only need the one
+     line each that says where things stand. */
+  const BILDFARBE = { bereit: 'gruen', zeichnet: 'blau', kein_modell: 'still', kein_programm: 'rot' }
+  let einbettungStand = $state(null)
+  let bildStand = $state(null)
+  $effect(() => {
+    if (!offen) return
+    api.einbettungAuskunft().then((a) => (einbettungStand = a)).catch(() => {})
+    api.bildmodelle().then((a) => (bildStand = a)).catch(() => {})
+  })
 
   const modelle = $derived(lokale())
   const modell = $derived(modelle.find((m) => m.id === gezeigt) ?? null)
@@ -106,7 +128,7 @@
   {/if}
 
   <div class="zwei">
-    <div class="links">
+    <div class="links" use:rollfade>
       <h4 class="abschnitt">{t('modell.laeuft_gerade')}</h4>
       {#if reise}
         <p class="leerzeile">{t(ordnerLeer ? 'modell.kein_modell_satz' : 'modell.nichts_laeuft')}</p>
@@ -125,7 +147,7 @@
               {#snippet unter()}
                 {#if m.context_tokens}{kurz(m.context_tokens)} · {/if}{dialektName(m.dialekt)}
                 {#if mtpAktiv(m)}
-                  <span class="mtp" title={t('modell.mtp_aktiv')}><Hauszeichen zeichen="blitz" groesse={12} /></span>
+                  <span class="mtp" title={t('modell.mtp_aktiv')}><Hauszeichen zeichen="blitz" groesse="klein" /></span>
                 {/if}
               {/snippet}
               {#snippet rechts()}
@@ -143,10 +165,13 @@
       <div class="kachelzeile">
         <Kachel
           titel={t('modell.katalog')}
-          onclick={() => { offen = false; zustand.katalogOffen = true }}
+          onclick={() => ausFenster(
+            () => { offen = false; zustand.katalogOffen = true },
+            () => { zustand.katalogOffen = false; offen = true },
+          )}
           ariaLabel={t('modell.katalog')}
         >
-          {#snippet zeichen()}<Hauszeichen zeichen="raster" groesse={17} />{/snippet}
+          {#snippet zeichen()}<Hauszeichen zeichen="raster" groesse="mittel" />{/snippet}
           {#snippet unter()}
             {ordnerLeer && maschineGb ? t('modell.katalog_unter_erst', { gb: maschineGb }) : t('modell.katalog_unter')}
           {/snippet}
@@ -160,7 +185,7 @@
           onclick={() => (gezeigt = SERVER)}
           ariaLabel={t('modell.server')}
         >
-          {#snippet zeichen()}<Hauszeichen zeichen="server" groesse={17} />{/snippet}
+          {#snippet zeichen()}<Hauszeichen zeichen="server" groesse="mittel" />{/snippet}
           {#snippet unter()}
             <Leuchtpunkt farbe={laeuft ? 'gruen' : 'still'} groesse={6} />
             {laeuft ? t('modell.server_unter_an', { port: auskunft.port }) : t('modell.server_unter_aus')}
@@ -168,9 +193,41 @@
           {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
         </Kachel>
       </div>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('einbettungsserver.titel')}
+          gewaehlt={gezeigt === EINBETTUNG}
+          onclick={() => (gezeigt = EINBETTUNG)}
+          ariaLabel={t('einbettungsserver.titel')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="einbettung" groesse="mittel" />{/snippet}
+          {#snippet unter()}
+            <Leuchtpunkt farbe={einbettungStand?.laeuft ? 'gruen' : 'still'} groesse={6} />
+            {einbettungStand?.laeuft
+              ? t('einbettungsserver.laeuft', { port: einbettungStand.port })
+              : t('einbettungsserver.aus')}
+          {/snippet}
+          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
+        </Kachel>
+      </div>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('bildserver.titel')}
+          gewaehlt={gezeigt === BILD}
+          onclick={() => (gezeigt = BILD)}
+          ariaLabel={t('bildserver.titel')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="bild" groesse="mittel" />{/snippet}
+          {#snippet unter()}
+            <Leuchtpunkt farbe={BILDFARBE[bildStand?.stand] ?? 'still'} groesse={6} />
+            {t(`bildserver.stand_${bildStand?.stand ?? 'kein_programm'}`)}
+          {/snippet}
+          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
+        </Kachel>
+      </div>
     </div>
 
-    <div class="rechts">
+    <div class="rechts" use:rollfade>
       {#if modell}
         <div class="kopfkarte">
           <div class="min">
@@ -185,6 +242,10 @@
           </Standpille>
         </div>
         <Parametertafel {modell} />
+      {:else if gezeigt === EINBETTUNG}
+        <Einbettungsserver />
+      {:else if gezeigt === BILD}
+        <Bildserver />
       {:else}
         <Modellserver />
       {/if}

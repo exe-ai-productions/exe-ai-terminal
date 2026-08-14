@@ -222,11 +222,18 @@ class Generierungsverwaltung:
                 anzahl += 1
         return anzahl
 
-    def bestaetigen(self, generierung_id: str, aufruf_id: str, erlaubt: bool) -> bool:
-        """Deliver the user's decision.
+    def bestaetigen(
+        self, generierung_id: str, aufruf_id: str, erlaubt: bool,
+        antwort: str | None = None,
+    ) -> bool:
+        """Deliver the user's decision, or their answer.
 
         False here does not mean "denied" but "nobody is waiting for this
         answer" — the answer is over, or the click already happened.
+
+        ``antwort`` belongs to ``ask_user``: there the waiting call wants a
+        text, not a yes. Both travel the same future, and the waiting side
+        knows which of the two it asked for.
         """
         generierung = self._laufende.get(generierung_id)
         if generierung is None:
@@ -234,5 +241,5 @@ class Generierungsverwaltung:
         zukunft = generierung.bestaetigungen.get(aufruf_id)
         if zukunft is None or zukunft.done():
             return False
-        zukunft.set_result(erlaubt)
+        zukunft.set_result(antwort if antwort is not None else erlaubt)
         return True

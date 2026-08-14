@@ -1,9 +1,10 @@
 /*
 Markdown rendering and syntax highlighting.
 
-Deliberately without a third-party library: nothing is fetched at runtime,
-nothing leaves the machine, and the file stays small enough to understand.
-That fits a program whose whole purpose is to get by without the cloud.
+Markdown itself is still done here, by hand: nothing is fetched at runtime,
+nothing leaves the machine. The syntax colouring moved out to
+lib/einfaerben.js, which uses highlight.js — hand-written patterns cannot
+tell a regex literal from a division, and that is where they broke.
 
 Order matters: first the code blocks are taken out and parked, then the
 rest is transformed, and at the end the blocks come back. Otherwise
@@ -14,6 +15,7 @@ Everything is escaped beforehand. Untreated text never ends up in the
 document.
 */
 
+import { hervorheben } from './einfaerben.js'
 import { t } from './texte.svelte.js'
 import { dateiart, dateigroesse, dateiname, dateizeichen } from './dateiarten.js'
 
@@ -41,83 +43,21 @@ function maskierenInhalt(text) {
     .replace(/>/g, '&gt;');
 }
 
-/* ---------- Syntax highlighting ---------- */
-
-const SPRACHEN = {
-  python: {
-    schluessel: /\b(def|class|return|if|elif|else|for|while|in|not|and|or|import|from|as|with|try|except|finally|raise|lambda|yield|async|await|pass|break|continue|global|None|True|False|self)\b/g,
-    kommentar: /(#[^\n]*)/g,
-    text: /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g
-  },
-  javascript: {
-    schluessel: /\b(const|let|var|function|return|if|else|for|while|of|in|new|class|extends|import|export|from|default|async|await|try|catch|finally|throw|typeof|instanceof|null|undefined|true|false|this)\b/g,
-    kommentar: /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g,
-    text: /(`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g
-  },
-  bash: {
-    schluessel: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|export|source|local|echo|cd|sudo|apt|systemctl|docker|curl|git|python3?|pip)\b/g,
-    kommentar: /(#[^\n]*)/g,
-    text: /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g
-  },
-  json: {
-    schluessel: /\b(true|false|null)\b/g,
-    kommentar: null,
-    text: /("(?:[^"\\]|\\.)*")/g
-  },
-  sql: {
-    schluessel: /\b(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|INDEX|PRIMARY|KEY|FOREIGN|REFERENCES|JOIN|LEFT|INNER|ON|GROUP|ORDER|BY|LIMIT|OFFSET|AND|OR|NOT|NULL|DEFAULT|ALTER|ADD|COLUMN|DROP)\b/gi,
-    kommentar: /(--[^\n]*)/g,
-    text: /('(?:[^'\\]|\\.)*')/g
-  },
-  yaml: {
-    schluessel: /\b(true|false|null|yes|no)\b/g,
-    kommentar: /(#[^\n]*)/g,
-    text: /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g
-  }
-};
-SPRACHEN.js = SPRACHEN.javascript;
-SPRACHEN.py = SPRACHEN.python;
-SPRACHEN.sh = SPRACHEN.bash;
-SPRACHEN.shell = SPRACHEN.bash;
-SPRACHEN.yml = SPRACHEN.yaml;
-
 /*
-  Strings and comments have to stay untouched — a keyword inside a string
-  is not a keyword.
+  The line numbers beside a block.
 
-  An earlier version parked them behind numbered placeholders. That went
-  wrong: the number coloring then grabbed the digits of the placeholders
-  and tore them apart. Hence now without placeholders — the code is split
-  into sections, and only the sections in between are touched.
+  Their own element, never part of the code: `user-select: none` keeps them
+  out of a selection, and the copy button takes the raw source anyway. A
+  number that lands in the clipboard turns pasted code into broken code.
+
+  From two lines on. A single line has nothing to count.
 */
-function hervorheben(code, sprache) {
-  const regeln = SPRACHEN[(sprache || '').toLowerCase()];
-  const roh = maskierenInhalt(code);
-  if (!regeln) return roh;
-
-  const teile = [];
-  if (regeln.text) teile.push(regeln.text.source);
-  if (regeln.kommentar) teile.push(regeln.kommentar.source);
-
-  const einfaerben = (abschnitt) => abschnitt
-    .replace(regeln.schluessel, '<span class="sx-schl">$&</span>')
-    .replace(/\b(\d+\.?\d*)\b/g, '<span class="sx-zahl">$1</span>')
-    .replace(/([a-zA-Z_][\w]*)(\s*\()/g, '<span class="sx-ruf">$1</span>$2');
-
-  if (!teile.length) return einfaerben(roh);
-
-  const sucher = new RegExp(teile.join('|'), 'g');
-  let ergebnis = '', zuletzt = 0, treffer;
-  while ((treffer = sucher.exec(roh)) !== null) {
-    ergebnis += einfaerben(roh.slice(zuletzt, treffer.index));
-    const istKommentar = regeln.kommentar && new RegExp('^(?:' + regeln.kommentar.source + ')$')
-      .test(treffer[0]);
-    ergebnis += '<span class="sx-' + (istKommentar ? 'komm' : 'text') + '">' +
-      treffer[0] + '</span>';
-    zuletzt = treffer.index + treffer[0].length;
-    if (treffer[0] === '') sucher.lastIndex++;  // prevent an endless loop
-  }
-  return ergebnis + einfaerben(roh.slice(zuletzt));
+function nummernspalte(code) {
+  const anzahl = code.split('\n').length;
+  if (anzahl < 2) return '';
+  let ziffern = '';
+  for (let n = 1; n <= anzahl; n++) ziffern += n + '\n';
+  return '<span class="code-nummern" aria-hidden="true">' + ziffern + '</span>';
 }
 
 /* ---------- Markdown ---------- */
@@ -187,8 +127,8 @@ function rendern(quelltext) {
         ? `<div class="code-kopf"><span>${maskieren(sprache)}</span>` +
           `<button class="code-kopieren" title="${kopieren}">${kopieren}</button></div>`
         : '';
-      bloecke.push('<div class="codeblock">' + kopf + '<pre><code>' +
-        hervorheben(roh, sprache) + '</code></pre></div>');
+      bloecke.push('<div class="codeblock">' + kopf + '<pre>' + nummernspalte(roh) +
+        '<code>' + hervorheben(roh, sprache) + '</code></pre></div>');
       return '' + (bloecke.length - 1) + '';
     }
   );
@@ -266,4 +206,32 @@ function rendern(quelltext) {
   return raus.join('\n').replace(/(\d+)/g, (_, i) => bloecke[i]);
 }
 
-export { rendern, hervorheben, maskieren }
+/*
+  The documents in one answer, without rendering it.
+
+  The rail beside the chat opens a tab for each of them as they arrive, and
+  it must not have to read that out of the page: the answer is the source,
+  the DOM is only a picture of it. Same rule as above decides what counts as
+  a document — one function, not two that drift apart.
+*/
+function dateienAus(quelltext) {
+  const gefunden = [];
+  let dateien = 0;
+  String(quelltext || '').replace(
+    /```([\w+-]*)\n?([\s\S]*?)```/g,
+    function (_, sprache, code) {
+      const art = dateiart(sprache);
+      if (art) {
+        gefunden.push({
+          name: dateiname(sprache, ++dateien),
+          art: sprache.toLowerCase(),
+          inhalt: code.replace(/\n$/, ''),
+        });
+      }
+      return '';
+    },
+  );
+  return gefunden;
+}
+
+export { rendern, hervorheben, maskieren, dateienAus }

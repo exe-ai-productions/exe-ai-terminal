@@ -1,17 +1,28 @@
 <script>
   import Werkzeugfrage from './Werkzeugfrage.svelte'
   import Arbeitsordner from './Arbeitsordner.svelte'
+  import Benutzerfrage from './Benutzerfrage.svelte'
+  import { dock, dockDatei } from '../lib/notizen.svelte.js'
   import Ordnerpillen from './Ordnerpillen.svelte'
   import Skillliste from './Skillliste.svelte'
+  import Bildfenster from './Bildfenster.svelte'
+  import Tempoanzeige from './Tempoanzeige.svelte'
+  import Leuchtpunkt from './Leuchtpunkt.svelte'
   import { gefiltert, skillAmAnfang, skills, skillsLaden } from '../lib/skills.svelte.js'
   import { maskeOeffnen, ordnerListe } from '../lib/arbeitsordner.svelte.js'
+  import { einreihen } from '../lib/warteschlange.svelte.js'
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
   import {
-    zustand, werkzeugfrageBeantworten, melde, aktuellerChat,
+    zustand, werkzeugfrageBeantworten, benutzerfrageBeantworten, melde, aktuellerChat,
   } from '../lib/zustand.svelte.js'
 
-  let { senden, abbrechen, bildErzeugen, bildStoppen, tempo, schlank = false, gruss = null } = $props()
+  let { senden, abbrechen, bildErzeugen, bildStoppen, bildZeichnen, bildLokalLaeuft = false, tempo, schlank = false, gruss = null } = $props()
+
+  /* The three things the bar can be doing, in the house's colours: waiting
+     for the first token is a wait, a running answer is a run, and anything
+     else is simply ready. */
+  const PUNKTFARBE = { bereit: 'gruen', prompt: 'gelb', laeuft: 'blau' }
 
   let text = $state('')
   let feld = $state(null)
@@ -26,6 +37,21 @@
      when none is there (reachability is the operator's/arbiter's
      business). */
   let bildmodus = $state(false)
+  /* The parameter window for the picture made on this machine. */
+  let bildfensterOffen = $state(false)
+  /* Picture servers configured by the user. Empty on a normal installation,
+     and then the image mode entry does not appear at all — one picture
+     entry in the menu, not two that sound alike. Fetched when the menu
+     opens rather than at startup: nobody needs it until then. */
+  let eigeneBildserver = $state([])
+  $effect(() => {
+    if (!menueOffen) return
+    api.bildEndpunkte().then((e) => (eigeneBildserver = e)).catch(() => (eigeneBildserver = []))
+  })
+  /* Their names, as one line. Built here rather than in the markup: an
+     expression that wraps across lines reads to the house-rule test as
+     hard-coded words, and it is easier to read here anyway. */
+  const bildserverNamen = $derived(eigeneBildserver.map((e) => e.id).join(' · '))
   let bildserverDa = $state(true)
   let erzeugtGerade = $state(false)
 
@@ -64,11 +90,22 @@
       } catch {
         bildserverDa = false
       }
+      /* An unreachable server is a notice, not a label. It used to be a red
+         line glued under the prompt, where it stayed for as long as the mode
+         did — the house has one place for something that went wrong, and
+         this is it. */
+      if (!bildserverDa) melde(t('fehler.bildserver_fehlt'), 'fehler')
     }
     setTimeout(() => feld?.focus(), 60)
   }
 
   const laeuftGerade = $derived(Boolean(zustand.laeuft))
+
+  /* The speed belongs to the run producing it, and a run belongs to one
+     chat. `tempo` is app-wide, so standing in another conversation while an
+     answer is written elsewhere would show that answer's numbers here, over
+     a chat where nothing is happening. */
+  const tempoHier = $derived(!zustand.laeuft || zustand.laeuft.chatId === zustand.aktiverChat)
   const ordnerAnzahl = $derived(ordnerListe().length)
 
   /* The thinking switch (interface milestone A: a light
@@ -90,13 +127,12 @@
     localStorage.setItem('denken:' + zustand.modellId, denken ? 'an' : 'aus')
   }
 
-  /* Fluid bar: fill level from the tok/s, full at 80 (at 100,
-     everyday local speeds only reached a third — the scale should
-     reflect one's own machine park, not an ideal measure). Without a
-     measurement, only the empty shell remains. */
-  const FLUID_VOLL = 80
-  const fluidAnteil = $derived(Math.min(1, (tempo.wert ?? 0) / FLUID_VOLL))
   const leer = $derived(!text.trim() && !anhang && !dokumentAnhang)
+  /* The action button shows the stop sign only while a run has nothing to
+     send beside it — with something in the field, sending (into the queue)
+     is what the hand is after. Image generation is not queued and keeps
+     its own stop. */
+  const stoppt = $derived(erzeugtGerade || bildLokalLaeuft || (laeuftGerade && leer))
   const BILD_TYPEN = ['image/png', 'image/jpeg', 'image/webp']
 
   /* Document attachment (4.1): image OR document, never
@@ -165,8 +201,20 @@
     anhangSetzen(eintrag.getAsFile())
   }
 
-  function fallenlassen(ereignis) {
+  async function fallenlassen(ereignis) {
     ereignis.preventDefault()
+    /* A file dragged out of the document dock: only its id travels, and the
+       dock hands over the file itself. From there it is an attachment like
+       any other — the field does not need to know where it came from. */
+    const ausDock = ereignis.dataTransfer?.getData('application/x-exe-dock')
+    if (ausDock) {
+      const eintrag = dock.liste.find((e) => e.id === ausDock)
+      if (!eintrag) return
+      const datei = await dockDatei(eintrag)
+      if (istDokument(datei)) dokumentSetzen(datei)
+      else anhangSetzen(datei)
+      return
+    }
     const datei = ereignis.dataTransfer?.files?.[0]
     if (!datei) return
     // The switch point: PDF/TXT/MD are documents, everything else tries
@@ -238,7 +286,13 @@
   async function absenden() {
     const inhalt = text.trim()
     if (bildmodus) {
-      if (!inhalt || erzeugtGerade || !bildserverDa) return
+      /* `bildLokalLaeuft` as well as the local flag: a picture started from
+         the picture window sets only the app-wide one, and the generator
+         takes one job at a time. Without this the second order goes out,
+         the service refuses it, and the refusal lands on top of the answer
+         that was still being written. The stop button beside this already
+         treats the two as one fact. */
+      if (!inhalt || erzeugtGerade || bildLokalLaeuft || !bildserverDa) return
       erzeugtGerade = true
       text = ''
       try {
@@ -248,7 +302,16 @@
       }
       return
     }
-    if ((!inhalt && !anhang && !dokumentAnhang) || laeuftGerade) return
+    if (!inhalt && !anhang && !dokumentAnhang) return
+    /* A run with no chat behind it: the chat was left with ⌘N or the "+"
+       button while an answer was still going. Queueing here would file the
+       message under no conversation at all — it would then be sent by
+       nobody and shown in every new chat. The old refusal is the right
+       answer in that corner, and the text stays in the field. */
+    if (laeuftGerade && !zustand.aktiverChat) {
+      melde(t('eingabe.laeuft_schon'))
+      return
+    }
     const bild = anhang?.datei ?? null
     const dokument = dokumentAnhang?.datei ?? null
     text = ''
@@ -259,7 +322,21 @@
        what gets stored, and the chat still shows it after a reload. */
     const skill = skillAmAnfang(inhalt)?.name ?? null
     // The thinking switch only goes along if the model really has it.
-    senden(inhalt, bild, dokument, denkFaehig ? denken : null, skill)
+    const auftrag = { inhalt, bild, dokument, denken: denkFaehig ? denken : null, skill }
+    /* An answer is still running: the message lines up instead of being
+       swallowed. The field empties either way, so typing on feels the same
+       whether something runs or not.
+
+       Unless the model is the one waiting: a standing question holds the
+       run open, so `laeuftGerade` is true — but what was typed IS the
+       answer to that question, not a new message. Queueing it would leave
+       the run waiting for something that is sitting in a queue waiting for
+       the run. `senden` knows what to do with it. */
+    if (laeuftGerade && !zustand.benutzerfrage) {
+      einreihen(zustand.aktiverChat, auftrag)
+      return
+    }
+    senden(auftrag.inhalt, bild, dokument, auftrag.denken, skill)
   }
 
   export function fokus() {
@@ -278,6 +355,11 @@
   ondrop={fallenlassen}
 />
 
+<!-- The parameter window for the picture made on this machine. Lives here
+     because it is opened from the plus menu, and hands its finished pair up
+     to the chat, which is the only place that owns the history. -->
+<Bildfenster bind:offen={bildfensterOffen} chatId={zustand.aktiverChat} zeichnen={bildZeichnen} />
+
 <div class="zone" class:schlank>
   <!-- Hangs above the field and is exactly as wide. Nothing shifts: the
        zone sits at the bottom edge anyway, the box grows upward into the
@@ -285,6 +367,14 @@
   {#if zustand.werkzeugfrage}
     <div class="frageplatz">
       <Werkzeugfrage frage={zustand.werkzeugfrage} antworten={werkzeugfrageBeantworten} />
+    </div>
+  {/if}
+
+  <!-- The model's own question, in the same spot: it waits for an answer
+       just as the confirmation does. -->
+  {#if zustand.benutzerfrage}
+    <div class="frageplatz">
+      <Benutzerfrage frage={zustand.benutzerfrage} antworten={benutzerfrageBeantworten} />
     </div>
   {/if}
 
@@ -377,7 +467,33 @@
         </span>
       </span>
     </button>
-    {#if zustand.features.image_generation}
+    <!-- The picture made HERE. Its own entry beside the image mode above:
+         that one talks to a picture server, this one runs a program on this
+         machine with nothing leaving it — and it has six numbers, which is
+         why it opens a window instead of switching the input field. -->
+    <button
+      role="menuitem"
+      onclick={() => {
+        menueOffen = false
+        bildfensterOffen = true
+      }}
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <circle cx="8.5" cy="9.5" r="1.6" />
+        <path d="M4 17l4.5-5 3.5 4 3-2.5L20 17" />
+      </svg>
+      <span>
+        {t('bild.titel')}
+        <span class="menuehinweis">{t('bild.hier_hinweis')}</span>
+      </span>
+    </button>
+    <!-- Image mode belongs to a picture server somebody configured
+         themselves. Without one it is not a feature that is switched off,
+         it is a feature that does not apply — and standing beside "make a
+         picture" it read like its twin. -->
+    {#if zustand.features.image_generation && eigeneBildserver.length}
     <button role="menuitem" onclick={bildmodusSchalten}>
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -386,7 +502,10 @@
       </svg>
       <span>
         {t('eingabe.bildmodus')}
-        <span class="menuehinweis">{t('eingabe.bildmodus_hinweis')}</span>
+        <!-- The name of the server it talks to. "Raw prompt to the
+             generator" said what it does technically and nothing about
+             which of the two entries this is. -->
+        <span class="menuehinweis">{bildserverNamen}</span>
       </span>
       {#if bildmodus}<span class="haken">✓</span>{/if}
     </button>
@@ -487,9 +606,6 @@
       aria-label={t('eingabe.nachricht')}
     ></textarea>
 
-    {#if bildmodus && !bildserverDa}
-      <div class="serverwarnung">{t('fehler.bildserver_fehlt')}</div>
-    {/if}
     <!-- While a generation runs, the waiting line stands in the answer
          bubble — not here. `erzeugtGerade` only
          blocks double-sending. -->
@@ -546,40 +662,36 @@
       </div>
 
       <div class="rechts">
-        <!-- The fluid bar instead of the number: fill
-             level = speed (full at 100 tok/s); the exact number sits
-             under every answer bubble, the status dot next to it stays.
-             The wave front is a path column rolling endlessly downward
-             via CSS transform — WebKit couldn't do the SMIL path morph
-             before it, which is why the bar looked dead.
-             Empty means: pushed all the way left out of the clip. -->
-        <svg class="fluid" width="56" height="10" viewBox="0 0 140 24"
-             role="img" aria-label={tempo.wert ? `${tempo.wert} tok/s` : ''}>
-          <defs><clipPath id="fluidschnitt"><rect x="1" y="1" width="138" height="22" rx="11" /></clipPath></defs>
-          <g clip-path="url(#fluidschnitt)">
-            <g class="fuellung"
-               style="transform: translateX({fluidAnteil > 0 ? Math.round(-128 * (1 - fluidAnteil)) : -150}px)">
-              <rect x="-140" y="0" width="268" height="24" fill="currentColor" />
-              <path class="welle" fill="currentColor"
-                    d="M128 -20 q8 5 0 10 q-8 5 0 10 q8 5 0 10 q-8 5 0 10 q8 5 0 10 q-8 5 0 10 L122 40 L122 -20 Z" />
-            </g>
-          </g>
-          <rect class="huelse" x="1" y="1" width="138" height="22" rx="11" stroke-width="3" />
-        </svg>
-        <span class="punkt"><i class={tempo.zustand}></i></span>
+        <!-- The live speed, in the fluid bar's old spot. It appears with
+             the first measurement and goes when the answer is through —
+             an idle display saying "0" would be a display saying nothing.
+             The status dot beside it is untouched. -->
+        <!-- Keyed on the conversation: the display keeps the last measured
+             figure standing after a run, and that figure belongs to the chat
+             it was measured in. Switching chats builds the component anew,
+             which is what makes a chat that has never run anything show
+             nothing at all. -->
+        {#key zustand.aktiverChat}
+          <Tempoanzeige wert={tempoHier ? tempo.wert : null} laeuft={tempoHier && tempo.zustand === 'laeuft'} />
+        {/key}
+        <span class="punkt"><Leuchtpunkt farbe={PUNKTFARBE[tempo.zustand] ?? 'still'} groesse={9} /></span>
 
         <!-- One button, two jobs: send while nothing runs — otherwise
              stop. In the same spot so the hand doesn't wander, and both
              can never stand there at once. Applies equally to image
              generation: if it runs, it gets
-             stopped. -->
+             stopped.
+             With something in the field it stays the send button even
+             during a run: the message then lines up in the queue. Whoever
+             types and then reaches for the arrow means to send, not to
+             abort — and an empty field is the unmistakable sign for stop. -->
         <button
           class="aktion"
-          class:stoppt={laeuftGerade || erzeugtGerade}
+          class:stoppt={stoppt}
           class:leer={!laeuftGerade && !erzeugtGerade && leer}
-          onclick={() => (erzeugtGerade ? bildStoppen() : laeuftGerade ? abbrechen() : absenden())}
-          title={laeuftGerade || erzeugtGerade ? t('eingabe.abbrechen_tipp') : t('eingabe.senden')}
-          aria-label={laeuftGerade || erzeugtGerade ? t('eingabe.abbrechen') : t('eingabe.senden')}
+          onclick={() => (erzeugtGerade || bildLokalLaeuft ? bildStoppen() : stoppt ? abbrechen() : absenden())}
+          title={stoppt ? t('eingabe.abbrechen_tipp') : t('eingabe.senden')}
+          aria-label={stoppt ? t('eingabe.abbrechen') : t('eingabe.senden')}
         >
           <span class="ring"></span>
           <svg class="pfeil" width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -733,14 +845,6 @@
     margin-left: auto;
     color: var(--blau);
     font-weight: 700;
-  }
-  .serverwarnung {
-    color: var(--rot);
-    border: 1px solid var(--rot);
-    border-radius: 9px;
-    font-size: 12px;
-    padding: 5px 10px;
-    margin-top: 6px;
   }
   /* The attachment chip docks ABOVE the field — one
      spot for both modes, flush with the field's left edge. Its own
@@ -968,52 +1072,10 @@
     .denkknopf .aktiv .strich { transition: none !important; }
   }
 
-  /* The fluid bar: chat-mark color, the fill glides softly after the new
-     measurement. */
-  .fluid {
-    display: block;
-    color: var(--text-still);
-  }
-  .fluid .huelse {
-    stroke: var(--linie-stark);
-    fill: none;
-  }
-  .fluid .fuellung {
-    transition: transform 0.45s ease;
-  }
-  /* The front rolls endlessly downward: the wave pattern repeats every
-     20 units — shift by 20 once and seamlessly start over. */
-  .fluid .welle {
-    animation: wogen 1.15s linear infinite;
-  }
-  @keyframes wogen {
-    to { transform: translateY(20px); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .fluid .welle { animation: none; }
-  }
   .punkt {
-    width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    border: 1.5px solid var(--linie-stark);
-    display: grid;
-    place-items: center;
-  }
-  .punkt i {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--text-still);
-    display: block;
-    transition: background 0.3s;
-  }
-  .punkt i.bereit { background: var(--gruen); }
-  .punkt i.prompt { background: var(--gelb); }
-  .punkt i.laeuft { background: var(--blau); animation: blinken 1s infinite; }
-  @keyframes blinken {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .aktion {

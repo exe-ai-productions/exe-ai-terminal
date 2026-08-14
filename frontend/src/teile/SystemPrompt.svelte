@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The settings window — one window, grouped like a real settings app.
 
      The left column is no longer a flat list but raised, named boxes:
@@ -16,7 +17,7 @@
 
      A broken file still gets saved — it is the user's file — but the window
      says so at once, in the red line under the field. Secrets never reach
-     the interface: the editor shows only ${…} placeholders, a ringed lamp
+     the interface: the editor shows only ${…} placeholders, a status dot
      says set or missing. */
   import { fade } from 'svelte/transition'
   import Fenster from './Fenster.svelte'
@@ -24,14 +25,18 @@
   import Agentenmarke from './Agentenmarke.svelte'
   import Schriftzug from './Schriftzug.svelte'
   import Hauszeichen from './Hauszeichen.svelte'
+  import Auswahlfeld from './Auswahlfeld.svelte'
+  import { eew, schalten as eewSchalten, standLaden as eewStandLaden } from '../lib/eew.svelte.js'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
   import Kachel from './Kachel.svelte'
   import Skillmaske from './Skillmaske.svelte'
   import Standpille from './Standpille.svelte'
   import Verbindungen from './Verbindungen.svelte'
+  import Klangwahl from './Klangwahl.svelte'
+  import { klangwahl } from '../lib/klaenge.svelte.js'
   import Schalter from './Schalter.svelte'
   import { api } from '../lib/api.js'
-  import { zustand, aktuellerChat, chatAendern, konturSetzen, schriftSetzen, blasenfarbeSetzen, melde, frage, modelleLaden } from '../lib/zustand.svelte.js'
+  import { zustand, aktuellerChat, chatAendern, konturSetzen, schriftSetzen, oberflaecheSetzen, codefarbenSetzen, blasenfarbeSetzen, melde, frage, modelleLaden } from '../lib/zustand.svelte.js'
 
   function blasenStandard() {
     const wert = getComputedStyle(document.documentElement).getPropertyValue('--blase').trim()
@@ -102,7 +107,51 @@
     }
   }
 
+  /* The guardian's switch. Shipped on: it only ever offers, so leaving it
+     on can cost nothing but a few seconds after a step that already went
+     wrong.
+
+     The fact itself lives in `lib/eew.svelte.js`, because the same switch
+     also stands in the module's own head — two switches for one fact is
+     fine, two copies of the fact are not. */
+  const waechterStandLaden = eewStandLaden
+  async function waechterSchalten(an) {
+    try {
+      await eewSchalten(an)
+    } catch {
+      melde(t('fehler.allgemein'), 'fehler')
+    }
+  }
+
+  /* The switch for cutting long documents into passages. Shipped on: the
+     alternative is not "nothing happens" but a context that quietly
+     overruns. */
+  let einbettungAn = $state(true)
+  async function einbettungStandLaden() {
+    try {
+      const stand = await api.einstellungAufgeloest('einbettung')
+      if (stand?.wert && typeof stand.wert.an === 'boolean') einbettungAn = stand.wert.an
+    } catch {
+      /* Leaves the default standing. */
+    }
+  }
+  async function einbettungSchalten(an) {
+    const vorher = einbettungAn
+    einbettungAn = an
+    try {
+      await api.einstellungSetzen('global', 'einbettung', { an })
+    } catch {
+      einbettungAn = vorher
+      melde(t('fehler.allgemein'), 'fehler')
+    }
+  }
+
   let sprachwahl = $state(gemerkteSprachwahl())
+  const sprachauswahl = $derived([
+    { wert: 'auto', text: t('einstellungen.sprache_auto') },
+    { wert: 'en', text: t('einstellungen.sprache_englisch') },
+    { wert: 'de', text: t('einstellungen.sprache_deutsch') },
+  ])
   async function spracheStellen(wert) {
     sprachwahl = wert
     try {
@@ -143,6 +192,8 @@
     }).catch(() => {})
     api.hfTokenStand().then((s) => { stand.hf = s.gesetzt; hfGesetzt = s.gesetzt }).catch(() => {})
     gedaechtnisStandLaden()
+    waechterStandLaden()
+    einbettungStandLaden()
   }
 
   const VORLAGE = () =>
@@ -198,7 +249,7 @@ once the question is answered.
   function unterText(key) {
     switch (key) {
       case 'sprache':
-        return `${spracheName} · ${t(sprachwahl === 'auto' ? 'editor.folgt_geraet' : 'editor.fest_gewaehlt')}`
+        return `${spracheName} · ${t(klangwahl.aus ? 'einstellungen.toene_aus' : 'einstellungen.toene_an')}`
       case 'darstellung': {
         const schriftKey = 'einstellungen.schrift_' + zustand.schrift
         return `${t('einstellungen.' + modus)} · ${t(schriftKey)}`
@@ -438,7 +489,7 @@ once the question is answered.
     </div>
 
     <div class="set-zwei">
-      <nav class="set-links" aria-label={t('editor.titel')}>
+      <nav class="set-links" use:rollfade aria-label={t('editor.titel')}>
         {#each GRUPPEN as g (g.name)}
           <div class="s2-gruppe">{t(g.titel)}</div>
           <div class="s2-box">
@@ -451,7 +502,7 @@ once the question is answered.
                 aria-current={istAktiv(key)}
                 onclick={() => navZiel(key)}
               >
-                <span class="s2-zeichen"><Hauszeichen zeichen={EINTRAEGE[key].zeichen} groesse={16} /></span>
+                <span class="s2-zeichen"><Hauszeichen zeichen={EINTRAEGE[key].zeichen} groesse="mittel" /></span>
                 <div class="s2-mitte">
                   <div class="s2-titel">{t(EINTRAEGE[key].titel)}</div>
                   <div class="s2-satz">{unterText(key)}</div>
@@ -467,9 +518,9 @@ once the question is answered.
         {/each}
       </nav>
 
-      <div class="set-rechts">
+      <div class="set-rechts" use:rollfade>
         <div class="set-kopf">
-          <span class="s2-zeichen gross"><Hauszeichen zeichen={kopfEintrag.zeichen} groesse={20} /></span>
+          <span class="s2-zeichen gross"><Hauszeichen zeichen={kopfEintrag.zeichen} groesse="gross" /></span>
           <h3>{t(kopfEintrag.titel)}</h3>
         </div>
 
@@ -480,13 +531,19 @@ once the question is answered.
                 {t('einstellungen.sprache')}
                 <span class="hinweis">{t('einstellungen.sprache_hinweis')}</span>
               </div>
-              <select class="auswahl" aria-label={t('einstellungen.sprache')}
-                      value={sprachwahl} onchange={(e) => spracheStellen(e.currentTarget.value)}>
-                <option value="auto">{t('einstellungen.sprache_auto')}</option>
-                <option value="en">{t('einstellungen.sprache_englisch')}</option>
-                <option value="de">{t('einstellungen.sprache_deutsch')}</option>
-              </select>
+              <div class="auswahl">
+                <Auswahlfeld
+                  wert={sprachwahl}
+                  eintraege={sprachauswahl}
+                  beschriftung={t('einstellungen.sprache')}
+                  gewaehlt={spracheStellen}
+                />
+              </div>
             </div>
+            <!-- The sounds sit here and not under appearance: how loud the
+                 program is is not a question of how it looks, and that panel
+                 had grown long enough. -->
+            <Klangwahl />
           </div>
         {:else if istDarstellung}
           <div class="kachelliste">
@@ -510,12 +567,34 @@ once the question is answered.
             </div>
             <div class="einstellkachel">
               <div class="zeilentext">
+                {t('einstellungen.oberflaeche')}
+                <span class="hinweis">{t('einstellungen.oberflaeche_hinweis')}</span>
+              </div>
+              <div class="segment">
+                {#each [['standard', 'einstellungen.schrift_standard'], ['gross', 'einstellungen.schrift_gross'], ['groesser', 'einstellungen.schrift_groesser']] as [wert, beschriftung] (wert)}
+                  <button aria-pressed={zustand.oberflaeche === wert} onclick={() => oberflaecheSetzen(wert)}>{t(beschriftung)}</button>
+                {/each}
+              </div>
+            </div>
+            <div class="einstellkachel">
+              <div class="zeilentext">
                 {t('einstellungen.schrift')}
                 <span class="hinweis">{t('einstellungen.schrift_hinweis')}</span>
               </div>
               <div class="segment">
                 {#each [['standard', 'einstellungen.schrift_standard'], ['gross', 'einstellungen.schrift_gross'], ['groesser', 'einstellungen.schrift_groesser']] as [wert, beschriftung] (wert)}
                   <button aria-pressed={zustand.schrift === wert} onclick={() => schriftSetzen(wert)}>{t(beschriftung)}</button>
+                {/each}
+              </div>
+            </div>
+            <div class="einstellkachel">
+              <div class="zeilentext">
+                {t('einstellungen.codefarben')}
+                <span class="hinweis">{t('einstellungen.codefarben_hinweis')}</span>
+              </div>
+              <div class="segment">
+                {#each [['exe', 'einstellungen.codefarben_exe'], ['tokyo', 'einstellungen.codefarben_tokyo'], ['onelight', 'einstellungen.codefarben_onelight']] as [wert, beschriftung] (wert)}
+                  <button aria-pressed={zustand.codefarben === wert} onclick={() => codefarbenSetzen(wert)}>{t(beschriftung)}</button>
                 {/each}
               </div>
             </div>
@@ -646,6 +725,20 @@ once the question is answered.
         {/if}
 
         {#if istSystem}
+          <div class="schalterzeile">
+            <div class="beschriftung">{t('waechter.titel')}
+              <span class="hinweis">{t('waechter.schalter')}</span>
+            </div>
+            <Schalter an={eew.an} beschriftung={t('waechter.titel')}
+                      onschalten={(an) => waechterSchalten(an)} />
+          </div>
+          <div class="schalterzeile">
+            <div class="beschriftung">{t('einbettung.titel')}
+              <span class="hinweis">{t('einbettung.schalter')}</span>
+            </div>
+            <Schalter an={einbettungAn} beschriftung={t('einbettung.titel')}
+                      onschalten={(an) => einbettungSchalten(an)} />
+          </div>
           <div class="schalterzeile">
             <div class="beschriftung">{t('editor.anrede_titel')}
               <span class="hinweis">{t('editor.anrede_unter')}</span>
@@ -1049,16 +1142,11 @@ once the question is answered.
     color: var(--text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
+  /* The picker brings its own measure; the row only says how wide it may be
+     so the label keeps the rest. */
   .auswahl {
     flex: none;
-    font: inherit;
-    font-size: 12.5px;
-    color: var(--text);
-    background: var(--bg-erhoben);
-    border: 1px solid var(--linie-stark);
-    border-radius: 9px;
-    padding: 5px 8px;
-    cursor: pointer;
+    width: 190px;
   }
   .farbwahl {
     display: flex;

@@ -23,7 +23,10 @@ from app import __version__
 from app.api.v1 import router as api_v1_router
 from app.api.v1.health import _health_ermitteln
 from app.modelldownload import Modelldownload
+from app import eewserver, einbettungsserver
+from app.bildrunner import Bildrunner
 from app.modellrunner import Modellrunner
+from app.sddownload import Sddownload
 from app.serverdownload import Serverdownload
 from app.config import PROJEKT_WURZEL, Config, get_config
 from app.paketierung import ressourcen
@@ -31,8 +34,10 @@ from app.db import datenbank_oeffnen, repositories_erstellen
 from app.discovery import Discovery
 from app.events import Ereignisse, bus
 from app.generationen import Generierungsverwaltung
+from app.hintergrundmeldung import anmelden as hintergrundmeldung_anmelden
 from app.protokoll import ProtokollMiddleware, logging_einrichten, speicher_mb
 from app.tools import WerkzeugRegistry, server_lesen
+from app.tools.hintergrund import laeufe
 from app.tools.mcp_auth import AuthSpeicher, OAuthVermittler
 from app.wecker import Wecker
 
@@ -97,6 +102,8 @@ async def lebenszyklus(app: FastAPI):
     app.state.repositories = repositories_erstellen(db)
     app.state.generierungen = Generierungsverwaltung()
     _standard_abonnenten_anmelden()
+    # A background command reports its result into the chat when it is done.
+    hintergrundmeldung_anmelden(app.state.repositories)
 
     # Clean up jobs (6.2): whatever was still running at the last stop is now,
     # honestly, interrupted. Pending confirmation prompts remain answerable.
@@ -140,6 +147,30 @@ async def lebenszyklus(app: FastAPI):
     # process, and a second instance would not know about the first.
     modellordner = config.pfad(config.app.modelle_verzeichnis)
     app.state.modellrunner = Modellrunner(modellordner, config.app.runner_programm)
+    # The picture runner is built HERE and not on first use. Its whole job is
+    # to hold one lock so two pictures cannot be drawn at once — and a lazy
+    # "check, then create" in a request handler can be run twice at the same
+    # moment by two requests, which would leave two runners holding two
+    # locks and let exactly the thing happen that the lock exists to stop.
+    app.state.bildrunner = Bildrunner(config.datenverzeichnis)
+    # The embedding server: its own folder, its own port, its own note and
+    # key. Not started here — it is a speed-up somebody switches on, and the
+    # one-shot path works without it.
+    app.state.einbettungsrunner = einbettungsserver.runner_bauen(
+        config.pfad(config.app.einbettungsmodelle_verzeichnis),
+        config.app.runner_programm,
+        config.app.einbettung_port,
+    )
+    if app.state.einbettungsrunner.aufraeumen():
+        log.info("Verwaister Einbettungsserver beendet")
+    # The guardian's own small model — the fourth process this program may
+    # hold. Not started here either: it comes up when Extended Workflow is
+    # switched on and goes when it is switched off.
+    app.state.eewrunner = eewserver.runner_bauen(
+        modellordner, config.app.runner_programm
+    )
+    if app.state.eewrunner.aufraeumen():
+        log.info("Verwaister Extended-Workflow-Server beendet")
     # A previous service run may have left its model server behind — it
     # lives in its own process group and holds the port until somebody who
     # knows about it ends it. That somebody is us, right now.
@@ -149,6 +180,10 @@ async def lebenszyklus(app: FastAPI):
     # The model server itself, fetchable in one click on machines that do
     # not have it — into the user's data folder, next to their models.
     app.state.serverdownload = Serverdownload(config.pfad("."))
+    # The picture generator the same way. Built here rather than on first
+    # use, so there is one of it: two requests arriving together would
+    # otherwise each build their own and write into the same file.
+    app.state.sddownload = Sddownload(config.datenverzeichnis)
     await discovery.starten()
 
     # The alarm clock (6.7) comes after discovery: its first pass catches up
@@ -180,6 +215,11 @@ async def lebenszyklus(app: FastAPI):
     try:
         yield
     finally:
+        # No process outlives its chat unseen: whatever a background run
+        # still has running goes down with the service.
+        getoetet = laeufe.alle_toeten()
+        if getoetet:
+            log.info("%d laufende(r) Befehl(e) beim Beenden gestoppt", getoetet)
         await wecker.stoppen()
         if registry is not None:
             await registry.stoppen()

@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The catalogue — a gallery of curated models, and the whole of Hugging
      Face one search away.
 
@@ -18,6 +19,7 @@
   import Modellkarte from './Modellkarte.svelte'
   import Modelldetail from './Modelldetail.svelte'
   import { api } from '../lib/api.js'
+  import { weg, zurueckgehen } from '../lib/fensterweg.svelte.js'
   import { t } from '../lib/texte.svelte.js'
   import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
   import { KATALOG, kartePasst, passendeFassung } from '../lib/modellempfehlungen.js'
@@ -249,7 +251,7 @@
   const zahlKurz = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n))
 </script>
 
-<Fenster bind:offen art="galerie">
+<Fenster bind:offen art="galerie" zurueck={weg.zurueck ? zurueckgehen : null}>
   <div class="kat-kopf">
     <div class="marke">
       <div class="markenzeile">
@@ -271,7 +273,7 @@
   </div>
 
   {#if detail}
-    <div class="rollbereich">
+    <div class="rollbereich" use:rollfade>
       <Modelldetail
         karte={detail}
         {maschineGb}

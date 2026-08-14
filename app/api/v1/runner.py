@@ -22,6 +22,7 @@ from app.api.abhaengigkeiten import hole_sprache
 from app.config import EndpointConfig
 from app.i18n import t
 from app.modelldownload import DownloadFehler, Modelldownload
+from app.feineinstellungen import Feineinstellungen
 from app.modellrunner import Modellrunner, RunnerFehler, SCHLUESSEL_VARIABLE
 from app.systemspeicher import gesamt_gb
 from app.ordner_oeffnen import OeffnenNichtMoeglich, ordner_oeffnen
@@ -96,6 +97,10 @@ class Start(BaseModel):
     # Optional draft model for speculative decoding — a small file from the
     # same folder that guesses ahead while the big one only checks.
     drafter: str | None = None
+    # The advanced section's levers, as sent. Kept loose on purpose: the
+    # clamping and the fallback for an unknown name live in one place, next
+    # to the flags they turn into.
+    fein: dict | None = None
 
 
 def hole_runner(request: Request) -> Modellrunner:
@@ -171,6 +176,7 @@ async def starten(
             schichten=daten.schichten,
             port=daten.port,
             drafter=daten.drafter,
+            fein=Feineinstellungen.aus_daten(daten.fein),
         )
     except RunnerFehler as fehler:
         raise _fehler(fehler.grund, sprache) from None

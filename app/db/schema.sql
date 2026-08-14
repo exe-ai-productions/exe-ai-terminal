@@ -107,6 +107,34 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS idx_documents_chat
     ON documents (chat_id, created_at);
 
+-- Document sections ------------------------------------------------------
+-- A document past the threshold does not travel whole anymore: it is cut
+-- into overlapping sections, each with its vector, and a question carries
+-- only the sections that fit it. The vector is a blob of single-precision
+-- floats (see app/einbettung.py) — a float per column would be 768 columns,
+-- and JSON would be three times the bytes for the same numbers.
+--
+-- Hangs off the document, so deleting the document takes its sections with
+-- it and no orphan vector is ever searched.
+-- `modell` is the name of the embedding model the vector came out of. Two
+-- models produce numbers that cannot be compared, and nothing in the numbers
+-- themselves says so: same length, same range, similarities that sort into a
+-- plausible-looking order and mean nothing. The name is the only thing that
+-- can tell them apart, so it is stored beside every vector and checked before
+-- anything is compared.
+CREATE TABLE IF NOT EXISTS dokument_abschnitte (
+    id          TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+    nummer      INTEGER NOT NULL,
+    text        TEXT NOT NULL,
+    vektor      BLOB NOT NULL,
+    modell      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_abschnitte_dokument
+    ON dokument_abschnitte (document_id, nummer);
+
 -- Jobs --------------------------------------------------------------------
 -- A job is one run of an agent (phase 6). It lives alongside the chats:
 -- its own list, its own states, its own log. `wartet` means: the run is

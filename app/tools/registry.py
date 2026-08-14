@@ -32,7 +32,7 @@ from app.paketierung import ist_eingefroren, programmpfad
 MCP_SERVER = {"websuche", "searxng"}
 import httpx
 
-from app.tools import memory, shell, skill
+from app.tools import dateiwerkzeuge, frage_werkzeug, grenzen, memory, shell, skill
 from app.tools.mcp_client import MCPFehler, MCPStdioClient, MCPWerkzeug
 from app.tools.mcp_http import MCPHttpClient
 
@@ -339,12 +339,16 @@ class WerkzeugRegistry:
 
     @property
     def anzahl(self) -> int:
-        return len(self._werkzeuge) + (1 if self.shell_an else 0)
+        return len(self._werkzeuge) + (
+            2 + len(dateiwerkzeuge.NAMEN) if self.shell_an else 0
+        )
 
     def namen(self) -> list[str]:
         namen = list(self._werkzeuge)
         if self.shell_an:
             namen.append(shell.WERKZEUG_NAME)
+            namen.append(frage_werkzeug.WERKZEUG_NAME)
+            namen += list(dateiwerkzeuge.NAMEN)
         return sorted(namen)
 
     def uebersicht(self) -> list[dict[str, Any]]:
@@ -390,6 +394,27 @@ class WerkzeugRegistry:
                     "needs_confirmation": True,
                 }
             )
+            for beschreibung in dateiwerkzeuge.beschreibungen():
+                eintraege.append(
+                    {
+                        "name": beschreibung.name,
+                        "beschreibung": beschreibung.beschreibung,
+                        "server": beschreibung.server,
+                        # Same "sometimes" as the shell: it depends on where
+                        # the path reaches.
+                        "needs_confirmation": True,
+                    }
+                )
+            beschreibung = frage_werkzeug.werkzeug_beschreibung()
+            eintraege.append(
+                {
+                    "name": beschreibung.name,
+                    "beschreibung": beschreibung.beschreibung,
+                    "server": beschreibung.server,
+                    # It IS the question — there is nothing to confirm first.
+                    "needs_confirmation": False,
+                }
+            )
         return sorted(eintraege, key=lambda e: e["name"])
 
     def als_openai_werkzeuge(self, nur: set[str] | None = None) -> list[dict[str, Any]]:
@@ -415,6 +440,18 @@ class WerkzeugRegistry:
             and shell.WERKZEUG_NAME not in self.abgeschaltet
         ):
             liste.append(shell.werkzeug_beschreibung().als_openai_werkzeug())
+        if self.shell_an:
+            liste += [
+                b.als_openai_werkzeug()
+                for b in dateiwerkzeuge.beschreibungen()
+                if (nur is None or b.name in nur) and b.name not in self.abgeschaltet
+            ]
+        if (
+            self.shell_an
+            and (nur is None or frage_werkzeug.WERKZEUG_NAME in nur)
+            and frage_werkzeug.WERKZEUG_NAME not in self.abgeschaltet
+        ):
+            liste.append(frage_werkzeug.werkzeug_beschreibung().als_openai_werkzeug())
         if (
             self.memory_pfad is not None
             and (nur is None or memory.WERKZEUG_NAME in nur)
@@ -436,7 +473,11 @@ class WerkzeugRegistry:
         mcp_servers.json and cannot be guessed wrong, while a tool name can
         be anything the server feels like.
         """
-        if name == shell.WERKZEUG_NAME:
+        if (
+            name == shell.WERKZEUG_NAME
+            or name == frage_werkzeug.WERKZEUG_NAME
+            or name in dateiwerkzeuge.NAMEN
+        ):
             return shell.SERVER_NAME if self.shell_an else ""
         if name == memory.WERKZEUG_NAME:
             return memory.SERVER_NAME if self.memory_pfad is not None else ""
@@ -463,8 +504,11 @@ class WerkzeugRegistry:
         """
         if name == shell.WERKZEUG_NAME:
             grund = shell.aussenpfad(argumente or {}, ordner or []) or ""
-            return (shell.GRUND_SCHLUESSEL, shell.GRUND_PLATZHALTER, grund) if grund else None
-        return None
+        elif name in dateiwerkzeuge.NAMEN:
+            grund = dateiwerkzeuge.aussenpfad(name, argumente or {}, ordner or []) or ""
+        else:
+            return None
+        return (shell.GRUND_SCHLUESSEL, shell.GRUND_PLATZHALTER, grund) if grund else None
 
     def braucht_bestaetigung(
         self, name: str, argumente: dict[str, Any] | None = None,
@@ -479,6 +523,8 @@ class WerkzeugRegistry:
         """
         if name == shell.WERKZEUG_NAME:
             return shell.braucht_bestaetigung(argumente or {}, ordner or [])
+        if name in dateiwerkzeuge.NAMEN:
+            return dateiwerkzeuge.aussenpfad(name, argumente or {}, ordner or []) is not None
         if name == memory.WERKZEUG_NAME:
             return memory.braucht_bestaetigung(argumente or {})
         if name in (skill.LADEN, skill.SCHREIBEN):
@@ -488,7 +534,7 @@ class WerkzeugRegistry:
 
     async def ausfuehren(
         self, name: str, argumente: dict[str, Any], bild_senke=None,
-        ordner: list[str] | None = None,
+        ordner: list[str] | None = None, chat_id: str | None = None,
     ) -> str:
         """Executes a tool — but only if it is approved.
 
@@ -499,6 +545,10 @@ class WerkzeugRegistry:
         ``ordner`` are the chat's shared working folders. Only the shell tool
         uses them, and it gets them from here rather than as an argument on
         purpose: anything the model can write, the model can forge.
+
+        ``chat_id`` for the same reason: the remembered folder, the live lines
+        and a background run's report all belong to a chat, and none of that
+        may come out of the model's arguments.
         """
         # The second lock on the switch. Not offering a tool already keeps an
         # honest model away from it, but a run can be older than the click and
@@ -531,8 +581,22 @@ class WerkzeugRegistry:
                     f"Werkzeug '{name}' ist nicht freigegeben."
                 )
             try:
-                return await shell.ausfuehren(argumente, ordner or [])
+                return await shell.ausfuehren(argumente, ordner or [], chat_id)
             except shell.ShellVerboten as fehler:
+                raise WerkzeugVerboten(str(fehler)) from fehler
+
+        if name == frage_werkzeug.WERKZEUG_NAME:
+            raise WerkzeugVerboten(
+                "ask_user is answered by the user, not executed. It only works "
+                "in a chat."
+            )
+
+        if (datei_modul := dateiwerkzeuge.modul(name)) is not None:
+            if not self.shell_an:
+                raise WerkzeugVerboten(f"Werkzeug '{name}' ist nicht freigegeben.")
+            try:
+                return await datei_modul.ausfuehren(argumente, ordner or [])
+            except grenzen.GrenzeVerletzt as fehler:
                 raise WerkzeugVerboten(str(fehler)) from fehler
 
         eintrag = self._werkzeuge.get(name)

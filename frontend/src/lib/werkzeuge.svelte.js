@@ -41,6 +41,10 @@ const SCHLUESSEL_AUS = 'werkzeuge_aus'
    The label comes from the catalogue where we have a word for it; otherwise
    the raw name stands, because inventing one would be guessing. */
 export const EINGEBAUTE_NAMEN = {
+  /* The key stays `shell` — it is the server name in mcp_servers.json and
+     what the tools are registered under. Only the word on screen changed:
+     this source carries five file tools and the question tool besides the
+     shell, so "Shell" had stopped being true. */
   shell: 'werkzeuge.eingebaut',
   memory: 'gedaechtnis.quelle',
   skills: 'skills.quelle',

@@ -8,7 +8,7 @@
      back. */
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
-  import { melde } from '../lib/zustand.svelte.js'
+  import { frage, melde } from '../lib/zustand.svelte.js'
   import { skillsLaden } from '../lib/skills.svelte.js'
   import Schalter from './Schalter.svelte'
   import Werkzeugzeichen from './Werkzeugzeichen.svelte'
@@ -100,11 +100,23 @@ what stands below.
     }
   }
 
-  async function zuruecksetzen(zeile) {
+  /* One route for both, and two different things to the user: a shipped
+     skill comes back in its own version, a skill the user wrote is gone for
+     good. The second one asks first — through the house's own prompt, never
+     a browser box — and wears the colour of deleting. */
+  async function entfernen(zeile) {
+    const endgueltig = !zeile.mitgeliefert
+    if (endgueltig) {
+      const ja = await frage(t('skills.loeschen_frage', { name: zeile.name }), {
+        okSchluessel: 'skills.loeschen',
+      })
+      if (!ja) return
+    }
     try {
       await api.skillZuruecksetzen(zeile.name)
       await laden()
       skillsLaden()
+      melde(t(endgueltig ? 'skills.geloescht' : 'skills.zurueckgesetzt', { name: zeile.name }), 'erfolg')
     } catch (fehler) {
       melde(String(fehler.message || fehler), 'fehler')
     }
@@ -159,9 +171,15 @@ what stands below.
       </div>
       <div class="was">{zeile.beschreibung}</div>
     </div>
-    {#if zeile.mitgeliefert && zeile.eigen}
-      <button class="zurueck" onclick={() => zuruecksetzen(zeile)}>
-        {t('skills.zuruecksetzen')}
+    <!-- Only what the user owns can go: a shipped skill would be back with
+         the next update, so it stays switchable and nothing more. -->
+    {#if zeile.eigen}
+      <button
+        class="zurueck"
+        class:gefahr={!zeile.mitgeliefert}
+        onclick={() => entfernen(zeile)}
+      >
+        {t(zeile.mitgeliefert ? 'skills.zuruecksetzen' : 'skills.loeschen')}
       </button>
     {/if}
     <Schalter
@@ -244,6 +262,15 @@ what stands below.
     padding: 3px 11px 4px;
     cursor: pointer;
     flex: none;
+  }
+  /* Red means it deletes — the house colour for exactly this, and only on
+     the button that really destroys something. */
+  .zurueck.gefahr {
+    color: var(--rot);
+    border-color: color-mix(in srgb, var(--rot) 45%, var(--linie-stark));
+  }
+  .zurueck.gefahr:hover {
+    background: color-mix(in srgb, var(--rot) 12%, var(--bg));
   }
   .zurueck:hover {
     color: var(--text);

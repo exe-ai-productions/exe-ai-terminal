@@ -1,8 +1,9 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The MCP server gallery — a connection is an icon, and what to do with it
      opens on a click.
 
-     A tile is deliberately spare: the maker's logo, the name, and a ringed
+     A tile is deliberately spare: the maker's logo, the name, and a dotted
      status dot. Everything else — the key, the browser sign-in, the switch,
      the tool count, forgetting or removing — lives in a small options menu
      that opens when the tile is clicked, anchored to it. This keeps the
@@ -234,7 +235,7 @@
   </button>
 {/snippet}
 
-<div class="rollbereich">
+<div class="rollbereich" use:rollfade>
   {#if verbundene.length}
     <div class="bereich" role="heading" aria-level="3" aria-label={t('verbindungen.gruppe_verbunden')}>
       <Schriftzug zug="verbunden" />

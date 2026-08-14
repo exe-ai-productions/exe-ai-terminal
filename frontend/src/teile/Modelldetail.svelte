@@ -59,7 +59,7 @@
     </div>
     <div class="zeichenreihe">
       {#each karte.faehigkeiten as f (f)}
-        <span class="zeichen" title={t(KANN[f])}><Hauszeichen zeichen={f} groesse={17} /></span>
+        <span class="zeichen" title={t(KANN[f])}><Hauszeichen zeichen={f} groesse="mittel" /></span>
       {/each}
     </div>
   </div>
@@ -79,8 +79,8 @@
 
   {#if aktuelle.mmproj || aktuelle.drafter}
     <div class="begleiter">
-      {#if aktuelle.mmproj}<span class="zeichen"><Hauszeichen zeichen="auge" groesse={17} /></span>{/if}
-      {#if aktuelle.drafter}<span class="zeichen"><Hauszeichen zeichen="blitz" groesse={17} /></span>{/if}
+      {#if aktuelle.mmproj}<span class="zeichen"><Hauszeichen zeichen="auge" groesse="mittel" /></span>{/if}
+      {#if aktuelle.drafter}<span class="zeichen"><Hauszeichen zeichen="blitz" groesse="mittel" /></span>{/if}
       {t('katalog.begleiter')}
     </div>
   {/if}

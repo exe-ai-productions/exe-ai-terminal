@@ -146,6 +146,47 @@ def test_anhalten_ohne_lauf_ist_kein_fehler(ordner, falsches_programm):
     assert runner.stoppen() is False
 
 
+# --- Several runners side by side -----------------------------------------
+#
+# Three of these exist now: the chat model, the embedding server and the
+# guardian. They share the class and differ in the name of the variable their
+# key lives under. Anything that reads the module constant instead of the
+# instance field reaches into a sibling's environment.
+
+
+def test_jeder_runner_raeumt_nur_seinen_eigenen_schluessel_weg(ordner, falsches_programm):
+    chat = Modellrunner(ordner, str(falsches_programm))
+    waechter = Modellrunner(
+        ordner, str(falsches_programm), schluessel_variable="EXE_TEST_ZWEITER_SCHLUESSEL"
+    )
+
+    chat.starten("klein.gguf", port=18111)
+    waechter.starten("gross.gguf", port=18112)
+    try:
+        assert os.environ.get("EXE_RUNNER_API_KEY")
+        assert os.environ.get("EXE_TEST_ZWEITER_SCHLUESSEL")
+
+        # Stopping the guardian must leave the chat model able to sign its
+        # requests; otherwise every answer comes back unauthorised and the
+        # endpoint looks dead for a reason nobody can see.
+        waechter.stoppen()
+
+        assert os.environ.get("EXE_RUNNER_API_KEY")
+        assert "EXE_TEST_ZWEITER_SCHLUESSEL" not in os.environ
+    finally:
+        chat.stoppen()
+        waechter.stoppen()
+        os.environ.pop("EXE_TEST_ZWEITER_SCHLUESSEL", None)
+
+
+def test_der_letzte_runner_raeumt_seinen_schluessel_wirklich_weg(ordner, falsches_programm):
+    runner = Modellrunner(ordner, str(falsches_programm))
+    runner.starten("klein.gguf", port=18113)
+    assert os.environ.get("EXE_RUNNER_API_KEY")
+    runner.stoppen()
+    assert "EXE_RUNNER_API_KEY" not in os.environ
+
+
 # --- Vision companions ----------------------------------------------------
 
 

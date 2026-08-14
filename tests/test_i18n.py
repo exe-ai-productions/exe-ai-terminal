@@ -57,11 +57,34 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # VRAM is the label on graphics memory in both languages — a German
         # spelling of it does not exist outside dictionaries.
         "modell.vram_label",
+        # Tokens per second is written TPS in both languages. It is a unit,
+        # like GB — and the German rendering of it is the English one.
+        "eingabe.tps_einheit",
+        # Seconds are written the same way in both languages; the entry is a
+        # number with a unit, not a sentence.
+        "terminal.dauer",
+        # "Standard" is the German word for standard as much as the English
+        # one; a different word here would be a worse translation.
+        "modell.kv_f16",
+        # A port is a port in both languages, exactly as it already is in
+        # the model server's own form.
+        "einbettungsserver.port",
+        # Extended Workflow is the product's name for the thing, and a
+        # product name is not translated.
+        "waechter.titel",
+        # The catalogue chip names the same graphics memory as the local
+        # window, so it carries the same untranslatable label.
+        "katalog.maschine",
         # Server is the German word for server as much as the English one.
         "modell.server_status_label",
         # A network port is called a port in German too. "Anschluss" is the
         # dictionary answer and not what anybody says or reads.
         "modell.feld_port",
+        # The generator's own vocabulary. Sampler, scheduler and LoRA are
+        # what the picture world calls these things in German as well —
+        # translating them would name controls nobody could look up, and the
+        # values inside them stay English either way.
+        "bild.sampler", "bild.scheduler", "bild.lora",
         # German tech speech says "downloaded"; the dictionary word would be
         # longer without being clearer.
         "modell.im_ordner",
@@ -74,6 +97,20 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # MTP is the acronym for the prediction module in both languages,
         # and Hugging Face is a product name — neither is translated.
         "modell.mtp_label", "editor.quelle_hf",
+        # "Terminal" is the same word in both languages, and it is the name
+        # of the thing the program is.
+        "terminal.titel",
+        # The names of the colour packs. Two are the names their authors
+        # gave them, and "Exe" is ours — none of the three is translated.
+        "einstellungen.codefarben_exe",
+        "einstellungen.codefarben_tokyo",
+        "einstellungen.codefarben_onelight",
+        # CLI is the name of the panel in both languages, and "Chat" is the
+        # same word — the status line names both.
+        "cli.titel", "cli.status_chat",
+        # A browser is called a browser in German too — the panel IS one, and
+        # the dictionary word for it is nothing anybody says.
+        "vorschau.titel",
     }
 
     def flach(knoten, praefix=""):

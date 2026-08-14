@@ -7,12 +7,17 @@
 */
 
 :root {
-  --bg: #fff;
-  --bg-leiste: #f6f5f2;
-  --bg-seite: #faf9f6;
+  /* Light mode is the mirror of dark, not its absence: there the raised
+     surface is LIGHTER than the ground, here it is WHITER. Ground and tile
+     used to share one white, which left a tile with no surface of its own —
+     a hairline had to carry the whole distinction, and the mode read flat.
+     The ground takes the quiet tone now, the tile keeps the pure white. */
+  --bg: #f7f6f2;
+  --bg-leiste: #f2f1ec;
+  --bg-seite: #f2f1ec;
   --bg-erhoben: #fff;
-  --linie: #e4e2da;
-  --linie-stark: #d2cfc5;
+  --linie: #e2e0d8;
+  --linie-stark: #cbc8bd;
   --text: #1a1a18;
   --text-leise: #6f6d66;
   --text-still: #9a978e;
@@ -160,6 +165,17 @@ button {
 /* Text size of the chat, three steps. The column grows with the letters so
    a line keeps roughly its length in characters — bigger type on more room,
    not fewer words per line. Set from the appearance settings. */
+/* Size of the interface, two steps above standard. One zoom on the app
+   root carries every pixel of the house with it — type, signs, lines,
+   radii and spacing keep their proportions to one another, which a pile of
+   per-element overrides never manages. */
+:root[data-oberflaeche='gross'] #wurzel {
+  zoom: 1.1;
+}
+:root[data-oberflaeche='groesser'] #wurzel {
+  zoom: 1.2;
+}
+
 :root[data-schrift='gross'] {
   --chat-schrift: 15.5px;
   --chat-breite: 810px;

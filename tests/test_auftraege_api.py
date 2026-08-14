@@ -76,7 +76,7 @@ class RegistryDouble(WerkzeugRegistry):
         }
         self.aufrufe: list[tuple[str, dict]] = []
 
-    async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None):
+    async def ausfuehren(self, name, argumente, bild_senke=None, ordner=None, chat_id=None):
         if name not in self._werkzeuge:
             raise AssertionError("Filter hat versagt")
         self.aufrufe.append((name, argumente))

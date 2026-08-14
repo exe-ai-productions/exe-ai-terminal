@@ -3,10 +3,21 @@
 # This file is version-controlled and serves as the template. Secrets (API keys,
 # passwords) do NOT belong here — put them in .env, see .env.example.
 #
+# It is also the list of everything the program knows. On every start the file
+# you actually use is compared against this one, and any key missing from
+# yours is written in with its comment — so a setting that arrives with an
+# update is visible instead of hidden. Your own values are never touched, and
+# a key added that way gets the program's built-in default, not the value
+# below: what stands here is how a FRESH installation starts out.
+#
 # All paths are relative to the project directory unless given as absolute.
 #
 # Comments here are English because everyone who sets this up reads them.
 # The source code stays German; that is the project's own language.
+#
+# When adding a key: its explanation goes ABOVE it, or on the same line. A
+# comment line standing alone AFTER a value is read as introducing the next
+# key and would travel with that one instead.
 
 app:
   # Address the service listens on.
@@ -35,6 +46,31 @@ app:
   # already exist. Edit it in the program under Chat -> System prompt, or by
   # hand. It ships empty.
   system_prompt_file: "./prompts/system.md"
+  # The persistent memory: a second prompt file beside the first, written by
+  # the model and by hand, read fresh on every request as well. Ships empty.
+  memory_file: "./prompts/memory.md"
+  # One Markdown file per agent — front matter plus prompt. Ships empty.
+  agenten_verzeichnis: "./prompts/agenten"
+  # Skills live in two places. The shipped ones sit next to the program and
+  # are replaced by every update; yours sit next to your prompts and are never
+  # touched. Same name in both: yours wins.
+  skills_mitgeliefert: "./skills"
+  skills_verzeichnis: "./prompts/skills"
+  # Where the model files live. This folder is the boundary — only what lies
+  # inside it can be started.
+  modelle_verzeichnis: "./data/modelle"
+  # The program that runs those files. Empty means "look for it", in the PATH
+  # first: whoever installed one of their own meant it to be used.
+  runner_programm: null
+  # Models that are not language models get folders of their own, and the
+  # FOLDER is what decides which kind a file is — telling them apart by name
+  # put an embedding model into the chat picker more than once.
+  einbettungsmodelle_verzeichnis: "./data/einbettungsmodelle"
+  bildmodelle_verzeichnis: "./data/bildmodelle"
+  # The embedding server is a small model server of its own, so it needs a
+  # port of its own — sharing one with the chat model makes the second start
+  # fail.
+  einbettung_port: 8081
 
 database:
   # Only "sqlite" is supported right now. The repository pattern makes it
@@ -47,8 +83,14 @@ features:
   mcp: true                  # Tool calls through MCP servers
   image_generation: true     # Image generation (phase 4.2)
   document_upload: true      # Per-chat document upload (phase 4.1)
-  beta_lock: false            # Beta: settings, tools and agents are read-only.
-                             # Set to false to hand the full app back.
+  # Beta: settings, tools and agents are read-only. Set to false to hand the
+  # full app back.
+  beta_lock: false
+  # The shell tool: lets the model run commands in the folders you shared with
+  # a chat. On by default, because the guard sits in the tool itself — sharing
+  # a folder is the permission, without one it stays shut, and any command
+  # reaching outside the share asks first.
+  shell_tool: true
 
 # Candidate endpoints — WHERE a model server is and HOW to talk to it.
 #
@@ -109,8 +151,16 @@ endpoints: []
   # every model in it can be picked. With `modell:` the entry stands for
   # exactly that one model — useful where the catalogue holds hundreds of
   # entries that have nothing to do with chatting.
+
 mcp:
+  # Where the tool servers are registered. A separate file rather than a
+  # section here, because the format matches what other programs use — an
+  # existing server list can be adopted without rewriting it.
   servers_file: "./mcp_servers.json"
+  # The rotating OAuth credentials of the hosted servers. Separate from the
+  # server list (you edit that one, the program edits this one) and separate
+  # from .env, which holds fixed keys.
+  auth_file: "./data/mcp_auth.json"
 
 # Image generation (phase 4.2). Deliberately just one address: whether ComfyUI
 # or Forge sits behind it directly, or an arbiter that lets the language model
@@ -143,7 +193,6 @@ image:
 # ─────────────────────────────────────────────────────────────────────────
 image_servers: []
 
-
 # How often endpoint reachability is checked, in seconds.
 discovery:
   interval_seconds: 15
@@ -158,6 +207,3 @@ logging:
   # Rotate above this size, keep this many old files.
   max_bytes: 10485760
   file_count: 5
-
-# Image generators live in their own file (bild_server.json) - the form
-# in the editor (Settings -> Tools -> Image servers) edits exactly that file.

@@ -241,6 +241,91 @@
       style="--laenge:32"
     />
   </svg>
+{:else if zeichen === 'stift'}
+  <!-- write_file: a pencil, nothing under it. Writing makes the file; the
+       page is the result, not the tool. -->
+  <svg
+    class="zeichen"
+    class:laeuft={animiert}
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path
+      class="strich z1"
+      d="M16 48 L18 39 L41 16 L48 23 L25 46 Z"
+      stroke-width="5"
+      style="--laenge:96"
+    />
+    <path class="strich z2" d="M36 21 L43 28" stroke-width="4.5" style="--laenge:10" />
+  </svg>
+{:else if zeichen === 'stiftlinie'}
+  <!-- edit_file: the same pencil, over a line that is already there. That
+       line is the difference between writing and changing. -->
+  <svg
+    class="zeichen"
+    class:laeuft={animiert}
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path
+      class="strich z1"
+      d="M14 42 L16 33 L39 10 L46 17 L23 40 Z"
+      stroke-width="5"
+      style="--laenge:96"
+    />
+    <path class="strich z2" d="M34 15 L41 22" stroke-width="4.5" style="--laenge:10" />
+    <path class="strich z3" d="M14 54 H50" stroke-width="4.5" style="--laenge:36" />
+  </svg>
+{:else if zeichen === 'sprechblase'}
+  <!-- ask_user: a speech bubble with a question mark — the one tool that
+       does not act but asks. -->
+  <svg
+    class="zeichen"
+    class:laeuft={animiert}
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path
+      class="strich z1"
+      d="M12 14 H52 V44 H30 L18 54 V44 H12 Z"
+      stroke-width="5"
+      style="--laenge:150"
+    />
+    <path class="strich z2" d="M26 25 A6.5 6.5 0 1 1 32 34 V37" stroke-width="4.5" style="--laenge:34" />
+  </svg>
+{:else if zeichen === 'ordner'}
+  <!-- list_dir: a folder, drawn as the one shape everybody reads at 15 px —
+       the tab first, then the body it belongs to. -->
+  <svg
+    class="zeichen"
+    class:laeuft={animiert}
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path
+      class="strich z1"
+      d="M8 20 V15 H26 L31 22 H56 V49 H8 Z"
+      stroke-width="5"
+      style="--laenge:170"
+    />
+    <path class="strich z2" d="M8 30 H56" stroke-width="4.5" style="--laenge:48" />
+  </svg>
 {:else}
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
     <path d="M9 6l6 6-6 6" />
@@ -252,9 +337,13 @@
      notification, the job log. 15 px came from the days when the only mark
      was a globe and it was decoration; the marks carry meaning now and were
      hard to make out. */
+  /* The size comes from whoever places the sign, through an inherited
+     custom property — 26 px where nobody says otherwise. A prop would have
+     meant a style attribute on each of the two dozen drawings below; one
+     variable set on the wrapper reaches all of them. */
   .zeichen {
-    width: 26px;
-    height: 26px;
+    width: var(--wz-groesse, 26px);
+    height: var(--wz-groesse, 26px);
     flex: none;
   }
   .strich {

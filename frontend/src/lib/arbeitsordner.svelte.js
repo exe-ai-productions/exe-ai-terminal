@@ -117,6 +117,18 @@ export async function ordnerLoesen(pfad) {
   await sichern(ordnerListe().filter((eintrag) => eintrag !== pfad))
 }
 
+/* A click on the chip shows the folder in the file manager — the shortest
+   way from "the model works in there" to "let me get a file out of there".
+   The path is not sent as a wish: the service takes it from the chat's own
+   list, and anything else is refused. */
+export async function ordnerZeigen(pfad) {
+  try {
+    await api.ordnerOeffnen(zustand.aktiverChat, pfad)
+  } catch (fehler) {
+    melde(fehler.message || t('fehler.allgemein'), 'fehler')
+  }
+}
+
 /* The system dialog blocks as long as it is open — the service answers only
    once it is closed. `laeuft` keeps a second click out meanwhile. */
 export async function systemdialog() {

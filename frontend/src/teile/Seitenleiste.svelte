@@ -1,9 +1,12 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   import { slide, fade } from 'svelte/transition'
   import { flip } from 'svelte/animate'
-  import { t } from '../lib/texte.svelte.js'
+  import { t, texte } from '../lib/texte.svelte.js'
+  import { chatgruppen, gruppenDatum } from '../lib/chatgruppen.js'
   import { api } from '../lib/api.js'
   import Modellwahl from './Modellwahl.svelte'
+  import Chatzeile from './Chatzeile.svelte'
   import {
     zustand, chatsLaden, chatOeffnen, neuerChat, chatAendern, chatLoeschen,
     auftragLoeschen, melde, kontextStand, bereichWechseln,
@@ -14,8 +17,18 @@
   let menue = $state(null) // { chat, x, y }
   let auftragMenue = $state(null) // { auftrag, x, y } — the same menu, for tasks
 
-  const angeheftet = $derived(zustand.chats.filter((c) => c.pinned))
-  const uebrige = $derived(zustand.chats.filter((c) => !c.pinned))
+  /* The list cut into days. `heute` is deliberately its own piece of
+     state and not a call to the clock inside the derivation: a derivation
+     that reads the clock never notices when the clock moves on, and the
+     "Today" heading would keep the name of the day the window was opened
+     on. The tick is slow because the only boundary that matters is
+     midnight. */
+  let jetzt = $state(Date.now())
+  $effect(() => {
+    const uhr = setInterval(() => (jetzt = Date.now()), 60000)
+    return () => clearInterval(uhr)
+  })
+  const gruppen = $derived(chatgruppen(zustand.chats, jetzt))
   const kontext = $derived(kontextStand())
 
   /* Jobs: the same bar as for the chats — search field, create button,
@@ -197,91 +210,21 @@
     />
   </div>
 
-  <div class="liste">
-    {#if angeheftet.length}
-      <div class="gruppe" transition:slide={{ duration: 160 }}>{t('chat.angeheftet')}</div>
-      {#each angeheftet as chat (chat.id)}
+  <div class="liste" use:rollfade>
+    <!-- Pinned first, then today, yesterday, and one heading per day
+         beyond that. The headings are the same ones the pinned group has
+         always worn — a date is a section of the list, not a new kind of
+         thing, so it gets no look of its own. -->
+    {#each gruppen as gruppe (gruppe.schluessel ?? gruppe.datum.getTime())}
+      <div class="gruppe" transition:slide={{ duration: 160 }}>
+        {gruppe.schluessel ? t(gruppe.schluessel) : gruppenDatum(gruppe.datum, texte.sprache)}
+      </div>
+      {#each gruppe.chats as chat (chat.id)}
         <div animate:flip={{ duration: 220 }} transition:slide={{ duration: 180 }}>
-          <button
-            class="chat"
-            class:aktiv={chat.id === zustand.aktiverChat}
-            onclick={() => chatOeffnen(chat.id)}
-            oncontextmenu={(e) => menueOeffnen(e, chat)}
-          >
-            {#if zustand.fertigeChats.includes(chat.id)}
-              <span class="fertigpunkt" title={t('chat.antwort_fertig')} aria-label={t('chat.antwort_fertig')}></span>
-            {/if}
-            <span class="titel">{chat.title}</span>
-            <!-- The pin releases on click — no detour
-                 through the right-click menu when the symbol is standing
-                 there anyway. span instead of button: a button inside a
-                 button is forbidden. -->
-            <span
-              class="nadel"
-              role="button"
-              tabindex="0"
-              title={t('chat.loesen')}
-              aria-label={t('chat.loesen')}
-              onclick={(e) => { e.stopPropagation(); anheften(chat) }}
-              onkeydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  anheften(chat)
-                }
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2">
-                <path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3z" />
-              </svg>
-            </span>
-          </button>
+          <Chatzeile {chat} oeffnen={chatOeffnen} menue={menueOeffnen} {anheften} />
         </div>
       {/each}
-    {/if}
-
-    {#if uebrige.length}
-      <div class="gruppe">{angeheftet.length ? t('chat.zuletzt') : t('chat.alle')}</div>
-      {#each uebrige as chat (chat.id)}
-        <div animate:flip={{ duration: 220 }} transition:slide={{ duration: 180 }}>
-          <button
-            class="chat"
-            class:aktiv={chat.id === zustand.aktiverChat}
-            onclick={() => chatOeffnen(chat.id)}
-            oncontextmenu={(e) => menueOeffnen(e, chat)}
-          >
-            {#if zustand.fertigeChats.includes(chat.id)}
-              <span class="fertigpunkt" title={t('chat.antwort_fertig')} aria-label={t('chat.antwort_fertig')}></span>
-            {/if}
-            <span class="titel">{chat.title}</span>
-            <!-- Quick pinning: the pin only appears on
-                 hover — the same pin as above, just as an invitation
-                 instead of a state. Right-click remains alongside. -->
-            <span
-              class="nadel einladung"
-              role="button"
-              tabindex="0"
-              title={t('chat.anheften')}
-              aria-label={t('chat.anheften')}
-              onclick={(e) => { e.stopPropagation(); anheften(chat) }}
-              onkeydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  anheften(chat)
-                }
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2">
-                <path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3z" />
-              </svg>
-            </span>
-          </button>
-        </div>
-      {/each}
-    {/if}
+    {/each}
 
     {#if !zustand.chats.length}
       <div class="gruppe">{zustand.suche ? t('chat.keine_treffer') : t('chat.leer')}</div>
@@ -626,24 +569,6 @@
     cursor: pointer;
     transition: background 0.12s, color 0.12s;
   }
-  /* The finished answer waiting to be seen: blue is the house colour for
-     "running, active" and this is its afterglow — ringed in text colour so
-     it reads on the active row too, pulsing so the eye finds it. */
-  .fertigpunkt {
-    flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 99px;
-    background: var(--blau);
-    box-shadow: 0 0 0 1.5px var(--text);
-    animation: fertigpuls 1.6s ease-in-out infinite;
-  }
-  @keyframes fertigpuls {
-    50% { opacity: 0.45; transform: scale(0.82); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .fertigpunkt { animation: none; }
-  }
   .chat:hover {
     background: var(--linie);
     color: var(--text);
@@ -657,35 +582,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     flex: 1;
-  }
-  .nadel {
-    opacity: 0.5;
-    flex: none;
-    display: inline-flex;
-    padding: 3px;
-    margin: -3px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: opacity 0.12s, background 0.12s;
-  }
-  .nadel:hover,
-  .nadel:focus-visible {
-    opacity: 1;
-    background: var(--linie);
-  }
-  /* The invitation pin is invisible until you are on the row — otherwise
-     every chat row would carry a symbol that indicates nothing. */
-  .nadel.einladung {
-    opacity: 0;
-  }
-  .chat:hover .nadel.einladung,
-  .chat:focus-within .nadel.einladung {
-    opacity: 0.5;
-  }
-  .chat .nadel.einladung:hover,
-  .chat .nadel.einladung:focus-visible {
-    opacity: 1;
-    background: var(--linie-stark);
   }
   /* Keeps toggle and footer at the bottom. Don't let the list do this
      work: collapsed it is hidden, and both slid upward. */

@@ -1,0 +1,130 @@
+/*
+  The three colour packs for code.
+
+  One set of variables, three fillings. The classes are highlight.js's own,
+  so a new grammar is coloured without anybody touching this file.
+
+  Two of the packs bring their own background on purpose. A dark editor pack
+  in a light program is not a mistake — it is what people know from their
+  editor, and asking a pack to follow the app would turn Tokyo Night into a
+  washed-out version of itself.
+
+  `Exe` is the exception and the default: it has no background of its own and
+  follows the house, light and dark, using the tones the program already had.
+*/
+
+:root {
+  --code-schl: var(--sx-schl);
+  --code-text: var(--sx-text);
+  --code-komm: var(--sx-komm);
+  --code-zahl: var(--sx-zahl);
+  --code-ruf: var(--sx-ruf);
+  --code-typ: var(--sx-ruf);
+  --code-var: var(--text);
+  --code-grund: var(--code-bg);
+  --code-vordergrund: var(--code-text);
+}
+
+/* Tokyo Night — a dark pack, carrying its own ground. */
+:root[data-codefarben='tokyo'] {
+  --code-schl: #bb9af7;
+  --code-text: #9ece6a;
+  --code-komm: #565f89;
+  --code-zahl: #ff9e64;
+  --code-ruf: #7aa2f7;
+  --code-typ: #2ac3de;
+  --code-var: #c0caf5;
+  --code-grund: #1a1b26;
+  --code-vordergrund: #a9b1d6;
+}
+
+/* One Light — a light pack, likewise with its own ground. */
+:root[data-codefarben='onelight'] {
+  --code-schl: #a626a4;
+  --code-text: #50a14f;
+  --code-komm: #a0a1a7;
+  --code-zahl: #986801;
+  --code-ruf: #4078f2;
+  --code-typ: #c18401;
+  --code-var: #e45649;
+  --code-grund: #fafafa;
+  --code-vordergrund: #383a42;
+}
+
+/* The classes highlight.js hands out. Grouped by what they mean, not by
+   what they are called — a type and a class name get one colour, and
+   whoever adds a grammar does not have to decide anything. */
+.hljs {
+  color: var(--code-vordergrund);
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-meta-keyword {
+  color: var(--code-schl);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--code-text);
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--code-komm);
+  font-style: italic;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--code-zahl);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--code-ruf);
+}
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-params {
+  color: var(--code-typ);
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-subst,
+.hljs-property {
+  color: var(--code-var);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+.hljs-deletion {
+  color: var(--rot);
+}
+
+/*
+  Program output carries its own colours (npm, git, vite). They are mapped
+  onto the chosen pack, so a build log in the terminal reads like the code
+  blocks beside it — see lib/ansi.js.
+*/
+.ansi-rot { color: var(--rot); }
+.ansi-gruen { color: var(--gruen); }
+.ansi-gelb { color: var(--gelb); }
+.ansi-blau { color: var(--code-ruf); }
+.ansi-lila { color: var(--code-schl); }
+.ansi-cyan { color: var(--code-typ); }
+.ansi-grau { color: var(--text-still); }
+.ansi-weiss { color: var(--text); }
+.ansi-schwarz { color: var(--text-still); }
+.ansi-fett { font-weight: 600; }

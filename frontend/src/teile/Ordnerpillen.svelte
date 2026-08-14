@@ -16,7 +16,7 @@
   import { t } from '../lib/texte.svelte.js'
   import {
     HOECHSTENS, fliegen, landen, ordnerListe, ordnerName,
-    ordnerLoesen, maskeOeffnen,
+    ordnerLoesen, ordnerZeigen, maskeOeffnen,
   } from '../lib/arbeitsordner.svelte.js'
 
   let { ort = 'leiste' } = $props()
@@ -28,14 +28,20 @@
 {#if ordner.length}
   <div class="reihe" class:kopf={ort === 'kopf'}>
     {#each ordner as pfad (pfad)}
-      <div class="pille" title={pfad} in:landen={{ key: pfad }} out:fliegen={{ key: pfad }}>
-        <svg class="zeichen" width="14" height="14" viewBox="0 0 64 64" fill="none"
-             stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-             aria-hidden="true">
-          <path d="M11 50 V14 H27 L32 21 H53 V50 Z" stroke-width="5" />
-          <path d="M11 26 H53" stroke-width="4.5" />
-        </svg>
-        <span class="name">{ordnerName(pfad)}</span>
+      <div class="pille" in:landen={{ key: pfad }} out:fliegen={{ key: pfad }}>
+        <!-- The face of the chip opens the folder, the sign at its end lets
+             it go. Two jobs, two controls — a folder is a fact, so the face
+             answers with brightness and never with a colour. -->
+        <button class="flaeche" title={t('arbeitsordner.zeigen').replace('{pfad}', pfad)}
+                onclick={() => ordnerZeigen(pfad)}>
+          <svg class="zeichen" width="14" height="14" viewBox="0 0 64 64" fill="none"
+               stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true">
+            <path d="M11 50 V14 H27 L32 21 H53 V50 Z" stroke-width="5" />
+            <path d="M11 26 H53" stroke-width="4.5" />
+          </svg>
+          <span class="name">{ordnerName(pfad)}</span>
+        </button>
         <button class="x" onclick={() => ordnerLoesen(pfad)}
                 aria-label={t('arbeitsordner.loesen')} title={t('arbeitsordner.loesen')}>✕</button>
       </div>
@@ -101,14 +107,42 @@
   .pille {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 2px;
+    height: 28px;
+    box-sizing: border-box;
     max-width: 100%;
     min-width: 0;
     border: 1px solid var(--text-leise);
-    border-radius: 12px;
+    border-radius: 9px;
     background: var(--bg-erhoben);
-    padding: 4px 6px 4px 8px;
+    padding: 0 4px 0 4px;
+    overflow: hidden;
   }
+  /* The highlight belongs to the WHOLE chip, not to the face inside it.
+     With it on the face, the remove sign stayed dark while everything left
+     of it lit up — the chip read as two halves. Same mistake the fold arrow
+     in the tools window had, and the same fix: put it on the container. */
+  .pille:hover {
+    background: var(--linie);
+  }
+  .flaeche {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 22px;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    padding: 0 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.14s;
+  }
+  /* The face still answers on its own, a shade stronger, so it stays
+     visible which half of the chip the pointer is on. */
+  .flaeche:hover { background: var(--linie-stark); }
   .pille .zeichen {
     flex: none;
     color: var(--text-leise);
@@ -133,12 +167,15 @@
     flex: none;
   }
   .x:hover {
-    background: var(--linie);
+    background: var(--linie-stark);
     color: var(--text);
   }
+  /* Hovering anywhere on the chip already brightens the remove sign — it is
+     part of the chip, not a separate control that has to be found. */
+  .pille:hover .x { color: var(--text-leise); }
   .mehr {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     box-sizing: border-box;
     flex: none;

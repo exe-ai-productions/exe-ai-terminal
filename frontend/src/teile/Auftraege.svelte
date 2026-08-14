@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The jobs view (6.5, variant A).
 
      Its own section next to the chats: the sidebar switches over, the
@@ -183,7 +184,7 @@
     <p class="leer">{t('jobs.leer')}</p>
   {/if}
 
-  <div class="auftraege">
+  <div class="auftraege" use:rollfade>
   <div class="spur">
     {#each wartende as auftrag (auftrag.id)}
       <div class="banner" transition:slide={{ duration: 180 }}>

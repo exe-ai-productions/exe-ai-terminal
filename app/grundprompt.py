@@ -58,6 +58,11 @@ you did not call a tool, say what you are basing your answer on instead.
 Never present invented content as the contents of a file, a page or a command's
 output."""
 
+# The shell sentence below says the same thing as the guardian's own
+# instruction in app/waechter.py — deliberately, and it has to stay that way:
+# the guardian repairs what this prompt failed to prevent, and two prompts
+# that disagree about the machinery teach the model twice and correctly once.
+# WHOEVER CHANGES ONE READS THE OTHER.
 WERKZEUGE = """\
 You have tools. Use them instead of guessing: when the user asks about
 something you can reach with a tool, call it rather than answering from
@@ -69,7 +74,42 @@ you; you just call. If a call is refused or goes unanswered, say plainly that
 it did not happen — do not work around it and do not pretend it succeeded.
 
 If a call fails, report the actual error and what you suggest next. Do not
-silently retry variations of the same thing."""
+silently retry variations of the same thing.
+
+Each command runs in its own shell: a `cd` persists to the next call, but
+environment activation does not — call programs through their path
+(`.venv/bin/python3 -m pytest`) instead of activating first."""
+
+# Which tool for which job. The file tools exist because small models lose
+# the quoting fight when they build shell one-liners for what a plain path
+# argument does — and this is the one place that can say so before the model
+# has already picked wrong.
+#
+# The background parameter is named here exactly as the tool schema spells it
+# (`background`, see app/tools/shell.py). A prompt that says "in the
+# background" without the word leaves the model to guess a parameter, and a
+# guessed parameter is a refused call.
+DATEIWERKZEUGE = """\
+For file work use the file tools — read_file, write_file, edit_file,
+list_dir — rather than building shell one-liners for the same thing.
+run_command is for everything else: running programs, pipes, bulk moves.
+
+A command that will run long: start it with `background=true`; its result
+returns to the conversation by itself."""
+
+# The one tool that hands control back. Its own block, because it is worth a
+# sentence only when the tool is actually switched on.
+FRAGEN = """\
+For a decision that belongs to the user — naming things, destructive choices,
+taste — ask with the ask_user tool and a small set of options instead of
+guessing."""
+
+# The rail beside the chat draws what the model produces. Without this the
+# model reads its own page back to the user, who is looking at it.
+VORSCHAU = """\
+A document you produce as a code block is shown to the user rendered, in a
+panel beside the chat — do not additionally walk them through its full
+content."""
 
 # The defence that cannot live in a tool description, because it is about all
 # of them at once — and because a memory turns a one-off injection into a
@@ -147,6 +187,9 @@ def bauen(
     ordner: Sequence[str] = (),
     gedaechtnis: bool = False,
     skills: Sequence[tuple[str, str]] = (),
+    dateiwerkzeuge: bool = False,
+    fragen: bool = False,
+    vorschau: bool = False,
 ) -> str:
     """The shipped prompt for exactly this situation.
 
@@ -162,10 +205,21 @@ def bauen(
     ``skills`` holds name and one-line description of the skills the model may
     reach for by itself. Skills the user has to name are not in here and cost
     nothing at all.
+
+    ``dateiwerkzeuge``, ``fragen`` and ``vorschau`` follow the same rule as
+    everything else here: each sentence appears only when the thing it talks
+    about is switched on. On the smallest local model every word costs
+    attention, and a sentence about a tool that is off costs it for nothing.
     """
     teile = [GRUNDLAGE]
     if werkzeuge:
         teile += [WAHRHEIT, WERKZEUGE, FREMDTEXT]
+    if dateiwerkzeuge:
+        teile.append(DATEIWERKZEUGE)
+    if fragen:
+        teile.append(FRAGEN)
+    if vorschau:
+        teile.append(VORSCHAU)
     if ordner:
         teile.append(ORDNER.format(ordner="\n".join(f"- {p}" for p in ordner)))
     if gedaechtnis:

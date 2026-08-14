@@ -23,6 +23,7 @@ from app.api.v1.schemas import (
 from app.db import Repositories
 from app.events import Ereignisse, bus
 from app.i18n import t
+from app import waechter
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -156,6 +157,11 @@ async def chat_loeschen(
 ) -> None:
     _chat_oder_404(repositories, chat_id, user_id, sprache)
     repositories.chats.loeschen(chat_id, user_id=user_id)
+    # What the database holds goes with the row (foreign keys, cascade).
+    # What lives in memory has to be told: the guardian's findings belong to
+    # a conversation that no longer exists, and nobody would ever come to
+    # collect them.
+    waechter.wache.vergessen(chat_id)
     await bus.veroeffentlichen(Ereignisse.CHAT_GELOESCHT, chat_id=chat_id, user_id=user_id)
 
 

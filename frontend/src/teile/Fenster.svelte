@@ -10,6 +10,8 @@
      the veil scrolls — the window as a whole, never a region inside it.
      That's the scrollbar rule: none where none has to be. */
   import { fade, scale } from 'svelte/transition'
+  import { t } from '../lib/texte.svelte.js'
+  import { cubicIn } from 'svelte/easing'
 
   /* `symbol` is an optional icon before the title — the job dialog puts
      the agent mark there. As a snippet and not a fixed component, so the
@@ -51,10 +53,20 @@
      card grid breathes, and a touch taller — a gallery is looked at, not
      scanned down a side list. Still capped to the app area by the same
      min()/clamp() as the others. */
-  const BREITE = { frage: '460px', liste: '900px', vorschau: '1200px', galerie: '1100px' }
+  const BREITE = { frage: '460px', liste: '1040px', vorschau: '1200px', galerie: '1040px' }
 
+  /* `schrumpfen` closes the window the way the first-start window does:
+     it collapses to a point instead of fading. Reserved for a window whose
+     closing IS the start of something — the work then appears where the
+     window went, and the eye follows it there. The mechanic is the
+     first-start window's; only the numbers live here now, so both breathe
+     the same way. */
+  /* `zurueck` turns the window into a step: an arrow appears in the top-left
+     corner and runs it. Closing still closes everything — the arrow is the
+     way back, not a second close button. */
   let {
-    offen = $bindable(false), titel = '', art = 'frage', symbol, children,
+    offen = $bindable(false), titel = '', art = 'frage', symbol, schrumpfen = false,
+    zurueck = null, children,
   } = $props()
 </script>
 
@@ -63,12 +75,25 @@
   <div class="schleier" class:weit={art === 'vorschau'} transition:fade={{ duration: 150 }}
        onclick={(e) => { if (e.target === e.currentTarget) offen = false }}>
     <div class="popup" class:liste={art === 'liste'} class:vorschau={art === 'vorschau'}
-         class:galerie={art === 'galerie'}
+         class:galerie={art === 'galerie'} class:mitweg={Boolean(zurueck)}
          style="width:min({BREITE[art] ?? BREITE.frage}, 92vw)"
-         transition:scale={{ duration: 190, start: 0.97 }}>
+         transition:scale={schrumpfen
+           ? { duration: 420, start: 0.03, opacity: 0, easing: cubicIn }
+           : { duration: 190, start: 0.97 }}>
       <!-- A window whose body carries its own drawn heading passes an
            empty title; a second plain-text title above it would say the
            same thing twice. -->
+      {#if zurueck}
+        <!-- Sits above the body and outside the title, because a window whose
+             body carries its own drawn heading passes no title at all — and
+             the way back has to be there either way. -->
+        <button class="zurueck" onclick={zurueck} aria-label={t('app.zurueck')} title={t('app.zurueck')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 5 8 12l7 7" />
+          </svg>
+        </button>
+      {/if}
       {#if titel || symbol}
         <h3>{@render symbol?.()}{titel}</h3>
       {/if}
@@ -88,6 +113,40 @@
     align-items: flex-start;
     padding: 13vh 16px 6vh;
     overflow-y: auto;
+  }
+  /* The arrow rides in the top-left corner, and the window makes room for
+     it rather than laying it over whatever is there: the catalogue draws its
+     own mark exactly in that spot, and an arrow on top of a mark is two
+     things fighting for one corner. The room appears only where an arrow
+     does, so every window without one looks exactly as it always did. */
+  .popup {
+    position: relative;
+  }
+  .popup.mitweg > h3,
+  .popup.mitweg > .leib {
+    padding-left: 34px;
+  }
+  .zurueck {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1;
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--linie-stark);
+    border-radius: 99px;
+    background: none;
+    color: var(--text-leise);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .zurueck:hover {
+    background: var(--linie);
+    color: var(--text);
   }
   .popup {
     background: var(--bg-erhoben);
@@ -117,7 +176,7 @@
      window collapses to a line. The lower bound in pixels keeps it standing
      there too. */
   .popup.liste .leib {
-    height: clamp(440px, 66vh, 640px);
+    height: clamp(440px, 74vh, 720px);
     display: flex;
     flex-direction: column;
     min-height: 0;

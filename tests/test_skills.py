@@ -232,3 +232,59 @@ def test_ein_geschriebener_skill_ueberschattet_einen_mitgelieferten(client):
     assert (eigen / "handoff" / skills.SKILL_DATEI).is_file()
     assert "Shipped body." in (haus / "handoff" / skills.SKILL_DATEI).read_text()
     assert skills.skills_laden(haus, eigen)["handoff"].eigen is True
+
+
+# --- Deleting: only what the user owns --------------------------------------
+
+
+def test_ein_eigener_skill_laesst_sich_loeschen(client):
+    """Written, then gone. Until now a mistyped skill could only be switched
+    off, never removed."""
+    client.post("/api/v1/skills", json={"name": "wegdamit", "inhalt": NEU})
+    assert _verwaltung(client, "wegdamit") is not None
+
+    antwort = client.delete("/api/v1/skills/wegdamit")
+    assert antwort.status_code == 204
+    assert _verwaltung(client, "wegdamit") is None
+
+
+def test_das_loeschen_holt_den_mitgelieferten_zurueck(client, config):
+    """A user's copy shadows a shipped skill. Removing the copy is not a
+    deletion but a reset — the shipped one stands there again."""
+    mitgeliefert, _ = config.skillverzeichnisse
+    _schreiben(
+        mitgeliefert,
+        "handoff",
+        "---\ndescription: The shipped one\nauto: false\n---\n\nShipped instruction.\n",
+    )
+    client.post("/api/v1/skills", json={"name": "handoff", "inhalt": NEU})
+    assert _verwaltung(client, "handoff")["beschreibung"] == "Writes a plan for the next step"
+
+    client.delete("/api/v1/skills/handoff")
+    zeile = _verwaltung(client, "handoff")
+    assert zeile is not None
+    assert zeile["eigen"] is False
+    assert zeile["beschreibung"] == "The shipped one"
+
+
+def test_ein_mitgelieferter_ohne_eigene_fassung_bleibt(client, config):
+    """Nothing to delete: the shipped folder is not this route's business,
+    and a deletion there would be undone by the next update anyway."""
+    mitgeliefert, _ = config.skillverzeichnisse
+    _schreiben(
+        mitgeliefert,
+        "bleibt",
+        "---\ndescription: Stays put\nauto: false\n---\n\nShipped instruction.\n",
+    )
+    antwort = client.delete("/api/v1/skills/bleibt")
+    assert antwort.status_code == 404
+    assert _verwaltung(client, "bleibt") is not None
+
+
+def test_ein_name_ist_nie_ein_pfad(client):
+    """The name comes out of the URL and is about to become a path. A dotted
+    escape does not even reach the handler — the router refuses it — and a
+    name that does reach it is turned away by the pattern."""
+    assert client.delete("/api/v1/skills/..").status_code in (400, 404, 405)
+    assert client.delete("/api/v1/skills/etc%2Fpasswd").status_code in (400, 404, 405)
+    assert client.delete("/api/v1/skills/Gross Raum").status_code == 400

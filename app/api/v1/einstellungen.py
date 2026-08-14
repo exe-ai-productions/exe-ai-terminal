@@ -20,12 +20,20 @@ from app.db import Repositories
 from app.db.repositories.einstellungen import GLOBAL
 from app.anrede import SCHLUESSEL as ANREDE
 from app.anrede import schalter_pruefen as anrede_pruefen
+from app.bildvorgabenwahl import SCHLUESSEL as BILD_VORGABEN
+from app.bildvorgabenwahl import wahl_pruefen as bild_vorgaben_pruefen
 from app.gedaechtnis import SCHLUESSEL as GEDAECHTNIS
 from app.gedaechtnis import schalter_pruefen
+from app.klangwahl import SCHLUESSEL as KLAENGE
+from app.klangwahl import wahl_pruefen as klaenge_pruefen
 from app.modellwahl import aus_pruefen, wahl_pruefen
 from app.parameter import pruefen
 from app.skillwahl import SCHLUESSEL as SKILLS_AUTO
 from app.skillwahl import schalter_pruefen as skills_auto_pruefen
+from app.einbettungwahl import SCHLUESSEL as EINBETTUNG
+from app.einbettungwahl import schalter_pruefen as einbettung_pruefen
+from app.waechterwahl import SCHLUESSEL as WAECHTER
+from app.waechterwahl import schalter_pruefen as waechter_pruefen
 from app.werkzeugwahl import SCHLUESSEL as WERKZEUGE_AUS
 from app.werkzeugwahl import aus_pruefen as werkzeuge_aus_pruefen
 
@@ -42,6 +50,10 @@ PRUEFER = {
     GEDAECHTNIS: schalter_pruefen,
     ANREDE: anrede_pruefen,
     SKILLS_AUTO: skills_auto_pruefen,
+    KLAENGE: klaenge_pruefen,
+    WAECHTER: waechter_pruefen,
+    EINBETTUNG: einbettung_pruefen,
+    BILD_VORGABEN: bild_vorgaben_pruefen,
 }
 
 

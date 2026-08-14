@@ -1,4 +1,5 @@
 <script>
+  import { rollfade } from '../lib/rollfade.js'
   /* The confirmation before a tool touches anything (1.6).
 
      It hangs right above the input field and is exactly as wide — the
@@ -13,6 +14,7 @@
      need right now for judging. */
   import { fly, slide } from 'svelte/transition'
   import { backOut, cubicIn } from 'svelte/easing'
+  import { hervorheben, maskieren } from '../lib/einfaerben.js'
   import { t } from '../lib/texte.svelte.js'
 
   let { frage, antworten } = $props()
@@ -36,17 +38,25 @@
     ]),
   )
 
-  /* The single line that stands while folded: the first argument's value,
-     first line of it, shortened. That is what a command is recognised by —
-     `cat > game.js << EOF` says enough to decide, the two hundred lines
-     after it do not. */
-  const VORSCHAU_ZEICHEN = 68
-  const vorschau = $derived.by(() => {
-    const erster = zeilen[0]?.[1] ?? ''
-    const zeile = erster.split('\n')[0].trim()
-    if (!zeile) return ''
-    const mehr = erster.includes('\n') || zeile.length > VORSCHAU_ZEICHEN
-    return zeile.slice(0, VORSCHAU_ZEICHEN) + (mehr ? ' …' : '')
+  /* The thing the decision rests on gets a surface of its own, always
+     visible: the command, whole, in monospace, coloured by the same bash
+     scheme the chat uses. The grey ellipsis line in the head could be read
+     but not judged — a command cut off at 68 characters hides exactly the
+     part worth refusing.
+
+     For run_command that is the command; for any other tool the first
+     argument, which is the one that says what it will touch. */
+  const befehl = $derived(String(frage.argumente?.command ?? zeilen[0]?.[1] ?? ''))
+  const befehlFarbig = $derived(befehl ? hervorheben(befehl, 'bash') : '')
+
+  /* The reason names a path, and a path is read letter by letter — so it
+     stands in monospace inside the sentence. The value travels alongside
+     the sentence, so nothing has to be guessed out of it. */
+  const grundText = $derived.by(() => {
+    const satz = maskieren(frage.grund || '')
+    const wert = frage.grundWert || ''
+    if (!wert) return satz
+    return satz.replace(maskieren(wert), `<span class="pfad">${maskieren(wert)}</span>`)
   })
 
   /* The box takes the keyboard to itself while it is open: Escape
@@ -95,10 +105,12 @@
          English the verb goes before it ("Run websuche?") instead of
          after. -->
     <span class="titel">{t('werkzeug.frage_vor')}<b>{frage.name}</b>{t('werkzeug.frage_nach')}</span>
-    {#if !offen && vorschau}
-      <span class="vorschau">{vorschau}</span>
-    {/if}
   </button>
+
+  <!-- The command itself, never folded away. -->
+  {#if befehl}
+    <div class="befehl" use:rollfade><span class="stumm">$</span> {@html befehlFarbig}</div>
+  {/if}
 
   <!-- The reason, when there is one. It carries the waiting colour of the
        house — the only colour in this box, and only when something really
@@ -112,13 +124,13 @@
         <path d="M32 28 V38" stroke-width="4.5" />
         <path d="M32 44.5 V45" />
       </svg>
-      <span>{frage.grund}</span>
+      <span>{@html grundText}</span>
     </p>
   {/if}
 
   {#if offen}
     {#if zeilen.length}
-      <dl class="argumente" transition:slide={{ duration: 200 }}>
+      <dl class="argumente" use:rollfade transition:slide={{ duration: 200 }}>
         {#each zeilen as [schluessel, wert] (schluessel)}
           <dt>{schluessel}</dt>
           <dd>{wert}</dd>
@@ -193,37 +205,52 @@
   .titel b {
     font-weight: 600;
   }
-  /* Folded, the one line that says what is about to run. Monospace, because
-     that is what it is — a command, a query, a path.
-
-     Bright, not quiet: this line is what the decision rests on. It used to
-     sit in the stillest grey in the box while the label above it was full
-     white — the wrong way round. */
-  .vorschau {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-leise);
+  /* The command, on a surface of its own. It is what the decision rests
+     on, so it is never folded away and never cut off: it wraps, grows with
+     the content, and only starts scrolling at a third of the window — the
+     same rule the input field beside it follows. */
+  .befehl {
+    margin: 9px 0 0;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--linie);
+    border-radius: 9px;
     font-family: var(--schrift-fest);
     font-size: 12px;
+    line-height: 1.55;
+    color: var(--text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+  .befehl .stumm {
+    color: var(--text-still);
   }
   /* The reason. Yellow is the house's waiting-and-caution colour (the job
-     tiles and the context meter use it for the same thing) — and it is the
-     only colour in this box, because a reason is a state and everything
-     else here is not. */
+     tiles and the context meter use it for the same thing), and reaching
+     outside the shared folders is exactly that. Only the form changed: a
+     quiet surface instead of a line of full yellow text, the way the house
+     rule wants colour on a surface and never behind running text. */
   .grund {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 7px;
     margin: 9px 0 0;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--gelb) 12%, var(--bg-erhoben));
     font-size: 12px;
     line-height: 1.45;
-    color: var(--gelb);
+    color: var(--text);
   }
   .grund svg {
     flex: none;
-    margin-top: 1px;
+    color: var(--gelb);
+  }
+  .grund :global(.pfad) {
+    font-family: var(--schrift-fest);
+    font-size: 11.5px;
   }
   .grund span {
     min-width: 0;
