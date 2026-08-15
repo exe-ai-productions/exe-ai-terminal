@@ -802,7 +802,11 @@
     "satz_ternary": "The two-bit sibling: noticeably sharper than one bit, still light enough for 16 GB machines.",
     "lang_ternary": "Two bits per weight instead of one — noticeably sharper than the one-bit build, and still light enough for a 16 GB machine. Sees images, calls tools.",
     "satz_bonsai": "One bit per weight — a 27B brain in a 3.8 GB file. Unbeatable per gigabyte, thinks before it answers.",
-    "lang_bonsai": "One bit per weight brings a 27B model down to a 3.8 GB file — unbeatable per gigabyte, and it thinks before it answers. Sees images, calls tools, and fits an 8 GB machine."
+    "lang_bonsai": "One bit per weight brings a 27B model down to a 3.8 GB file — unbeatable per gigabyte, and it thinks before it answers. Sees images, calls tools, and fits an 8 GB machine.",
+    "kann_eew": "Extended Workflow",
+    "empfohlen": "★ Recommended",
+    "satz_exeguard": "Our own guardian model — tiny, trained on the terminal's own tools.",
+    "lang_exeguard": "Exe Guard Dynamic: our self-trained guardian model. It spots a failed step and suggests the one instruction that fixes it. (Final wording just before release.)"
   },
   "terminal": {
     "titel": "Terminal",

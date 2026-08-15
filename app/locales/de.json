@@ -802,7 +802,11 @@
     "satz_ternary": "Das Zwei-Bit-Geschwister: merklich schärfer als ein Bit, immer noch leicht genug für 16-GB-PCs.",
     "lang_ternary": "Zwei Bit pro Gewicht statt einem — merklich schärfer als die Ein-Bit-Fassung und immer noch leicht genug für einen 16-GB-PC. Sieht Bilder, ruft Werkzeuge.",
     "satz_bonsai": "Ein Bit pro Gewicht — ein 27B-Hirn in einer 3,8-GB-Datei. Unschlagbar pro Gigabyte, denkt vor der Antwort.",
-    "lang_bonsai": "Ein Bit pro Gewicht bringt ein 27B-Modell auf eine 3,8-GB-Datei — unschlagbar pro Gigabyte, und es denkt vor der Antwort. Sieht Bilder, ruft Werkzeuge und passt auf eine 8-GB-PC."
+    "lang_bonsai": "Ein Bit pro Gewicht bringt ein 27B-Modell auf eine 3,8-GB-Datei — unschlagbar pro Gigabyte, und es denkt vor der Antwort. Sieht Bilder, ruft Werkzeuge und passt auf eine 8-GB-PC.",
+    "kann_eew": "Extended Workflow",
+    "empfohlen": "★ Empfohlen",
+    "satz_exeguard": "Unser eigenes Wächter-Modell — winzig, auf die Werkzeuge des Terminals trainiert.",
+    "lang_exeguard": "Exe Guard Dynamic: unser selbst trainiertes Wächter-Modell. Erkennt gescheiterte Schritte und schlägt den einen richtigen Befehl vor. (Endbeschriftung kurz vor Release.)"
   },
   "terminal": {
     "titel": "Terminal",

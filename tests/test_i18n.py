@@ -111,6 +111,9 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # A browser is called a browser in German too — the panel IS one, and
         # the dictionary word for it is nothing anybody says.
         "vorschau.titel",
+        # "Extended Workflow" is the feature's own name, kept the same in
+        # both languages — like "Terminal".
+        "katalog.kann_eew",
     }
 
     def flach(knoten, praefix=""):

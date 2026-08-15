@@ -14,6 +14,7 @@
      a fit is a fact, not a state, so it wears brightness and a border,
      never one of the four state colours. */
   import Hauszeichen from './Hauszeichen.svelte'
+  import EEWzeichen from './EEWzeichen.svelte'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
   import { t } from '../lib/texte.svelte.js'
   import { LOGOS } from '../lib/logos.js'
@@ -43,6 +44,7 @@
     auge: 'katalog.kann_auge',
     gluehbirne: 'katalog.kann_gluehbirne',
     blitz: 'katalog.kann_blitz',
+    eew: 'katalog.kann_eew',
   }
 
   function halt(e, fn) {
@@ -62,10 +64,13 @@
   {#if !passt}
     <span class="plakette">{t('katalog.braucht_maschine', { gb: brauchtMaschine(fassung) })}</span>
   {/if}
+  {#if karte.marke === 'exe'}
+    <span class="empfohlen">{t('katalog.empfohlen')}</span>
+  {/if}
 
   <div class="oben">
     {#if marke}
-      <div class="logo echt"><svg viewBox={marke.vb} width="26" height="26" aria-hidden="true">{@html marke.html}</svg></div>
+      <div class="logo echt" class:eigen={karte.marke === 'exe'}>{#if karte.marke === 'exe'}<svg viewBox="3 3 66 66" width="44" height="44" aria-hidden="true">{@html marke.html}</svg>{:else}<svg viewBox={marke.vb} width="26" height="26" aria-hidden="true">{@html marke.html}</svg>{/if}</div>
     {:else}
       <div class="logo">{karte.logo}</div>
     {/if}
@@ -79,7 +84,7 @@
 
   <div class="zeichenreihe">
     {#each karte.faehigkeiten as f (f)}
-      <span class="zeichen" title={t(KANN[f])}><Hauszeichen zeichen={f} groesse="mittel" /></span>
+      <span class="zeichen" title={t(KANN[f])}>{#if f === 'eew'}<EEWzeichen groesse={22} />{:else}<Hauszeichen zeichen={f} groesse="mittel" />{/if}</span>
     {/each}
   </div>
 
@@ -141,6 +146,18 @@
     font: 700 10.5px var(--schrift);
     color: var(--text-leise);
   }
+  .empfohlen {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: #241d0e;
+    border: 1px solid #b8912e;
+    border-radius: 99px;
+    padding: 2px 9px;
+    font: 600 10px var(--schrift);
+    color: #e7ce7a;
+    white-space: nowrap;
+  }
   .oben {
     display: flex;
     align-items: center;
@@ -164,6 +181,10 @@
   }
   .logo.echt {
     border: 1px solid var(--linie);
+  }
+  .logo.eigen {
+    border: none;
+    padding: 0;
   }
   .wer {
     min-width: 0;
