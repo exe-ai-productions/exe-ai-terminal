@@ -12,7 +12,9 @@
      which owns the one download at a time; this view only chooses a build
      and asks. */
   import Hauszeichen from './Hauszeichen.svelte'
+  import EEWzeichen from './EEWzeichen.svelte'
   import { t } from '../lib/texte.svelte.js'
+  import { LOGOS } from '../lib/logos.js'
   import { passt, brauchtMaschine, passendeFassung } from '../lib/modellempfehlungen.js'
 
   let {
@@ -31,8 +33,10 @@
     auge: 'katalog.kann_auge',
     gluehbirne: 'katalog.kann_gluehbirne',
     blitz: 'katalog.kann_blitz',
+    eew: 'katalog.kann_eew',
   }
 
+  const marke = $derived(karte.marke ? LOGOS[karte.marke] : null)
   const empfohlen = $derived(passendeFassung(karte, maschineGb))
   let gewaehlt = $state(null)
   const aktuelle = $derived(gewaehlt ?? empfohlen)
@@ -52,14 +56,18 @@
 
 <div class="detail">
   <div class="oben">
-    <div class="logo">{karte.logo}</div>
+    {#if marke}
+      <div class="logo echt" class:eigen={karte.marke === 'exe'}>{#if karte.marke === 'exe'}<svg viewBox="3 3 66 66" width="44" height="44" aria-hidden="true">{@html marke.html}</svg>{:else}<svg viewBox={marke.vb} width="26" height="26" aria-hidden="true">{@html marke.html}</svg>{/if}</div>
+    {:else}
+      <div class="logo">{karte.logo}</div>
+    {/if}
     <div class="wer">
       <div class="name">{karte.name}</div>
       <div class="unter">{karte.von} · {aktuelle.datei.replace(/\.gguf$/i, '')}</div>
     </div>
     <div class="zeichenreihe">
       {#each karte.faehigkeiten as f (f)}
-        <span class="zeichen" title={t(KANN[f])}><Hauszeichen zeichen={f} groesse="mittel" /></span>
+        <span class="zeichen" title={t(KANN[f])}>{#if f === 'eew'}<EEWzeichen groesse={22} />{:else}<Hauszeichen zeichen={f} groesse="mittel" />{/if}</span>
       {/each}
     </div>
   </div>
@@ -129,6 +137,13 @@
     align-items: center;
     justify-content: center;
     font: 700 13px var(--schrift);
+  }
+  .logo.echt {
+    border: 1px solid var(--linie);
+  }
+  .logo.eigen {
+    border: none;
+    padding: 0;
   }
   .wer {
     min-width: 0;

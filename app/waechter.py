@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from itertools import count
+from pathlib import Path
 from typing import Any
 
 from app import denkschalter
@@ -40,7 +41,9 @@ from app.providers import ChatNachricht, Generierungsanfrage
 from app.waechter_ausloeser import (
     ARGUMENTE_GRENZE,
     AUFTRAG_GRENZE,
+    BEFEHL_GESCHEITERT,
     ERGEBNIS_GRENZE,
+    GRUND_GRENZE,
     WERKZEUG_GRENZE,
     Befund,
 )
@@ -94,14 +97,23 @@ ANTWORT_GRENZE = 200
 # those bounds. The parts, in characters:
 #
 #     ANWEISUNG (the system message)                       431
-#     the labels around the fields, plus newlines           80
+#     the labels around the fields, plus newlines          100
 #     tool name          WERKZEUG_GRENZE                    60
 #     the user's request AUFTRAG_GRENZE                    600
 #     the arguments      ARGUMENTE_GRENZE                 1200
 #     the result         ERGEBNIS_GRENZE                    800
+#     the refusal reason GRUND_GRENZE                       160
 #     released folders   ORDNER_GRENZE                      400
+#     the .venv marker   len(UMGEBUNGSMARKE)                 34
 #                                                    ---------
-#                                                         3571
+#                                                         3785
+#
+# This sum is a conservative envelope, not a reachable finding: the refusal
+# reason rides a refused call, the .venv marker rides a failed command, and
+# the 60-char tool name rides a tool that is not the shell — no single
+# finding carries all three. Summing them anyway is deliberate: the window
+# must hold whichever combination shows up, and the cheapest way to be sure
+# is to hold the sum of all of them.
 #
 # NOT in the sum, and worth saying because it is the usual reason a window
 # this size is too small: no conversation history, and no tool descriptions.
@@ -110,30 +122,25 @@ ANTWORT_GRENZE = 200
 # Characters become tokens at the ratio below. Byte-level BPE gives about
 # four characters per token on English prose, about three on paths and JSON,
 # and about two on dense log output and non-ASCII text — so two is taken as
-# the floor for the mixture a finding actually carries, not the average.
+# the floor for the mixture a finding actually carries, not the average, and
+# it is the number the rest of this code computes with (ZEICHEN_JE_TOKEN).
 #
-#     3571 / 2 = 1785 tokens of report
+#     3785 / 2 = 1893 tokens of report
 #         + 64 tokens for what the chat template wraps around two messages
 #         + 200 tokens of answer (ANTWORT_GRENZE)
-#         = 2049 tokens
+#         = 2157 tokens
 #
-# One token over the 2048 this used to be — which on its own would argue for
-# shaving a limit rather than doubling the window. The reason to double it is
-# the ratio itself: two characters per token is a guess at a floor, and there
-# is no way to know before the prompt is built whether this particular report
-# is English prose or a wall of non-ASCII text where a single character costs
-# several tokens. Guessing low here is not a near miss, it is silent: a
-# request that does not fit is not refused, the server drops the front of it,
-# and the model then answers a report whose first half is gone.
+# That is the honest worst case, and it would fit a 2560 window with room.
+# The window is held at 4096 for one reason worth stating plainly rather than
+# dressing up: the two-per-character ratio is a floor, not a guarantee, and a
+# report that is a wall of non-ASCII text can cost more. Even in the paranoid
+# case where every character became a token of its own, 3785 + 64 + 200 =
+# 4049 still fits 4096 — which no smaller round window does. The cost is the
+# extra key-value cache on a three-billion-parameter model, a rounding error
+# against the model file itself, and the guardian's reason to exist is that
+# it answers before the user has fixed the thing by hand.
 #
-# At 4096 the largest possible request fits even if every character became a
-# token of its own (3571 + 64 + 200 = 3835), which is past any ratio worth
-# arguing about. What it costs is the second two thousand tokens of
-# key-value cache on a three-billion-parameter model — a rounding error
-# against the file itself, and the guardian's reason to exist is that it
-# answers before the user has fixed the thing by hand.
-#
-# ^ RAISING ANY OF THE SEVEN LIMITS ABOVE MEANS REDOING THIS SUM. The test
+# ^ RAISING ANY OF THE NINE LIMITS ABOVE MEANS REDOING THIS SUM. The test
 #   `test_der_groesste_moegliche_prompt_passt_ins_fenster` assembles the
 #   largest request this code can build and does the arithmetic again, so a
 #   limit raised without a window raised fails the suite rather than the run.
@@ -255,6 +262,33 @@ def ordnerzeile(ordner: list[str] | None) -> str:
     return ", ".join(teile)
 
 
+# The fact that turns a wrong suggestion into a right one. Without it, a
+# `python3 -m pytest` that fails with "No module named pytest" reads to the
+# model like a missing global package, and it proposes `pip install` — while
+# the environment that already has pytest sits one folder deep. Naming the
+# interpreter directly (`.venv/bin/python3 -m pytest`) is the fix, and the
+# tool starts every command in its own shell, so `source .venv/bin/activate`
+# does not carry over — which the model can only know if the venv is named.
+UMGEBUNGSMARKE = "The working folder contains .venv/"
+
+
+def umgebungszeile(ordner: list[str] | None) -> str:
+    """One line if a released folder holds a `.venv`, empty otherwise.
+
+    Scans every released folder, not only the ones that fit on the folder
+    line: the marker is a single fact about the environment, and it is worth
+    naming even when the folder itself was dropped from the list for length.
+    """
+    for eintrag in ordner or []:
+        try:
+            if (Path(eintrag) / ".venv").is_dir():
+                return UMGEBUNGSMARKE
+        except OSError:
+            # A path that cannot be looked at is simply not a venv here.
+            continue
+    return ""
+
+
 def frage_bauen(
     befund: Befund, ordner: list[str] | None = None, zustand=None
 ) -> Generierungsanfrage:
@@ -282,8 +316,22 @@ def frage_bauen(
     if befund.argumente:
         teile.append(f"Called with: {befund.argumente}")
     teile.append(f"It came back with: {befund.ergebnis}")
+    # Why a refused call was refused. `ergebnis` for a refusal only says a
+    # tool was "not allowed"; the reason is what tells apart a path outside
+    # the shared folders — repairable by naming one inside — from a refusal
+    # nothing can be done about, so the model stops proposing the one fix
+    # that is never right, asking for the permission again.
+    if befund.grund:
+        teile.append("Refused because: " + befund.grund)
     if zeile := ordnerzeile(ordner):
         teile.append("Released folders: " + zeile)
+    # Only a command that FAILED can be the "No module named X" this marker
+    # answers. On a refused write or an unreadable file it is noise, and a
+    # small model reads noise as instruction — told about a .venv beside a
+    # refused path, it proposed writing the note INTO the .venv. So the fact
+    # rides only the finding it can actually repair.
+    if befund.art == BEFEHL_GESCHEITERT and (marke := umgebungszeile(ordner)):
+        teile.append(marke)
     return Generierungsanfrage(
         nachrichten=[
             ChatNachricht(role="system", content=ANWEISUNG),

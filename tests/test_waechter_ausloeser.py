@@ -59,6 +59,24 @@ def test_ein_abgelehnter_aufruf_loest_aus_egal_was_im_text_steht():
     assert befund.art == ausloeser.AUFRUF_ABGELEHNT
 
 
+def test_der_grund_reist_mit_und_wird_gedeckelt():
+    """Why a call was refused is kept on the finding, bounded like the rest —
+    the model reads it, and something the caller renders has no length this
+    code knows."""
+    befund = ausloeser.pruefen(
+        name="write_file",
+        ergebnis="not allowed",
+        abgelehnt=True,
+        grund="Reaches /etc/hosts — outside the shared folders",
+    )
+    assert befund.grund == "Reaches /etc/hosts — outside the shared folders"
+
+    lang = ausloeser.pruefen(
+        name="write_file", ergebnis="not allowed", abgelehnt=True, grund="p" * 500
+    )
+    assert len(lang.grund) == ausloeser.GRUND_GRENZE
+
+
 def test_eine_verfehlte_aenderung_loest_aus():
     for text in (
         "old_text was not found in 'app/main.py'. Read the file and copy the passage",

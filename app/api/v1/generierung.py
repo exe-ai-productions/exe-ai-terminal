@@ -705,6 +705,11 @@ async def completions(
                     # before 'tool_call' is reported — otherwise the window
                     # would say "running" while in truth nobody has agreed yet.
                     abgelehnt: str | None = None
+                    # The reason a call is refused, English and rendered from
+                    # the tool's own sentence, so the guardian can tell a path
+                    # outside the shared folders from any other refusal. None
+                    # until a confirmation is actually asked for.
+                    grund: str = ""
                     if registry is not None and registry.braucht_bestaetigung(
                         aufruf.name, aufruf.argumente, chat.working_dirs
                     ):
@@ -719,6 +724,13 @@ async def completions(
                         anlass = registry.bestaetigungsgrund(
                             aufruf.name, aufruf.argumente, chat.working_dirs
                         )
+                        # The same sentence in English for the guardian's
+                        # report: its model is asked in English whatever the
+                        # window's language, and the tool messages it matches
+                        # against are English too. The window still shows the
+                        # user's own language, from `sprache` just below.
+                        if anlass:
+                            grund = t(anlass[0], "en", **{anlass[1]: anlass[2]})
                         yield _sse(
                             "tool_confirm",
                             name=aufruf.name,
@@ -867,6 +879,7 @@ async def completions(
                             abgelehnt=abgelehnt is not None,
                             argumente=aufruf.argumente,
                             auftrag=letzter_auftrag,
+                            grund=grund,
                         )
                         eintrag = (
                             waechter.wache.aufnehmen(chat.id, befund)

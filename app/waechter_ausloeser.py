@@ -80,6 +80,13 @@ MARKE_RESERVE = 24
 # otherwise carry that kilobyte into the report.
 WERKZEUG_GRENZE = 60
 
+# Why a refused call was refused — one sentence naming a path, not a value
+# the model wrote. ARGUMENT_GRENZE would fit it with room to spare, but a
+# ceiling this generous is sized for what a call carries, and the window
+# arithmetic in app/waechter.py counts every ceiling on the report — a
+# reason this loose would spend budget the two new lines do not need.
+GRUND_GRENZE = 160
+
 _EXIT_CODE = re.compile(r"\[exit code (-?\d+)\]\s*$")
 # The exit code is anchored at the END of the result: the shell tool appends
 # it as the last thing it writes. Searched loosely, a successful
@@ -103,6 +110,13 @@ class Befund:
     ``auftrag`` is the last thing the user asked for. Without it a
     suggestion could only ever repair the command; with it, the guardian
     can propose the step that was actually meant.
+
+    ``grund`` is why a refused call was refused — the sentence the
+    confirmation box itself showed, in English. ``ergebnis`` for a refusal
+    only ever says a tool was "not allowed"; without the reason the
+    guardian cannot tell a call refused for reaching outside the shared
+    folders from one refused for any other reason, and proposes the one
+    fix that is never right — asking for the permission again.
     """
 
     art: str
@@ -110,6 +124,7 @@ class Befund:
     ergebnis: str
     auftrag: str = ""
     argumente: dict[str, Any] = field(default_factory=dict)
+    grund: str = ""
 
 
 def pruefen(
@@ -120,6 +135,7 @@ def pruefen(
     abgelehnt: bool = False,
     argumente: dict[str, Any] | None = None,
     auftrag: str = "",
+    grund: str = "",
 ) -> Befund | None:
     """The whole catalogue, in the order the cases exclude each other.
 
@@ -135,6 +151,7 @@ def pruefen(
         ergebnis=text[:ERGEBNIS_GRENZE],
         auftrag=(auftrag or "")[:AUFTRAG_GRENZE],
         argumente=_gekuerzte_argumente(argumente),
+        grund=(grund or "")[:GRUND_GRENZE],
     )
 
 

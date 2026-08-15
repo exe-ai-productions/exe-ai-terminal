@@ -250,13 +250,38 @@ def _groesster_befund(argumente):
         name="w" * 500,
         ergebnis="'" + "d" * 20000 + "' does not exist.",
         fehlgeschlagen=True,
+        abgelehnt=True,
         argumente=argumente,
         auftrag="b" * 20000,
+        # The refusal reason is a field like any other and joins the sum.
+        grund="g" * 20000,
     )
 
 
-@pytest.mark.parametrize("argumente", _ARGUMENTSCHAEDEN.values(), ids=_ARGUMENTSCHAEDEN)
-def test_der_groesste_moegliche_prompt_passt_ins_fenster(argumente):
+def _umschlag_befund():
+    """Every ceiling at once — a deliberate over-approximation.
+
+    No real finding carries all of these together: the refusal reason rides
+    a refused call, the .venv marker rides a FAILED COMMAND, and a 60-char
+    tool name rides a tool that is not the shell. But the window has to hold
+    the sum regardless of which combination shows up, so the guard measures
+    the envelope, not any one reachable finding. Its art is the failed
+    command, the only one the .venv marker joins.
+    """
+    from app import waechter_ausloeser as ausloeser
+
+    fuell = ausloeser.ARGUMENTE_GRENZE - len(str({"command": ""}))
+    return Befund(
+        art=waechter.BEFEHL_GESCHEITERT,
+        werkzeug="w" * ausloeser.WERKZEUG_GRENZE,
+        ergebnis="d" * ausloeser.ERGEBNIS_GRENZE,
+        auftrag="b" * ausloeser.AUFTRAG_GRENZE,
+        argumente={"command": "a" * fuell},
+        grund="g" * ausloeser.GRUND_GRENZE,
+    )
+
+
+def test_der_groesste_moegliche_prompt_passt_ins_fenster(tmp_path):
     """The real guard on `KONTEXT`.
 
     A request that does not fit is not refused by the model server — it
@@ -265,9 +290,12 @@ def test_der_groesste_moegliche_prompt_passt_ins_fenster(argumente):
     and measured. Raise a cutting limit without raising the window and this
     fails; that is what it is for.
     """
-    befund = _groesster_befund(argumente)
-    assert befund is not None
-    anfrage = waechter.frage_bauen(befund, _ORDNER, _zustand(thinking=True))
+    (tmp_path / ".venv").mkdir()
+    ordner = _ORDNER + [str(tmp_path)]
+    anfrage = waechter.frage_bauen(_umschlag_befund(), ordner, _zustand(thinking=True))
+    # Both new lines are really in the envelope that gets measured.
+    assert "Refused because:" in anfrage.nachrichten[1].content
+    assert waechter.UMGEBUNGSMARKE in anfrage.nachrichten[1].content
     assert waechter.fenster_bedarf(anfrage) <= waechter.KONTEXT
 
 
@@ -282,7 +310,56 @@ def test_die_grenzen_halten_am_groessten_befund(argumente):
     assert len(befund.auftrag) == ausloeser.AUFTRAG_GRENZE
     assert len(befund.ergebnis) == ausloeser.ERGEBNIS_GRENZE
     assert len(str(befund.argumente)) <= ausloeser.ARGUMENTE_GRENZE
+    assert len(befund.grund) == ausloeser.GRUND_GRENZE
     assert len(waechter.ordnerzeile(_ORDNER)) <= waechter.ORDNER_GRENZE
+
+
+def test_der_ablehnungsgrund_steht_im_bericht():
+    """A refused call carries WHY it was refused — without it the model
+    proposes the one fix that is never right, asking for permission again."""
+    from app.waechter_ausloeser import Befund
+
+    befund = Befund(
+        art="aufruf_abgelehnt",
+        werkzeug="write_file",
+        ergebnis="The user did not allow “write_file”. Not executed.",
+        grund="Reaches /etc/hosts — outside the shared folders",
+    )
+    inhalt = waechter.frage_bauen(befund).nachrichten[1].content
+    assert "Reaches /etc/hosts — outside the shared folders" in inhalt
+
+
+def test_ohne_grund_keine_ablehnungszeile():
+    """A finding that has no reason does not grow an empty label."""
+    from app.waechter_ausloeser import Befund
+
+    befund = Befund(art="datei_unlesbar", werkzeug="read_file", ergebnis="x")
+    assert "Refused because:" not in waechter.frage_bauen(befund).nachrichten[1].content
+
+
+def test_die_venv_marke_erscheint_nur_wenn_eine_da_ist(tmp_path):
+    """The one fact that turns `pip install` into `.venv/bin/python3`."""
+    from app.waechter_ausloeser import Befund
+
+    befund = Befund(art="befehl_gescheitert", werkzeug="run_command", ergebnis="x")
+    ohne = waechter.frage_bauen(befund, [str(tmp_path)]).nachrichten[1].content
+    assert waechter.UMGEBUNGSMARKE not in ohne
+
+    (tmp_path / ".venv").mkdir()
+    mit = waechter.frage_bauen(befund, [str(tmp_path)]).nachrichten[1].content
+    assert waechter.UMGEBUNGSMARKE in mit
+
+
+def test_die_venv_marke_sieht_auch_einen_abgeschnittenen_ordner(tmp_path):
+    """The folder line is capped for length; the venv scan is not — a marker
+    is a single fact worth naming even when its folder fell off the list."""
+    from app.waechter_ausloeser import Befund
+
+    (tmp_path / ".venv").mkdir()
+    lange = [f"/Users/x/{'p' * 60}/nr{n}" for n in range(20)]
+    befund = Befund(art="befehl_gescheitert", werkzeug="run_command", ergebnis="x")
+    inhalt = waechter.frage_bauen(befund, lange + [str(tmp_path)]).nachrichten[1].content
+    assert waechter.UMGEBUNGSMARKE in inhalt
 
 
 # --- The guardian's own server ---------------------------------------------
