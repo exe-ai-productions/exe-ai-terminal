@@ -806,7 +806,9 @@
     "kann_eew": "Extended Workflow",
     "empfohlen": "★ Empfohlen",
     "satz_exeguard": "Unser eigenes Wächter-Modell — winzig, auf die Werkzeuge des Terminals trainiert.",
-    "lang_exeguard": "Exe Guard Dynamic: unser selbst trainiertes Wächter-Modell. Erkennt gescheiterte Schritte und schlägt den einen richtigen Befehl vor. (Endbeschriftung kurz vor Release.)"
+    "lang_exeguard": "Exe Guard Dynamic: unser selbst trainiertes Wächter-Modell. Erkennt gescheiterte Schritte und schlägt den einen richtigen Befehl vor. (Endbeschriftung kurz vor Release.)",
+    "satz_exeturbo": "Unser kleines Kernmodell für schwache Rechner — MoE, auf das Terminal trainiert.",
+    "lang_exeturbo": "Exe Turbo S: unser selbst trainiertes Kernmodell für Rechner mit 6–8 GB. Rechnet pro Wort nur mit 1,5 von 8,3 Milliarden Parametern und kennt die Werkzeuge und Regeln des Terminals."
   },
   "terminal": {
     "titel": "Terminal",

@@ -806,7 +806,9 @@
     "kann_eew": "Extended Workflow",
     "empfohlen": "★ Recommended",
     "satz_exeguard": "Our own guardian model — tiny, trained on the terminal's own tools.",
-    "lang_exeguard": "Exe Guard Dynamic: our self-trained guardian model. It spots a failed step and suggests the one instruction that fixes it. (Final wording just before release.)"
+    "lang_exeguard": "Exe Guard Dynamic: our self-trained guardian model. It spots a failed step and suggests the one instruction that fixes it. (Final wording just before release.)",
+    "satz_exeturbo": "Our small core model for weak machines — MoE, trained on the terminal.",
+    "lang_exeturbo": "Exe Turbo S: our self-trained core model for machines with 6–8 GB of memory. It computes with only 1.5 of its 8.3 billion parameters per token and knows the terminal's tools and rules."
   },
   "terminal": {
     "titel": "Terminal",

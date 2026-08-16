@@ -155,6 +155,24 @@ export const KATALOG = [
       { id: 'exeterminal/Exe-Guard-Dynamic-GGUF', name: '2-Bit · Q2_K', datei: 'Exe-Guard-Dynamic-Q2_K.gguf', groesse: 1.19 },
     ],
   },
+  {
+    id: 'exe-turbo-s',
+    name: 'Exe Turbo S',
+    von: 'Exe',
+    logo: '>',
+    marke: 'exe',
+    satz: 'katalog.satz_exeturbo',
+    langsatz: 'katalog.lang_exeturbo',
+    faehigkeiten: ['eew', 'winkel', 'gluehbirne'],
+    kontext: 128000,
+    fassungen: [
+      { id: 'exeterminal/Exe-Turbo-S-V1-GGUF', name: '8-Bit · Q8_0', datei: 'Exe-Turbo-S-v1-Q8_0.gguf', groesse: 9.01 },
+      { id: 'exeterminal/Exe-Turbo-S-V1-GGUF', name: '6-Bit · Q6_K', datei: 'Exe-Turbo-S-v1-Q6_K.gguf', groesse: 6.96 },
+      { id: 'exeterminal/Exe-Turbo-S-V1-GGUF', name: '5-Bit · Q5_K_M', datei: 'Exe-Turbo-S-v1-Q5_K_M.gguf', groesse: 6.03 },
+      { id: 'exeterminal/Exe-Turbo-S-V1-GGUF', name: '4-Bit · Q4_K_M', datei: 'Exe-Turbo-S-v1-Q4_K_M.gguf', groesse: 5.16 },
+      { id: 'exeterminal/Exe-Turbo-S-V1-GGUF', name: '3-Bit I-Quant · IQ3_M', datei: 'Exe-Turbo-S-v1-IQ3_M.gguf', groesse: 3.78 },
+    ],
+  },
 ]
 
 /** The memory a build needs to run at the everyday context, in GB. */
