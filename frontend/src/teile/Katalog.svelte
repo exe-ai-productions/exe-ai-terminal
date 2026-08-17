@@ -436,30 +436,33 @@
     flex-wrap: wrap;
   }
   /* The three catalogue tabs — Chat always reachable from the other two,
-     the other two always reachable from Chat. One pill, never a second
-     control that could drift out of step with it. */
+     the other two always reachable from Chat. The same segmented switch
+     the settings and the sidebar wear (see SystemPrompt's .segment): the
+     shape lives in one visual dialect, not a fifth hand-copy of it. */
   .reiterleiste {
     display: inline-flex;
     flex: none;
-    border: 1px solid var(--linie-stark);
-    border-radius: 99px;
-    padding: 3px;
-    gap: 2px;
+    background: var(--bg-seite);
+    border: 1px solid var(--linie);
+    border-radius: 9px;
+    padding: 2px;
   }
   .reiterleiste button {
     border: none;
     background: none;
-    padding: 6px 15px;
-    border-radius: 99px;
-    font: 600 12.5px var(--schrift);
     color: var(--text-leise);
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 11px;
+    border-radius: 7px;
     cursor: pointer;
-    transition: background 0.12s, color 0.12s;
+    transition: background 0.16s, color 0.16s;
   }
   .reiterleiste button:hover { color: var(--text); }
   .reiterleiste button.aktiv {
-    background: var(--text);
-    color: var(--bg);
+    background: var(--bg-erhoben);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
   .marke {
     min-width: 0;

@@ -179,18 +179,16 @@ export const KATALOG = [
 /* Embedding and image cards start empty on purpose — the same rule as the
    chat catalogue above: a card whose repository or file name was not
    checked against the real thing is left out rather than guessed at. They
-   fill in by data care, one verified card at a time, same as chat did. */
-export const KATALOG_EINBETTUNG = []
-export const KATALOG_BILD = []
+   fill in by data care, one verified card at a time, same as chat did.
+
+   One table carries all three lists, keyed by the same names as ARTEN —
+   so the tabs, the lookup and the per-kind data cannot disagree. */
+const KATALOGE = { chat: KATALOG, einbettung: [], bild: [] }
 
 /** The curated list for a catalogue tab — what `Katalog.svelte` shows when
     that tab is open. Falls back to the chat list for an unknown key so a
     typo never renders an empty gallery silently. */
-export function katalogFuer(art) {
-  if (art === 'einbettung') return KATALOG_EINBETTUNG
-  if (art === 'bild') return KATALOG_BILD
-  return KATALOG
-}
+export const katalogFuer = (art) => KATALOGE[art] ?? KATALOG
 
 /** The memory a build needs to run at the everyday context, in GB. */
 export function bedarf(fassung) {

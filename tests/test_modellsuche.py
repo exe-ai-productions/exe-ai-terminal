@@ -82,7 +82,7 @@ def test_ein_eintrag_wird_zu_einem_fund(client, katalog):
     assert fund["name"] == "Qwen3.6-27B-MLX-6bit"
     assert fund["ladungen"] == 829410
     assert fund["beliebt"] == 14
-    assert fund["art"] == "gguf"
+    assert "art" not in fund
 
 
 def test_ein_name_ohne_anbieter_bleibt_ganz(client, katalog):
@@ -178,3 +178,28 @@ def test_katalog_antwortet_unsinn(client, katalog):
     # all means the catalogue is broken, and that must not look the same.
     katalog({"unerwartet": True})
     assert client.get("/api/v1/models/search?q=x").status_code == 502
+
+
+# --- The tab vocabulary lives in three places; this keeps them one ---------
+
+
+def test_tab_namen_laufen_ueberall_gleich():
+    """The kinds are named in the backend (ARTEN), in the frontend tab row
+    (modellempfehlungen.js ARTEN) and as locale labels (katalog.art_*).
+    Nothing ties them together at runtime — this test does."""
+    import json
+    import re
+    from pathlib import Path
+
+    wurzel = Path(__file__).resolve().parent.parent
+    js = (wurzel / "frontend/src/lib/modellempfehlungen.js").read_text(encoding="utf-8")
+    treffer = re.search(r"export const ARTEN = \[([^\]]*)\]", js)
+    assert treffer, "frontend ARTEN nicht gefunden"
+    vorn = re.findall(r"'([a-z]+)'", treffer.group(1))
+
+    assert vorn == list(modellsuche.ARTEN), "Frontend-Tabs != Backend-Arten"
+
+    for sprache in ("de", "en"):
+        texte = json.loads((wurzel / f"app/locales/{sprache}.json").read_text(encoding="utf-8"))
+        for art in modellsuche.ARTEN:
+            assert texte["katalog"].get(f"art_{art}"), f"{sprache}: katalog.art_{art} fehlt"

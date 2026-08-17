@@ -164,7 +164,7 @@ export const api = {
   /* Searches the model catalogue. Runs on our server, never in the page.
      `art` is one of the catalogue's three tabs — chat, einbettung, bild —
      and scopes the search to that kind alone. */
-  modellSuche: (q, art = 'chat', anzahl = 12) =>
+  modellSuche: (q, art, anzahl = 12) =>
     ruf(`/models/search?q=${encodeURIComponent(q)}&art=${art}&anzahl=${anzahl}`),
   /* The GGUF files of one found repository — what the download can finish. */
   modellDateien: (repo) => ruf(`/models/files?repo=${encodeURIComponent(repo)}`),

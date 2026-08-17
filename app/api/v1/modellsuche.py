@@ -63,20 +63,18 @@ class Fund(BaseModel):
     id: str
     name: str
     anbieter: str
-    art: str
     ladungen: int
     beliebt: int
     aufgabe: str | None = None
 
 
-def _fund_bauen(eintrag: dict[str, Any], art: str) -> Fund:
+def _fund_bauen(eintrag: dict[str, Any]) -> Fund:
     kennung = eintrag.get("modelId") or eintrag.get("id") or ""
     anbieter, _, name = kennung.partition("/")
     return Fund(
         id=kennung,
         name=name or kennung,
         anbieter=anbieter if name else "",
-        art=art,
         ladungen=int(eintrag.get("downloads") or 0),
         beliebt=int(eintrag.get("likes") or 0),
         aufgabe=eintrag.get("pipeline_tag"),
@@ -154,6 +152,4 @@ async def suchen(
         treffer.append(eintrag)
     treffer.sort(key=lambda e: int(e.get("downloads") or 0), reverse=True)
 
-    # A found model's own `art` names its file FORMAT, unrelated to which
-    # catalogue tab asked for it — all three tabs fetch the same format.
-    return [_fund_bauen(eintrag, "gguf") for eintrag in treffer[:anzahl]]
+    return [_fund_bauen(eintrag) for eintrag in treffer[:anzahl]]

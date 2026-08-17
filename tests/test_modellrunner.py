@@ -343,7 +343,7 @@ def test_flash_attn_zustand_liest_die_eigene_zeile_des_servers(ordner):
     runner = Modellrunner(ordner)
     runner._zeile_aufnehmen("llama_context: n_ctx     = 32768")
     runner._zeile_aufnehmen("llama_context: flash_attn    = enabled")
-    assert runner.flash_attn_zustand() == "enabled"
+    assert runner.flash_attn_zustand() is True
 
 
 def test_flash_attn_zustand_nimmt_die_letzte_zeile(ordner):
@@ -352,7 +352,7 @@ def test_flash_attn_zustand_nimmt_die_letzte_zeile(ordner):
     runner = Modellrunner(ordner)
     runner._zeile_aufnehmen("llama_context: flash_attn    = enabled")
     runner._zeile_aufnehmen("llama_context: flash_attn    = disabled")
-    assert runner.flash_attn_zustand() == "disabled"
+    assert runner.flash_attn_zustand() is False
 
 
 def test_flash_attn_zustand_ignoriert_fremde_zeilen(ordner):
@@ -368,4 +368,4 @@ def test_flash_attn_zustand_ueberlebt_den_vollen_ringpuffer(ordner):
     runner._zeile_aufnehmen("llama_context: flash_attn    = enabled")
     for n in range(500):
         runner._zeile_aufnehmen(f"srv  log: request {n}")
-    assert runner.flash_attn_zustand() == "enabled"
+    assert runner.flash_attn_zustand() is True

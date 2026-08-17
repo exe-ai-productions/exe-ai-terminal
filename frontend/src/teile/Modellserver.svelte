@@ -124,6 +124,16 @@
   })
 
   const laeuft = $derived(Boolean(auskunft?.laeuft))
+  /* One mapping decides dot AND word for the flash-attention row — two
+     separate ternary chains would drift apart on exactly the case that
+     matters. */
+  const flashLage = $derived(
+    !laeuft || auskunft?.flash_aktiv == null
+      ? { punkt: 'still', wort: 'flash_unbekannt' }
+      : auskunft.flash_aktiv
+        ? { punkt: 'gruen', wort: 'flash_aktiv' }
+        : { punkt: 'rot', wort: 'flash_inaktiv' },
+  )
   const hatProgramm = $derived(Boolean(auskunft?.programm))
   const hatModelle = $derived((auskunft?.modelle?.length ?? 0) > 0)
   const maschineGb = $derived(auskunft?.speicher_gb ?? null)
@@ -508,13 +518,8 @@
 
               <label>{t('modell.feld_flash')}<span>{t('modell.feld_flash_hilfe')}</span></label>
               <div class="fazeile">
-                <Leuchtpunkt farbe={!laeuft ? 'still' : auskunft?.flash_aktiv === true ? 'gruen' : auskunft?.flash_aktiv === false ? 'rot' : 'still'} groesse={9} />
-                <span>
-                  {!laeuft ? t('modell.flash_unbekannt')
-                    : auskunft?.flash_aktiv === true ? t('modell.flash_aktiv')
-                    : auskunft?.flash_aktiv === false ? t('modell.flash_inaktiv')
-                    : t('modell.flash_unbekannt')}
-                </span>
+                <Leuchtpunkt farbe={flashLage.punkt} groesse={9} />
+                <span>{t(`modell.${flashLage.wort}`)}</span>
               </div>
 
               <label for="rs-faeden">{t('modell.feld_faeden')}<span>{t('modell.feld_faeden_hilfe')}</span></label>

@@ -162,7 +162,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         port=lauf.port if lauf else None,
         drafter=lauf.drafter if lauf else None,
         fein=lauf.fein.als_daten() if lauf and lauf.fein else None,
-        flash_aktiv={"enabled": True, "disabled": False}.get(runner.flash_attn_zustand()),
+        flash_aktiv=runner.flash_attn_zustand(),
         zuordnung=_zuordnung(runner),
     )
 

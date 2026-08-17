@@ -273,7 +273,7 @@ class Modellrunner:
         # Flash attention's state, caught the moment its line passes by.
         # The log is a ring buffer — a busy server pushes the one load-time
         # line out of it, so the answer must be kept, not re-searched.
-        self._flash_attn: str | None = None
+        self._flash_attn: bool | None = None
         self._schloss = threading.Lock()
 
     # --- What can be seen without starting anything ------------------------
@@ -313,13 +313,14 @@ class Modellrunner:
     def protokoll(self) -> list[str]:
         return list(self._protokoll)
 
-    def flash_attn_zustand(self) -> str | None:
+    def flash_attn_zustand(self) -> bool | None:
         """Whether flash attention ended up on, read off the server's own
         words instead of asked for — the flag sent is always "auto", so that
         line is the only place the true answer lives. Caught when the line
         passes through the log and kept, because the ring buffer forgets.
         None while the log has not reached it yet (server still loading, or
-        not running)."""
+        not running). A bool, so the engine's wording lives in this one
+        method and nowhere else."""
         return self._flash_attn
 
     def _zeile_aufnehmen(self, zeile: str) -> None:
@@ -329,7 +330,7 @@ class Modellrunner:
         if treffer:
             wert = treffer.group(1).lower()
             if wert in ("enabled", "disabled"):
-                self._flash_attn = wert
+                self._flash_attn = wert == "enabled"
 
     def befehl(
         self,
