@@ -83,7 +83,9 @@ GEFAEHRLICH: tuple[tuple[str, str], ...] = (
 # Where a command may reach without asking: the shared folders. Everything
 # else needs the user's yes. What counts as "reaching outside" is a
 # heuristic, not a proof — see `greift_nach_draussen`.
-_PFAD_MUSTER = re.compile(r"(?<![\w-])(~[/\w.-]*|/[\w./-]+)")
+# The look-behind excludes the dot so "./run_tests.sh" stays one relative
+# path instead of yielding the stump "/run_tests.sh".
+_PFAD_MUSTER = re.compile(r"(?<![\w.-])(~[/\w.-]*|/[\w./-]+)")
 
 
 class ShellVerboten(Exception):
@@ -196,9 +198,23 @@ def greift_nach_draussen(befehl: str, ordner: list[str]) -> str | None:
         sauber = kandidat.strip("\"'`;|&()<>")
         if not sauber:
             continue
+        # A shared folder with a blank in its name, written without quotes:
+        # the split cuts the path at the blank, and the stump looks like an
+        # escape. If the command carries the folder's full name, the stump is
+        # our own folder cut short, not a path of its own.
+        if any(
+            " " in str(w) and str(w).startswith(sauber) and str(w) in befehl
+            for w in wurzeln
+        ):
+            continue
         try:
             ziel = _aufgeloest(sauber, wurzel)
         except (OSError, RuntimeError):
+            continue
+        # Redirection targets under /dev are shell plumbing, not a reach:
+        # "2>/dev/null" silences a command, it does not touch a file. Writing
+        # to a raw device stays caught by the tripwire above.
+        if str(ziel) == "/dev/null" or str(ziel).startswith(("/dev/std", "/dev/fd/", "/dev/tty")):
             continue
         if not liegt_innerhalb(ziel, wurzeln):
             return str(ziel)

@@ -30,6 +30,7 @@ class FalscherKlient:
     """Stands in for httpx and remembers what it was asked for."""
 
     letzte_parameter: dict | None = None
+    alle_parameter: list[dict] = []
 
     def __init__(self, daten, fehler=None):
         self._antwort = FalscheAntwort(daten, fehler)
@@ -45,6 +46,7 @@ class FalscherKlient:
 
     async def get(self, adresse, params=None):
         FalscherKlient.letzte_parameter = params
+        FalscherKlient.alle_parameter.append(params)
         if isinstance(self._antwort._fehler, httpx.HTTPError):
             raise self._antwort._fehler
         return self._antwort
@@ -53,6 +55,8 @@ class FalscherKlient:
 @pytest.fixture
 def katalog(monkeypatch):
     def setzen(daten, fehler=None):
+        FalscherKlient.letzte_parameter = None
+        FalscherKlient.alle_parameter = []
         monkeypatch.setattr(modellsuche.httpx, "AsyncClient", FalscherKlient(daten, fehler))
     return setzen
 
@@ -98,11 +102,53 @@ def test_muell_im_katalog_wird_uebergangen(client, katalog):
 
 def test_gesucht_wird_nach_ladungen_sortiert(client, katalog):
     katalog([])
-    client.get("/api/v1/models/search?q=qwen&art=gguf&anzahl=5")
+    client.get("/api/v1/models/search?q=qwen&art=chat&anzahl=5")
     parameter = FalscherKlient.letzte_parameter
     assert parameter["filter"] == "gguf"
     assert parameter["sort"] == "downloads"
     assert parameter["limit"] == 5
+
+
+def test_chat_sucht_ohne_etikett_und_haelt_die_anderen_arten_draussen(client, katalog):
+    """The chat tab queries WITHOUT a pipeline tag — most community quant
+    repositories carry none, and a hard tag filter would hide them — and
+    drops the kinds the other tabs own from the answer instead."""
+    katalog([
+        EINTRAG,
+        {"modelId": "leise/ohne-etikett", "downloads": 7},
+        {"modelId": "fremd/einbettung", "downloads": 9, "pipeline_tag": "feature-extraction"},
+        {"modelId": "fremd/aehnlichkeit", "downloads": 9, "pipeline_tag": "sentence-similarity"},
+        {"modelId": "fremd/bild", "downloads": 9, "pipeline_tag": "text-to-image"},
+    ])
+    antwort = client.get("/api/v1/models/search?q=x&art=chat").json()
+    assert "pipeline_tag" not in FalscherKlient.letzte_parameter
+    assert [f["id"] for f in antwort] == [EINTRAG["modelId"], "leise/ohne-etikett"]
+
+
+def test_einbettung_fragt_beide_etiketten_und_meldet_jeden_fund_einmal(client, katalog):
+    """Half the known embedding repositories say "sentence-similarity"
+    instead of "feature-extraction" — one tag alone loses them. A repo
+    carrying both tags may come back twice and must be answered once."""
+    katalog([{"modelId": "nomic/embed", "downloads": 12, "pipeline_tag": "feature-extraction"}])
+    antwort = client.get("/api/v1/models/search?q=x&art=einbettung").json()
+    etiketten = {p.get("pipeline_tag") for p in FalscherKlient.alle_parameter}
+    assert etiketten == {"feature-extraction", "sentence-similarity"}
+    assert [f["id"] for f in antwort] == ["nomic/embed"]
+
+
+def test_bild_fragt_nur_sein_eigenes_etikett(client, katalog):
+    katalog([])
+    client.get("/api/v1/models/search?q=x&art=bild")
+    assert [p.get("pipeline_tag") for p in FalscherKlient.alle_parameter] == ["text-to-image"]
+
+
+def test_der_alte_name_gguf_zaehlt_als_chat(client, katalog):
+    # A page from before the tabs still asks with art=gguf. It meant what
+    # the chat tab means now, and it must not be told "unknown kind".
+    katalog([EINTRAG])
+    antwort = client.get("/api/v1/models/search?q=x&art=gguf")
+    assert antwort.status_code == 200
+    assert "pipeline_tag" not in FalscherKlient.letzte_parameter
 
 
 @pytest.mark.parametrize("art", ["safetensors", "pytorch", "onnx", "mlx", ""])

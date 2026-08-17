@@ -201,3 +201,41 @@ def test_ein_schlichter_download_vermerkt_nichts(tmp_path, strom):
     download.starten("wer/was", "modell.gguf")
     assert warten_bis(lambda: download.stand().fertig)
     assert modellzuordnung.lade(tmp_path) == {}
+
+
+def test_ein_anderer_zielordner_bekommt_die_datei(tmp_path, strom):
+    """A download routed to another kind's folder lands THERE — an
+    embedding model in the chat folder would be invisible to the embedding
+    server and a broken entry in the chat list."""
+    strom(b"abc")
+    chat = tmp_path / "chat"
+    einbettung = tmp_path / "einbettung"
+    download = Modelldownload(chat)
+    download.starten("wer/was", "embed.gguf", ordner=einbettung)
+    assert warten_bis(lambda: download.stand().fertig)
+    assert (einbettung / "embed.gguf").is_file()
+    assert not (chat / "embed.gguf").exists()
+
+
+def test_schon_da_gilt_im_zielordner(tmp_path, strom):
+    strom(b"abc")
+    einbettung = tmp_path / "einbettung"
+    einbettung.mkdir()
+    (einbettung / "embed.gguf").write_bytes(b"alt")
+    download = Modelldownload(tmp_path / "chat")
+    with pytest.raises(DownloadFehler) as fehler:
+        download.starten("wer/was", "embed.gguf", ordner=einbettung)
+    assert fehler.value.grund == "schon_da"
+
+
+def test_der_begleiter_vermerk_folgt_dem_zielordner(tmp_path, strom):
+    from app import modellzuordnung
+
+    strom(b"abc")
+    einbettung = tmp_path / "einbettung"
+    download = Modelldownload(tmp_path / "chat")
+    download.starten("wer/was", "mmproj.gguf", ziel="m-mmproj.gguf",
+                     gehoert_zu="m.gguf", rolle="mmproj", ordner=einbettung)
+    assert warten_bis(lambda: download.stand().fertig)
+    assert modellzuordnung.lade(einbettung) != {}
+    assert modellzuordnung.lade(tmp_path / "chat") == {}

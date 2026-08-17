@@ -59,11 +59,11 @@ def test_festnageln_nutzt_die_nicht_veraltete_form():
 
 def test_alles_zusammen_bleibt_lesbar():
     zeile = flags(Feineinstellungen(
-        kv_cache="q4_0", flash_attention="on", faeden=6,
+        kv_cache="q8_0", flash_attention="on", faeden=6,
         moe_auf_cpu=True, moe_schichten=4, festnageln=True,
     ))
     assert zeile == [
-        "--cache-type-k", "q4_0", "--cache-type-v", "q4_0",
+        "--cache-type-k", "q8_0", "--cache-type-v", "q8_0",
         "--flash-attn", "on",
         "--threads", "6",
         "--n-cpu-moe", "4",
@@ -101,6 +101,19 @@ def test_leere_daten_sind_die_vorgaben():
 
 
 def test_hin_und_zurueck():
-    e = Feineinstellungen(kv_cache="q8_0", flash_attention="on", faeden=4,
+    e = Feineinstellungen(kv_cache="q8_0", faeden=4,
                           moe_auf_cpu=True, moe_schichten=2, festnageln=True)
     assert Feineinstellungen.aus_daten(e.als_daten()).als_daten() == e.als_daten()
+
+
+def test_altes_flash_on_off_wird_zu_auto_geklammert():
+    """There is no flash switch any more; a value stored under an older
+    version must not keep riding along with every start."""
+    for alt in ("on", "off"):
+        assert Feineinstellungen.aus_daten({"flash_attention": alt}).flash_attention == "auto"
+
+
+def test_altes_q4_0_faellt_auf_die_naechste_sparstufe():
+    """Whoever stored q4_0 was saving memory on purpose — the fallback is
+    the surviving saving step, never the biggest cache."""
+    assert Feineinstellungen.aus_daten({"kv_cache": "q4_0"}).kv_cache == "q8_0"

@@ -35,7 +35,12 @@ async function ruf(pfad, optionen = {}) {
   })
   if (!antwort.ok) {
     const daten = await antwort.json().catch(() => ({}))
-    throw new ApiFehler(daten.detail || `Fehler ${antwort.status}`, antwort.status)
+    /* A validation error (422) carries `detail` as an array of objects —
+       anything but a plain string would surface as "[object Object]". */
+    let meldung = daten.detail
+    if (Array.isArray(meldung)) meldung = meldung.map((f) => f?.msg ?? '').filter(Boolean).join('; ')
+    if (typeof meldung !== 'string' || !meldung) meldung = `Fehler ${antwort.status}`
+    throw new ApiFehler(meldung, antwort.status)
   }
   return antwort.status === 204 ? null : antwort.json()
 }
@@ -148,16 +153,18 @@ export const api = {
   /* A companion (mmproj/mtp) carries which model it belongs to and its
      role, so the service records the association in a manifest and the
      runner attaches it later without guessing from file names. */
-  modellHolen: (repo, datei, ziel = null, gehoert_zu = null, rolle = null) =>
+  modellHolen: (repo, datei, ziel = null, gehoert_zu = null, rolle = null, art = 'chat') =>
     ruf('/runner/download', {
       method: 'POST',
-      body: alsText({ repo, datei, ziel, gehoert_zu, rolle }),
+      body: alsText({ repo, datei, ziel, gehoert_zu, rolle, art }),
     }),
   modellHolenStand: () => ruf('/runner/download'),
   modellHolenAbbrechen: () => ruf('/runner/download', { method: 'DELETE' }),
 
-  /* Searches the model catalogue. Runs on our server, never in the page. */
-  modellSuche: (q, art, anzahl = 12) =>
+  /* Searches the model catalogue. Runs on our server, never in the page.
+     `art` is one of the catalogue's three tabs — chat, einbettung, bild —
+     and scopes the search to that kind alone. */
+  modellSuche: (q, art = 'chat', anzahl = 12) =>
     ruf(`/models/search?q=${encodeURIComponent(q)}&art=${art}&anzahl=${anzahl}`),
   /* The GGUF files of one found repository — what the download can finish. */
   modellDateien: (repo) => ruf(`/models/files?repo=${encodeURIComponent(repo)}`),
@@ -297,7 +304,12 @@ export async function* antwortStrom(koerper, signal) {
   })
   if (!antwort.ok) {
     const daten = await antwort.json().catch(() => ({}))
-    throw new ApiFehler(daten.detail || `Fehler ${antwort.status}`, antwort.status)
+    /* A validation error (422) carries `detail` as an array of objects —
+       anything but a plain string would surface as "[object Object]". */
+    let meldung = daten.detail
+    if (Array.isArray(meldung)) meldung = meldung.map((f) => f?.msg ?? '').filter(Boolean).join('; ')
+    if (typeof meldung !== 'string' || !meldung) meldung = `Fehler ${antwort.status}`
+    throw new ApiFehler(meldung, antwort.status)
   }
 
   const leser = antwort.body.getReader()

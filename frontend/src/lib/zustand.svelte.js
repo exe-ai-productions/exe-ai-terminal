@@ -54,6 +54,9 @@ export const zustand = $state({
      in the menu bar, two modules: teile/ModelleLokal and teile/ModelleCloud. */
   lokalOffen: false,
   katalogOffen: false,
+  /* Which tab the catalogue should open on when a panel sends the user
+     there — read once by the catalogue window, then cleared. */
+  katalogArtWunsch: null,
   cloudOffen: false,
   werkzeugeOffen: false,
   werkzeugfrage: null, // { generationId, aufrufId, name, argumente, chatId }
@@ -102,6 +105,13 @@ export function menueFensterOeffnen(name) {
   zustand.katalogOffen = name === 'katalog'
   zustand.werkzeugeOffen = name === 'werkzeuge'
   zustand.promptOffen = name === 'prompt'
+}
+
+/* From an empty server panel straight to where its models are: the
+   catalogue, already on the right tab. */
+export function katalogOeffnen(art) {
+  zustand.katalogArtWunsch = art
+  menueFensterOeffnen('katalog')
 }
 
 /* A prompt dialog in the house style. Returns a promise:

@@ -41,6 +41,10 @@
     modellGesperrt = false,
     modellGeaendert = null,
     leerText = '',
+    /* Where a model for this panel is to be had: opens the catalogue on
+       this panel's own tab. Shown only while the folder is empty — the one
+       moment the panel cannot help itself. */
+    katalogTat = null,
     ordnerOeffnen = null,
     tatText = '',
     tatPunkt = 'still',
@@ -77,6 +81,11 @@
     </div>
   {:else if leerText}
     <p class="leer">{leerText}</p>
+    {#if katalogTat}
+      <button class="zumkatalog" onclick={katalogTat}>
+        {t('modell.zum_katalog')}
+      </button>
+    {/if}
   {/if}
 
   {@render mitte?.()}
@@ -140,6 +149,22 @@
     letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--text-still);
+  }
+  /* Centered on its own line: the empty panel's one way forward, same
+     button family as the foot, radius 9 like every control. */
+  .zumkatalog {
+    align-self: center;
+    font: inherit;
+    font-size: 13px;
+    border-radius: 9px;
+    padding: 7px 14px;
+    cursor: pointer;
+    border: 1px solid var(--linie-stark);
+    background: none;
+    color: var(--text);
+  }
+  .zumkatalog:hover {
+    background: var(--linie);
   }
   .fuss {
     display: flex;

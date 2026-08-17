@@ -130,6 +130,38 @@ def test_leerzeichen_mit_backslash_bleibt_drinnen(tmp_path):
     assert shell.greift_nach_draussen(f"cat {maskiert}/notiz.txt", ordner) is None
 
 
+def test_leerzeichen_ohne_anfuehrungszeichen_bleibt_drinnen(tmp_path):
+    # Models write spaced paths without quotes. The split cuts the path at
+    # the blank; the stump must not count as an escape when the command
+    # carries the shared folder's full name. Found live on "4TB SSD".
+    heim = tmp_path / "4TB SSD"
+    lager = heim / "lager"
+    lager.mkdir(parents=True)
+    ordner = [str(heim)]
+    assert shell.greift_nach_draussen(f"cd {heim}/lager && find . -name '*.py'", ordner) is None
+
+
+def test_dev_null_ist_kein_ausbruch(tmp_path):
+    # "2>/dev/null" rides along in a large share of everyday commands.
+    ordner = [str(tmp_path)]
+    assert shell.greift_nach_draussen('grep -r -i "auswertung" . 2>/dev/null', ordner) is None
+    assert shell.greift_nach_draussen("ls . >/dev/null 2>&1", ordner) is None
+
+
+def test_relatives_skript_ist_kein_ausbruch(tmp_path):
+    ordner = [str(tmp_path)]
+    assert shell.greift_nach_draussen("./run_tests.sh", ordner) is None
+
+
+def test_echte_ausbrueche_bleiben_erkannt(tmp_path):
+    # The two genuine catches from the collector run must survive the fixes.
+    ordner = [str(tmp_path)]
+    assert shell.greift_nach_draussen("grep -r geheim /", ordner) is not None
+    assert shell.greift_nach_draussen("find / -name auswertung", ordner) is not None
+    # Writing outside /dev stays a reach, the whitelist is /dev plumbing only.
+    assert shell.greift_nach_draussen("echo x > /tmp/raus.txt", ordner) is not None
+
+
 def test_pfad_in_option_wird_weiter_erkannt(tmp_path):
     # The raw scan exists for paths hiding in option words — that net must
     # survive the stump filter.

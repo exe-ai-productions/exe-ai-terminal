@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -53,6 +54,11 @@ BEKANNTE_ORTE = (
 # How much of the output is kept. Enough to see a start fail, not enough to
 # grow into a memory leak on a server that runs for days.
 PROTOKOLL_ZEILEN = 400
+
+# The flag we send is always "auto" now — the engine decides for itself, and
+# says what it decided in exactly one line at load time: "…: flash_attn    =
+# enabled" or "…: flash_attn    = disabled". This is that line, read back.
+_FLASH_ATTN_MUSTER = re.compile(r"flash_attn\s*=\s*(\w+)")
 
 # Where the started server's process id is noted. The server outlives the
 # service on purpose (its own process group, so a service crash does not
@@ -264,6 +270,10 @@ class Modellrunner:
         # runner rather than a global.
         self._schluessel: str | None = None
         self._protokoll: deque[str] = deque(maxlen=PROTOKOLL_ZEILEN)
+        # Flash attention's state, caught the moment its line passes by.
+        # The log is a ring buffer — a busy server pushes the one load-time
+        # line out of it, so the answer must be kept, not re-searched.
+        self._flash_attn: str | None = None
         self._schloss = threading.Lock()
 
     # --- What can be seen without starting anything ------------------------
@@ -302,6 +312,24 @@ class Modellrunner:
 
     def protokoll(self) -> list[str]:
         return list(self._protokoll)
+
+    def flash_attn_zustand(self) -> str | None:
+        """Whether flash attention ended up on, read off the server's own
+        words instead of asked for — the flag sent is always "auto", so that
+        line is the only place the true answer lives. Caught when the line
+        passes through the log and kept, because the ring buffer forgets.
+        None while the log has not reached it yet (server still loading, or
+        not running)."""
+        return self._flash_attn
+
+    def _zeile_aufnehmen(self, zeile: str) -> None:
+        zeile = zeile.rstrip("\n")
+        self._protokoll.append(zeile)
+        treffer = _FLASH_ATTN_MUSTER.search(zeile)
+        if treffer:
+            wert = treffer.group(1).lower()
+            if wert in ("enabled", "disabled"):
+                self._flash_attn = wert
 
     def befehl(
         self,
@@ -419,6 +447,7 @@ class Modellrunner:
                     raise RunnerFehler("port_belegt")
 
             self._protokoll.clear()
+            self._flash_attn = None
             # A fresh key per start; the service keeps it in its own
             # environment, where the provider picks it up to sign requests.
             schluessel = secrets.token_urlsafe(24)
@@ -453,7 +482,7 @@ class Modellrunner:
         if prozess is None or prozess.stdout is None:
             return
         for zeile in prozess.stdout:
-            self._protokoll.append(zeile.rstrip("\n"))
+            self._zeile_aufnehmen(zeile)
 
     def stoppen(self) -> bool:
         with self._schloss:

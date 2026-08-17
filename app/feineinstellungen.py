@@ -18,16 +18,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# What the KV cache may be stored as. The order is the order they are offered
-# in: the engine's own default first, then the two that trade a little
-# quality for a lot of room at a large context.
-KV_TYPEN = ("f16", "q8_0", "q4_0")
+# What the KV cache may be stored as. Just the engine's own default and the
+# one quantized step worth taking: q8_0 halves the cache at essentially no
+# quality loss once flash attention is on, which it always is now (auto).
+# bf16/f32 buy nothing, and q4_0 loses more than the halving is worth — so
+# there is no third step to choose between, only a switch.
+KV_TYPEN = ("f16", "q8_0")
 KV_VORGABE = "f16"
 
-# Flash attention is a three-way switch in the engine, and "auto" is what it
-# does when nobody says otherwise — so that is our default too.
-FA_WERTE = ("auto", "on", "off")
+# Flash attention has no control in the window any more — the engine's
+# "auto" decides. Keeping only "auto" valid means a stored "on"/"off" from
+# an older version is clamped away by aus_daten instead of riding along
+# forever with no switch left to change it.
+FA_WERTE = ("auto",)
 FA_VORGABE = "auto"
+
+# The cache step an older version offered and this one does not: whoever
+# stored it was saving memory on purpose, so it maps to the surviving
+# saving step, not to the biggest cache.
+KV_ALT = {"q4_0": "q8_0"}
 
 # A thread count nobody would type on purpose. Above this the engine is being
 # asked to fight itself for cores.
@@ -62,6 +71,7 @@ class Feineinstellungen:
         """
         d = daten or {}
         kv = str(d.get("kv_cache") or KV_VORGABE)
+        kv = KV_ALT.get(kv, kv)
         fa = str(d.get("flash_attention") or FA_VORGABE)
         faeden = d.get("faeden")
         try:

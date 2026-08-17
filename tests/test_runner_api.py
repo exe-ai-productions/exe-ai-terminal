@@ -43,6 +43,9 @@ class StummerRunner:
     def protokoll(self):
         return []
 
+    def flash_attn_zustand(self):
+        return None
+
     def starten(self, modell, *, kontext=8192, schichten=99, port=8080, drafter=None,
                 fein=None):
         # The advanced settings are kept so a test can look at what arrived.

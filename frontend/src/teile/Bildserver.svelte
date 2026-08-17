@@ -22,7 +22,7 @@
   import { api } from '../lib/api.js'
   import { BILDVORGABEN } from '../lib/bildvorgaben.js'
   import { t } from '../lib/texte.svelte.js'
-  import { melde, zustand } from '../lib/zustand.svelte.js'
+  import { katalogOeffnen, melde, zustand } from '../lib/zustand.svelte.js'
   import Auswahlfeld from './Auswahlfeld.svelte'
   import Servertafel from './Servertafel.svelte'
   import Zahlenfeld from './Zahlenfeld.svelte'
@@ -153,6 +153,7 @@
   modellBeschriftung={t('bildserver.modell')}
   modellGesperrt={arbeitet}
   leerText={stand ? t('bildserver.kein_modell_lang') : ''}
+  katalogTat={() => katalogOeffnen('bild')}
   ordnerOeffnen={() => api.bildordnerOeffnen().catch(() => {})}
   tatText={arbeitet ? t('bildserver.probe_laeuft') : t('bildserver.probelauf')}
   tatPunkt={arbeitet ? 'blau' : 'still'}

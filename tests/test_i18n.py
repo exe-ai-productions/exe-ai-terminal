@@ -63,9 +63,6 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # Seconds are written the same way in both languages; the entry is a
         # number with a unit, not a sentence.
         "terminal.dauer",
-        # "Standard" is the German word for standard as much as the English
-        # one; a different word here would be a worse translation.
-        "modell.kv_f16",
         # A port is a port in both languages, exactly as it already is in
         # the model server's own form.
         "einbettungsserver.port",
@@ -75,6 +72,10 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # The catalogue chip names the same graphics memory as the local
         # window, so it carries the same untranslatable label.
         "katalog.maschine",
+        # "Chat" is the German word for chat as much as the English one —
+        # one of the three catalogue tab names, and the only one of the
+        # three that happens to be spelled the same in both languages.
+        "katalog.art_chat",
         # Server is the German word for server as much as the English one.
         "modell.server_status_label",
         # A network port is called a port in German too. "Anschluss" is the

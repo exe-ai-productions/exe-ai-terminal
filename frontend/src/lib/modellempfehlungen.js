@@ -34,10 +34,11 @@
 
 import { speicherSchaetzung } from './speicherschaetzung.js'
 
-/* The kinds the search offers. A format name is a name, like a tool name —
-   it never goes through the translation catalogue. Only GGUF for now: the
-   one the program can fetch as a single file and start by itself. */
-export const ARTEN = ['gguf']
+/* The catalogue's three tabs. Each is its own search on the server side
+   (see app/api/v1/modellsuche.py) and its own curated list here — a chat
+   model, an embedding model and an image model are different things to
+   run, and a merged list offers each one where it cannot work. */
+export const ARTEN = ['chat', 'einbettung', 'bild']
 
 /* The context the fit estimate assumes — the everyday case, not the model's
    ceiling. A build "fits" when its file plus a conversation of this size
@@ -174,6 +175,22 @@ export const KATALOG = [
     ],
   },
 ]
+
+/* Embedding and image cards start empty on purpose — the same rule as the
+   chat catalogue above: a card whose repository or file name was not
+   checked against the real thing is left out rather than guessed at. They
+   fill in by data care, one verified card at a time, same as chat did. */
+export const KATALOG_EINBETTUNG = []
+export const KATALOG_BILD = []
+
+/** The curated list for a catalogue tab — what `Katalog.svelte` shows when
+    that tab is open. Falls back to the chat list for an unknown key so a
+    typo never renders an empty gallery silently. */
+export function katalogFuer(art) {
+  if (art === 'einbettung') return KATALOG_EINBETTUNG
+  if (art === 'bild') return KATALOG_BILD
+  return KATALOG
+}
 
 /** The memory a build needs to run at the everyday context, in GB. */
 export function bedarf(fassung) {

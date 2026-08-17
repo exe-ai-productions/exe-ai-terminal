@@ -32,6 +32,9 @@
     /* Shown instead of the number at the far right, where the end of the
        range means "everything" rather than a quantity. */
     endtext = '',
+    /* Off when a number field sits right beside the track — one value,
+       written once, and the track gets the room instead. */
+    mit_zahl = true,
   } = $props()
 
   const gestuft = $derived(Array.isArray(stufen) && stufen.length > 1)
@@ -89,7 +92,9 @@
       </div>
     {/if}
   </div>
-  <span class="zahl">{text}</span>
+  {#if mit_zahl}
+    <span class="zahl">{text}</span>
+  {/if}
 </div>
 
 <style>

@@ -177,6 +177,15 @@ async def lebenszyklus(app: FastAPI):
     if app.state.modellrunner.aufraeumen():
         log.info("Verwaister Modellserver aus dem vorigen Lauf beendet")
     app.state.modelldownload = Modelldownload(modellordner)
+    # One folder per kind of model, keyed by the catalogue's tab names. The
+    # download routes by this map, because each server reads only its own
+    # folder — a file in the wrong one is invisible where it belongs and a
+    # broken entry where it lands.
+    app.state.modellordner_je_art = {
+        "chat": modellordner,
+        "einbettung": config.pfad(config.app.einbettungsmodelle_verzeichnis),
+        "bild": config.pfad(config.app.bildmodelle_verzeichnis),
+    }
     # The model server itself, fetchable in one click on machines that do
     # not have it — into the user's data folder, next to their models.
     app.state.serverdownload = Serverdownload(config.pfad("."))

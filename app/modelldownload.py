@@ -97,6 +97,7 @@ class Modelldownload:
         ziel: str | None = None,
         gehoert_zu: str | None = None,
         rolle: str | None = None,
+        ordner: Path | None = None,
     ) -> Fortschritt:
         """``ziel`` is the local name, when it must differ from the remote one.
 
@@ -109,21 +110,28 @@ class Modelldownload:
         another model: when both are set, the bond is written into the folder
         manifest once the file is truly in place, so the runner reads it
         instead of guessing. Left absent, a download behaves as before.
+
+        ``ordner`` is the destination folder, when it is not the chat model
+        folder this instance was built on. Each server reads only its own
+        folder, so the file must land where its kind of server looks — an
+        embedding model in the chat folder is invisible to the embedding
+        server and a broken entry in the chat list.
         """
         with self._schloss:
             if self.laeuft():
                 raise DownloadFehler("laeuft_schon")
 
+            zielordner = Path(ordner).expanduser() if ordner else self._ordner
             _pruefen(datei)
             ziel = _pruefen(ziel) if ziel else datei
-            if (self._ordner / ziel).is_file():
+            if (zielordner / ziel).is_file():
                 raise DownloadFehler("schon_da")
 
             self._abbruch.clear()
             self._stand = Fortschritt(datei=ziel, geladen=0, gesamt=0)
             threading.Thread(
                 target=self._holen,
-                args=(repo, datei, ziel, gehoert_zu, rolle),
+                args=(repo, datei, ziel, gehoert_zu, rolle, zielordner),
                 daemon=True,
             ).start()
             return self._stand
@@ -135,10 +143,12 @@ class Modelldownload:
         ziel_name: str,
         gehoert_zu: str | None = None,
         rolle: str | None = None,
+        ordner: Path | None = None,
     ) -> None:
-        self._ordner.mkdir(parents=True, exist_ok=True)
-        ziel = self._ordner / ziel_name
-        halb = self._ordner / (ziel_name + UNFERTIG)
+        zielordner = ordner if ordner is not None else self._ordner
+        zielordner.mkdir(parents=True, exist_ok=True)
+        ziel = zielordner / ziel_name
+        halb = zielordner / (ziel_name + UNFERTIG)
         adresse = f"{BASIS}/{repo}/resolve/main/{datei}"
 
         # A Hugging Face token, when the user set one: lifts rate limits and
@@ -174,7 +184,7 @@ class Modelldownload:
             # The bond is recorded only after the file is truly in place, so a
             # cancelled or failed fetch leaves no dangling manifest entry.
             if gehoert_zu and rolle:
-                modellzuordnung.eintragen(self._ordner, gehoert_zu, rolle, ziel_name)
+                modellzuordnung.eintragen(zielordner, gehoert_zu, rolle, ziel_name)
 
             if self._stand:
                 self._stand.geladen = ziel.stat().st_size

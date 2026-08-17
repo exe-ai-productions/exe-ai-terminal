@@ -85,6 +85,10 @@ class Auskunft(BaseModel):
     # can show what is actually in force instead of its own defaults. None
     # while nothing runs — then the form falls back to the stored choice.
     fein: dict | None = None
+    # Whether flash attention ended up on — read off the server's own log,
+    # not off what was asked for, because the flag sent is always "auto".
+    # None while nothing runs yet or the log has not reached that line.
+    flash_aktiv: bool | None = None
     # The declared bond of each model to its companions, read from the folder
     # manifest and filtered to files that are still there. Keyed by model
     # file name; each value carries the projector and the draft, or null. The
@@ -158,6 +162,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         port=lauf.port if lauf else None,
         drafter=lauf.drafter if lauf else None,
         fein=lauf.fein.als_daten() if lauf and lauf.fein else None,
+        flash_aktiv={"enabled": True, "disabled": False}.get(runner.flash_attn_zustand()),
         zuordnung=_zuordnung(runner),
     )
 
@@ -217,6 +222,11 @@ class Holen(BaseModel):
     # declared.
     gehoert_zu: str | None = Field(None, min_length=1, max_length=200)
     rolle: Literal["mmproj", "mtp"] | None = None
+    # Which kind of model this is — one of the catalogue's tabs. It decides
+    # the destination folder, because each server reads only its own folder:
+    # an embedding model in the chat folder is invisible to the embedding
+    # server and a broken entry in the chat list.
+    art: Literal["chat", "einbettung", "bild"] = "chat"
 
 
 class Fortschritt(BaseModel):
@@ -254,12 +264,15 @@ def fortschritt(download: Modelldownload = Depends(hole_download)) -> Fortschrit
 @router.post("/download", response_model=Fortschritt, summary="Modell holen")
 def holen(
     daten: Holen,
+    request: Request,
     download: Modelldownload = Depends(hole_download),
     sprache: str = Depends(hole_sprache),
 ) -> Fortschritt:
+    ordner = request.app.state.modellordner_je_art.get(daten.art)
     try:
         download.starten(
-            daten.repo, daten.datei, daten.ziel, daten.gehoert_zu, daten.rolle
+            daten.repo, daten.datei, daten.ziel, daten.gehoert_zu, daten.rolle,
+            ordner=ordner,
         )
     except DownloadFehler as fehler:
         lage = {

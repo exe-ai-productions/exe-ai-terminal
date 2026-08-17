@@ -17,6 +17,13 @@
   function setzen(neu) {
     wert = Math.min(max, Math.max(min, neu))
   }
+
+  /* Typed input commits through the same clamp as the chevrons — an empty
+     or out-of-range field would otherwise travel to the server as it is
+     and come back as a validation error. */
+  function eingerastet() {
+    setzen(Number(wert) || min)
+  }
 </script>
 
 <div class="zahl" class:gesperrt>
@@ -28,6 +35,7 @@
     {max}
     step={schritt}
     disabled={gesperrt}
+    onchange={eingerastet}
   />
   <span class="treppe">
     <button

@@ -16,7 +16,7 @@
      the other two server panels — this file only says what goes in it. */
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
-  import { melde } from '../lib/zustand.svelte.js'
+  import { katalogOeffnen, melde } from '../lib/zustand.svelte.js'
   import Servertafel from './Servertafel.svelte'
   import Zahlenfeld from './Zahlenfeld.svelte'
 
@@ -72,6 +72,7 @@
   modellBeschriftung={t('einbettungsserver.modell')}
   modellGesperrt={laeuft}
   leerText={auskunft ? t('einbettungsserver.kein_modell') : ''}
+  katalogTat={() => katalogOeffnen('einbettung')}
   ordnerOeffnen={() => api.einbettungOrdnerOeffnen().catch(() => {})}
   tatText={laeuft ? t('einbettungsserver.stoppen') : t('einbettungsserver.starten')}
   tatPunkt={laeuft ? 'gruen' : 'still'}

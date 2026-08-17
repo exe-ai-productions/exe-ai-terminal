@@ -330,3 +330,42 @@ def test_ein_belegter_port_faellt_sofort_auf(ordner, falsches_programm):
             raise AssertionError("kein Fehler")
         except RunnerFehler as fehler:
             assert fehler.grund == "port_belegt"
+
+
+# --- Reading flash attention's true state off the log ----------------------
+
+
+def test_flash_attn_zustand_ohne_protokoll_ist_unbekannt(ordner):
+    assert Modellrunner(ordner).flash_attn_zustand() is None
+
+
+def test_flash_attn_zustand_liest_die_eigene_zeile_des_servers(ordner):
+    runner = Modellrunner(ordner)
+    runner._zeile_aufnehmen("llama_context: n_ctx     = 32768")
+    runner._zeile_aufnehmen("llama_context: flash_attn    = enabled")
+    assert runner.flash_attn_zustand() == "enabled"
+
+
+def test_flash_attn_zustand_nimmt_die_letzte_zeile(ordner):
+    """A second load in the same process — reload, restart — must not answer
+    with the first one's word once a newer line disagrees with it."""
+    runner = Modellrunner(ordner)
+    runner._zeile_aufnehmen("llama_context: flash_attn    = enabled")
+    runner._zeile_aufnehmen("llama_context: flash_attn    = disabled")
+    assert runner.flash_attn_zustand() == "disabled"
+
+
+def test_flash_attn_zustand_ignoriert_fremde_zeilen(ordner):
+    runner = Modellrunner(ordner)
+    runner._zeile_aufnehmen("srv  params_from_: some other line entirely")
+    assert runner.flash_attn_zustand() is None
+
+
+def test_flash_attn_zustand_ueberlebt_den_vollen_ringpuffer(ordner):
+    """The load-time line is written once; a busy server then pushes it out
+    of the 400-line ring buffer. The answer must survive that."""
+    runner = Modellrunner(ordner)
+    runner._zeile_aufnehmen("llama_context: flash_attn    = enabled")
+    for n in range(500):
+        runner._zeile_aufnehmen(f"srv  log: request {n}")
+    assert runner.flash_attn_zustand() == "enabled"

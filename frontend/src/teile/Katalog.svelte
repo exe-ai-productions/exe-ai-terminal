@@ -22,10 +22,31 @@
   import { weg, zurueckgehen } from '../lib/fensterweg.svelte.js'
   import { t } from '../lib/texte.svelte.js'
   import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
-  import { KATALOG, kartePasst, passendeFassung } from '../lib/modellempfehlungen.js'
+  import { ARTEN, kartePasst, katalogFuer, passendeFassung } from '../lib/modellempfehlungen.js'
   import { modellMarke } from '../lib/anbieterzeichen.js'
 
   let { offen = $bindable(false) } = $props()
+
+  /* Which of the three tabs is open — Chat, Einbettung, Bild. Always one of
+     them, always switchable back to Chat: the search below is scoped to
+     this, and so is the curated gallery. */
+  let art = $state('chat')
+  function artWaehlen(neu) {
+    if (neu === art) return
+    art = neu
+    detail = null
+    if (suchAktiv) suchen()
+  }
+
+  /* A server panel can send the user here with its own tab already open —
+     the wish is read once and cleared, so the next plain open starts on
+     Chat as always. */
+  $effect(() => {
+    if (offen && zustand.katalogArtWunsch) {
+      artWaehlen(zustand.katalogArtWunsch)
+      zustand.katalogArtWunsch = null
+    }
+  })
 
   /* What the machine holds and what already lies in the folder — the two
      facts every card reads. Polled gently while the window is open, so a
@@ -82,7 +103,7 @@
   /* Fitting cards to the front — a fit is a fact worth surfacing. Ties keep
      the curated order. */
   const karten = $derived(
-    [...KATALOG].sort((a, b) => Number(kartePasst(b, maschineGb)) - Number(kartePasst(a, maschineGb))),
+    [...katalogFuer(art)].sort((a, b) => Number(kartePasst(b, maschineGb)) - Number(kartePasst(a, maschineGb))),
   )
 
   $effect(() => {
@@ -103,7 +124,7 @@
           const n = nachzuege.shift()
           if (n) {
             try {
-              stand = await api.modellHolen(n.repo, n.datei, n.ziel ?? null, n.gehoert_zu ?? null, n.rolle ?? null)
+              stand = await api.modellHolen(n.repo, n.datei, n.ziel ?? null, n.gehoert_zu ?? null, n.rolle ?? null, n.art ?? 'chat')
             } catch {
               // A broken link ends the chain; the button offers the rest.
               nachzuege = []
@@ -130,8 +151,8 @@
   }
   async function starteJob(job, rest) {
     try {
-      stand = await api.modellHolen(job.repo, job.datei, job.ziel ?? null, job.gehoert_zu ?? null, job.rolle ?? null)
-      nachzuege = rest
+      stand = await api.modellHolen(job.repo, job.datei, job.ziel ?? null, job.gehoert_zu ?? null, job.rolle ?? null, art)
+      nachzuege = rest.map((j) => ({ ...j, art }))
     } catch (fehler) {
       melde(fehler.message, 'fehler')
     }
@@ -193,6 +214,10 @@
     clearTimeout(taktSuche)
     taktSuche = setTimeout(suchen, 400)
   }
+  /* Only the newest request may write the results: a slow answer for the
+     PREVIOUS tab or term would otherwise land last and show its models
+     under the wrong tab. */
+  let suchlauf = 0
   async function suchen() {
     clearTimeout(taktSuche)
     const begriff = suchbegriff.trim()
@@ -200,14 +225,18 @@
       treffer = null
       return
     }
+    const lauf = ++suchlauf
     sucht = true
     try {
-      treffer = await api.modellSuche(begriff, 'gguf')
+      const antwort = await api.modellSuche(begriff, art)
+      if (lauf !== suchlauf) return
+      treffer = antwort
     } catch (fehler) {
+      if (lauf !== suchlauf) return
       melde(fehler.message, 'fehler')
       treffer = []
     } finally {
-      sucht = false
+      if (lauf === suchlauf) sucht = false
     }
   }
   async function aufklappen(fund) {
@@ -264,6 +293,18 @@
       </div>
       <div class="markensatz">{t('katalog.markensatz')}</div>
     </div>
+    <div class="reiterleiste" role="tablist">
+      {#each ARTEN as eintrag (eintrag)}
+        <button
+          role="tab"
+          aria-selected={art === eintrag}
+          class:aktiv={art === eintrag}
+          onclick={() => artWaehlen(eintrag)}
+        >
+          {t(`katalog.art_${eintrag}`)}
+        </button>
+      {/each}
+    </div>
     {#if maschineGb}
       <div class="maschine">
         <span class="wort">{t('katalog.maschine')}:</span>
@@ -312,6 +353,9 @@
           />
         {/each}
       </div>
+      {#if !karten.length && !suchAktiv}
+        <p class="leer">{t('katalog.keine_kuratierten')}</p>
+      {/if}
 
       {#if suchAktiv}
         <div class="suchteil">
@@ -389,6 +433,33 @@
     gap: 16px;
     margin: 4px 0 14px;
     flex: none;
+    flex-wrap: wrap;
+  }
+  /* The three catalogue tabs — Chat always reachable from the other two,
+     the other two always reachable from Chat. One pill, never a second
+     control that could drift out of step with it. */
+  .reiterleiste {
+    display: inline-flex;
+    flex: none;
+    border: 1px solid var(--linie-stark);
+    border-radius: 99px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .reiterleiste button {
+    border: none;
+    background: none;
+    padding: 6px 15px;
+    border-radius: 99px;
+    font: 600 12.5px var(--schrift);
+    color: var(--text-leise);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .reiterleiste button:hover { color: var(--text); }
+  .reiterleiste button.aktiv {
+    background: var(--text);
+    color: var(--bg);
   }
   .marke {
     min-width: 0;

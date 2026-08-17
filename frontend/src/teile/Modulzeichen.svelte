@@ -17,13 +17,6 @@
 {:else if modul === 'vorschau'}
   <svg width={groesse} height={groesse} viewBox="0 0 24 24" fill="none" stroke="currentColor"
        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" /></svg>
-{:else if modul === 'waechter'}
-  <!-- A path that leaps the gap and carries on, arrow first: the work does
-       not stop where a step broke, it continues past it. A shield stood here
-       before, which said "protection" — and this does not protect anything,
-       it keeps things moving. -->
-  <svg width={groesse} height={groesse} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 16 H6.5" /><path d="M6.5 16 a5.5 5.5 0 0 1 11 0" /><path d="M17.5 16 H20" /><path d="M18 13.5 L21 16 l-3 2.5" /></svg>
 {:else}
   <svg width={groesse} height={groesse} viewBox="0 0 24 24" fill="none" stroke="currentColor"
        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>

@@ -29,14 +29,20 @@ def test_die_feineinstellungen_stehen_im_pruefer():
 
 def test_was_die_schublade_schickt_kommt_auch_an():
     geschickt = {
-        "kv_cache": "q4_0",
-        "flash_attention": "on",
+        "kv_cache": "q8_0",
+        "flash_attention": "auto",
         "faeden": 8,
         "moe_auf_cpu": True,
         "moe_schichten": 12,
         "festnageln": True,
     }
     assert wahl.wahl_pruefen(geschickt) == geschickt
+
+
+def test_ein_gespeichertes_flash_off_wird_beim_pruefen_zu_auto():
+    """The stored leftovers of the old three-way switch normalize away on
+    the next write instead of surviving forever."""
+    assert wahl.wahl_pruefen({"flash_attention": "off"})["flash_attention"] == "auto"
 
 
 # --- What comes back out --------------------------------------------------
@@ -79,7 +85,7 @@ def test_die_vorgabe_ist_das_was_die_maschine_ohnehin_tut():
 
 
 def test_zweimal_pruefen_aendert_nichts_mehr():
-    einmal = wahl.wahl_pruefen({"kv_cache": "q4_0", "faeden": 6})
+    einmal = wahl.wahl_pruefen({"kv_cache": "q8_0", "faeden": 6})
     assert wahl.wahl_pruefen(einmal) == einmal
 
 
@@ -99,12 +105,12 @@ def test_der_lauf_traegt_die_hebel_mit_sich(tmp_path):
     programm.chmod(programm.stat().st_mode | stat.S_IEXEC)
 
     runner = Modellrunner(tmp_path, str(programm))
-    fein = Feineinstellungen.aus_daten({"kv_cache": "q4_0", "moe_auf_cpu": True})
+    fein = Feineinstellungen.aus_daten({"kv_cache": "q8_0", "moe_auf_cpu": True})
     lauf = runner.starten("klein.gguf", port=18121, fein=fein)
     try:
         assert lauf.fein is not None
-        assert lauf.fein.kv_cache == "q4_0"
+        assert lauf.fein.kv_cache == "q8_0"
         assert lauf.fein.moe_auf_cpu is True
-        assert runner.lauf().fein.kv_cache == "q4_0"
+        assert runner.lauf().fein.kv_cache == "q8_0"
     finally:
         runner.stoppen()

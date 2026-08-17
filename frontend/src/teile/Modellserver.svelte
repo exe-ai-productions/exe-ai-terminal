@@ -18,12 +18,12 @@
   import { api } from '../lib/api.js'
   import { t } from '../lib/texte.svelte.js'
   import { ausFenster } from '../lib/fensterweg.svelte.js'
-  import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
+  import { katalogOeffnen, melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
   import { speicherSchaetzung } from '../lib/speicherschaetzung.js'
   import { empfehlungFuer } from '../lib/modellempfehlungen.js'
   import { FEINEINSTELLUNGEN } from '../lib/feineinstellungen.js'
   import Auswahlfeld from './Auswahlfeld.svelte'
-  import Modulzeichen from './Modulzeichen.svelte'
+  import EEWzeichen from './EEWzeichen.svelte'
   import { eew, modellWaehlen as eewModellWaehlen } from '../lib/eew.svelte.js'
   import Schalter from './Schalter.svelte'
   import Schieberegler from './Schieberegler.svelte'
@@ -152,9 +152,11 @@
   /* The advanced section. Shut on start: somebody who does not know what a
      KV cache is should never have to find out. */
   let erweitertOffen = $state(false)
+  /* flash_attention is deliberately NOT in here any more: there is no
+     control for it, the engine's "auto" decides — and a stored "off" from
+     an older version must not keep riding along with every start. */
   let fein = $state({
     kv_cache: 'f16',
-    flash_attention: 'auto',
     moe_auf_cpu: false,
     festnageln: false,
   })
@@ -163,16 +165,6 @@
   let faeden = $state(0)
   let moeSchichten = $state(0)
 
-  const kvauswahl = $derived([
-    { wert: 'f16', text: t('modell.kv_f16') },
-    { wert: 'q8_0', text: t('modell.kv_q8_0') },
-    { wert: 'q4_0', text: t('modell.kv_q4_0') },
-  ])
-  const flashauswahl = $derived([
-    { wert: 'auto', text: t('modell.flash_auto') },
-    { wert: 'on', text: t('modell.flash_on') },
-    { wert: 'off', text: t('modell.flash_off') },
-  ])
   const feindaten = $derived({
     ...fein,
     faeden: faeden || null,
@@ -190,8 +182,10 @@
 
   function feinUebernehmen(daten) {
     fein = {
-      kv_cache: daten.kv_cache ?? fein.kv_cache,
-      flash_attention: daten.flash_attention ?? fein.flash_attention,
+      /* The step an older version offered maps to the surviving saving
+         step — whoever stored q4_0 was saving memory on purpose. Same rule
+         as the backend's KV_ALT. */
+      kv_cache: daten.kv_cache === 'q4_0' ? 'q8_0' : (daten.kv_cache ?? fein.kv_cache),
       moe_auf_cpu: Boolean(daten.moe_auf_cpu),
       festnageln: Boolean(daten.festnageln),
     }
@@ -409,6 +403,8 @@
       modellBeschriftung={t('modell.feld_modell')}
       modellGesperrt={laeuft}
       modellGeaendert={modellGewaehlt}
+      leerText={t('modell.kein_modell_da')}
+      katalogTat={() => katalogOeffnen('chat')}
       ordnerOeffnen={ordnerOeffnen}
       tatText={laeuft ? t('modell.server_anhalten_kurz') : t('modell.server_starten_kurz')}
       tatPunkt={laeuft ? 'gruen' : 'still'}
@@ -431,11 +427,12 @@
             <!-- The third row, and deliberately no tile of its own: which
                  small model Extended Workflow uses is a model choice like
                  the two above it, and a fourth tile under SET UP would
-                 promise a page that has nothing else on it. The sign is the
-                 module's own, so the eye finds the connection. -->
+                 promise a page that has nothing else on it. The sign rides
+                 behind the name, the same house rule every row's name obeys
+                 — it marks which module the row belongs to, it does not
+                 lead the line and break the column of names. -->
             <label for="rs-eew">
-              <span class="eewzeichen"><Modulzeichen modul="waechter" groesse={13} /></span>
-              {t('modell.feld_eew')}<span>{t('modell.feld_eew_hilfe')}</span>
+              {t('modell.feld_eew')}<span class="eew-hinten"><EEWzeichen groesse={16} /></span><span>{t('modell.feld_eew_hilfe')}</span>
             </label>
             <Auswahlfeld
               id="rs-eew"
@@ -451,16 +448,25 @@
           <div class="gruppenname">{t('modell.gruppe_speicher')}</div>
           <div class="regler">
             <label for="rs-kontext">{t('modell.feld_kontext')}<span>{t('modell.feld_kontext_hilfe')}</span></label>
-            <!-- Dragged, not typed: the engine only understands these steps,
-                 and a field that silently accepts 33000 teaches nobody that. -->
-            <Schieberegler
-              id="rs-kontext"
-              bind:wert={kontext}
-              stufen={kontextstufen}
-              gesperrt={laeuft}
-              beschriftung={t('modell.feld_kontext')}
-              anzeige={kurzK}
-            />
+            <!-- Dragged for the steps everybody needs, typed for the one
+                 case that is not a step at all: a context above 128k, which
+                 the slider's fixed marks were never meant to reach. The
+                 slider keeps its old shape — same steps, same snap — the
+                 field beside it is the only new thing, and it is what a
+                 typed number always was: the truth. The slider settles on
+                 whichever mark sits nearest once the field goes higher. -->
+            <div class="kontextzeile">
+              <Schieberegler
+                id="rs-kontext"
+                bind:wert={kontext}
+                stufen={kontextstufen}
+                gesperrt={laeuft}
+                beschriftung={t('modell.feld_kontext')}
+                anzeige={kurzK}
+                mit_zahl={false}
+              />
+              <Zahlenfeld bind:wert={kontext} gesperrt={laeuft} min={512} max={1048576} schritt={1024} />
+            </div>
 
             <label for="rs-schichten">{t('modell.feld_schichten')}<span>{t('modell.feld_schichten_hilfe')}</span></label>
             <Schieberegler
@@ -495,13 +501,21 @@
           </button>
           {#if erweitertOffen}
             <div class="regler">
-              <label for="rs-kv">{t('modell.feld_kv')}<span>{t('modell.feld_kv_hilfe')}</span></label>
-              <Auswahlfeld id="rs-kv" bind:wert={fein.kv_cache} eintraege={kvauswahl}
-                           gesperrt={laeuft} beschriftung={t('modell.feld_kv')} />
+              <label>{t('modell.feld_kv')}<span>{t('modell.feld_kv_hilfe')}</span></label>
+              <Schalter an={fein.kv_cache === 'q8_0'} gesperrt={laeuft}
+                        beschriftung={t('modell.feld_kv')}
+                        onschalten={() => (fein.kv_cache = fein.kv_cache === 'q8_0' ? 'f16' : 'q8_0')} />
 
-              <label for="rs-flash">{t('modell.feld_flash')}<span>{t('modell.feld_flash_hilfe')}</span></label>
-              <Auswahlfeld id="rs-flash" bind:wert={fein.flash_attention} eintraege={flashauswahl}
-                           gesperrt={laeuft} beschriftung={t('modell.feld_flash')} />
+              <label>{t('modell.feld_flash')}<span>{t('modell.feld_flash_hilfe')}</span></label>
+              <div class="fazeile">
+                <Leuchtpunkt farbe={!laeuft ? 'still' : auskunft?.flash_aktiv === true ? 'gruen' : auskunft?.flash_aktiv === false ? 'rot' : 'still'} groesse={9} />
+                <span>
+                  {!laeuft ? t('modell.flash_unbekannt')
+                    : auskunft?.flash_aktiv === true ? t('modell.flash_aktiv')
+                    : auskunft?.flash_aktiv === false ? t('modell.flash_inaktiv')
+                    : t('modell.flash_unbekannt')}
+                </span>
+              </div>
 
               <label for="rs-faeden">{t('modell.feld_faeden')}<span>{t('modell.feld_faeden_hilfe')}</span></label>
               <Zahlenfeld id="rs-faeden" bind:wert={faeden} gesperrt={laeuft} min={0} max={256} />
@@ -587,21 +601,40 @@
     align-items: center;
   }
 
-  /* The section's head is a row you press, not a title with a button in it:
-     the whole line is the target, which is what a shut drawer wants. */
+  /* One heading, worn by every section's head — TEMPO, SPEICHER & KONTEXT,
+     ERWEITERT, NETZWERK. They used to be two different definitions (a
+     different size, a different colour, ERWEITERT with no font of its own)
+     and read as if the page had two hands; now there is exactly one place
+     that says what a section head looks like. Both classes take it, so a
+     row of divs and a row with a button behind it end up identical. */
+  .gruppenname,
   .klappkopf {
+    font: 600 11px var(--schrift);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-leise);
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+  /* The trailing line used to be gruppenname's alone; ERWEITERT sat there
+     unfinished. Both now end the same way. */
+  .gruppenname::after,
+  .klappkopf::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--linie);
+  }
+
+  /* The section's head is a row you press, not a title with a button in it:
+     the whole line is the target, which is what a shut drawer wants. */
+  .klappkopf {
     width: 100%;
     border: none;
     background: none;
     padding: 0 0 8px;
     cursor: pointer;
-    font: 600 11px var(--schrift);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-leise);
   }
   .klappkopf:hover { color: var(--text); }
   .winkel {
@@ -609,11 +642,15 @@
     transition: transform 0.15s;
   }
   .winkel.auf { transform: rotate(90deg); }
+  /* Same size and colour as every field's own explanation below it — see
+     `label span`. Only the weight and case reset, because it sits inside an
+     uppercase heading rather than under a normal-case field name. */
   .klapphilfe {
     font-weight: 400;
     letter-spacing: 0;
     text-transform: none;
     color: var(--text-still);
+    font-size: 11.5px;
   }
   @media (prefers-reduced-motion: reduce) {
     .winkel { transition: none; }
@@ -621,22 +658,6 @@
 
   .gruppe {
     margin-bottom: 16px;
-  }
-  .gruppenname {
-    font-size: 10.5px;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--text-still);
-    font-weight: 600;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .gruppenname::after {
-    content: '';
-    flex: 1;
-    border-top: 1px solid var(--linie);
   }
   .regler {
     display: grid;
@@ -652,13 +673,35 @@
     font-size: 11.5px;
     color: var(--text-still);
   }
-  /* The sign rides in the label, in the label's own quiet colour: it marks
-     which module the row belongs to, it does not announce it. */
-  .eewzeichen {
+  /* The sign rides behind the name, in the label's own quiet colour: it
+     marks which module the row belongs to, it does not lead the line and
+     break every row's names off their shared left edge. Its own rule
+     because `label span` above would otherwise flatten it into a block of
+     help text. */
+  .eew-hinten {
     display: inline-flex;
-    vertical-align: -2px;
-    margin-right: 6px;
-    color: var(--text-still);
+    align-items: center;
+    vertical-align: -3px;
+    margin-left: 6px;
+  }
+  .kontextzeile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kontextzeile :global(.regler) {
+    flex: 1;
+    min-width: 0;
+  }
+  .kontextzeile :global(.zahl) {
+    flex: none;
+    width: 108px;
+  }
+  .fazeile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
   }
   .schaetz {
     grid-column: 2;
