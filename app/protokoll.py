@@ -24,7 +24,6 @@ import json
 import logging
 import logging.handlers
 import os
-import resource
 import sys
 import time
 import uuid
@@ -49,8 +48,46 @@ def neue_request_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+def _spitzenspeicher_windows() -> float:
+    """Peak working set of this process, in MB, read from the process API.
+
+    Windows carries no `resource` module — the same number lives behind
+    GetProcessMemoryInfo, which is reachable without a further dependency.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    class _Speicherzaehler(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+        ]
+
+    zaehler = _Speicherzaehler()
+    zaehler.cb = ctypes.sizeof(zaehler)
+    ctypes.WinDLL("kernel32").K32GetProcessMemoryInfo(
+        ctypes.WinDLL("kernel32").GetCurrentProcess(),
+        ctypes.byref(zaehler),
+        zaehler.cb,
+    )
+    return round(zaehler.PeakWorkingSetSize / (1024 * 1024), 1)
+
+
 def speicher_mb() -> float:
     """Peak resident memory of this process so far, in MB."""
+    if sys.platform == "win32":
+        return _spitzenspeicher_windows()
+
+    import resource
+
     hoechststand = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     # Linux counts in kilobytes, macOS in bytes.
     teiler = 1024 if sys.platform != "darwin" else 1024 * 1024

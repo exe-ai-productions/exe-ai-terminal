@@ -10,11 +10,16 @@ import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
 log = logging.getLogger(__name__)
+
+# The last stamp handed out, and the lock that keeps two threads from
+# handing out the same one. Both belong to jetzt_iso() below.
+_letzter_stempel = ""
+_stempel_sperre = threading.Lock()
 
 SCHEMA_DATEI = Path(__file__).resolve().parent / "schema.sql"
 SCHEMA_VERSION = 11
@@ -191,8 +196,25 @@ def jetzt_iso() -> str:
     quick succession get the same timestamp and the sorting in the sidebar
     becomes random. The notation stays sortable because ISO 8601 with a
     fixed number of digits also compares correctly as text.
+
+    Asking the clock is not enough by itself. Windows advances its clock
+    only about every sixteen milliseconds, so everything written inside one
+    tick would carry identical microseconds and sort by chance after all —
+    which is exactly what the sidebar must not do. Whenever the clock has
+    not moved on, the stamp is carried forward by a microsecond instead:
+    the order then follows the order things were written in, and it never
+    runs ahead of the real time by more than the tick it is bridging.
     """
-    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+    global _letzter_stempel
+
+    with _stempel_sperre:
+        stempel = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        if stempel <= _letzter_stempel:
+            stempel = (
+                datetime.fromisoformat(_letzter_stempel) + timedelta(microseconds=1)
+            ).isoformat(timespec="microseconds")
+        _letzter_stempel = stempel
+        return stempel
 
 
 class Database:

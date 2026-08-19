@@ -207,14 +207,24 @@ def greift_nach_draussen(befehl: str, ordner: list[str]) -> str | None:
             for w in wurzeln
         ):
             continue
-        try:
-            ziel = _aufgeloest(sauber, wurzel)
-        except (OSError, RuntimeError):
-            continue
         # Redirection targets under /dev are shell plumbing, not a reach:
         # "2>/dev/null" silences a command, it does not touch a file. Writing
         # to a raw device stays caught by the tripwire above.
-        if str(ziel) == "/dev/null" or str(ziel).startswith(("/dev/std", "/dev/fd/", "/dev/tty")):
+        #
+        # Judged on what was written, not on what it resolves to: Windows has
+        # no /dev, so resolving turns the everyday "2>/dev/null" into a
+        # real-looking C:\dev\null and every second command would be reported
+        # as reaching outside. NUL is what the same plumbing is called there.
+        geschrieben = sauber.replace("\\", "/")
+        if (
+            geschrieben == "/dev/null"
+            or geschrieben.startswith(("/dev/std", "/dev/fd/", "/dev/tty"))
+            or sauber.upper() == "NUL"
+        ):
+            continue
+        try:
+            ziel = _aufgeloest(sauber, wurzel)
+        except (OSError, RuntimeError):
             continue
         if not liegt_innerhalb(ziel, wurzeln):
             return str(ziel)
@@ -405,12 +415,27 @@ async def _starten(befehl: str, wurzel: Path):
     wrote "-n HALLO" into the file. Whatever the user would get in their own
     terminal, they get here.
 
+    Windows has no /bin/sh, and its command processor reads /c where a POSIX
+    shell reads -c. Handed the wrong switch it ignores the command entirely
+    and opens an interactive session instead: the caller then gets a version
+    banner back and nothing was ever run. COMSPEC names whichever processor
+    the system actually uses.
+
     PYTHONUNBUFFERED keeps a python one-liner from withholding its output.
     """
+    if os.name == "nt":
+        programm = os.environ.get("COMSPEC") or "cmd.exe"
+        schalter = "/c"
+        text = befehl
+    else:
+        programm = os.environ.get("SHELL") or "/bin/sh"
+        schalter = "-c"
+        text = _mit_ordnermarke(befehl)
+
     return await asyncio.create_subprocess_exec(
-        os.environ.get("SHELL") or "/bin/sh",
-        "-c",
-        _mit_ordnermarke(befehl) if os.name == "posix" else befehl,
+        programm,
+        schalter,
+        text,
         cwd=str(wurzel),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

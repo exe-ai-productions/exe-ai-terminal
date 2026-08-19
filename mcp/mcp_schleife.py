@@ -79,6 +79,35 @@ async def anfrage_behandeln(
     return _fehler(kennung, -32601, f"Unbekannte Methode: {methode}")
 
 
+async def _zeilen(): # -> AsyncIterator[bytes]
+    """Standard input, line by line, on every system.
+
+    Windows needs its own way in. Its event loop hands every read to the
+    completion port, and a standard handle cannot be registered there —
+    the attempt fails with "invalid handle" and the server stays mute until
+    the caller's handshake times out. Reading the pipe in a worker thread
+    sidesteps the completion port entirely; everywhere else the loop reads
+    the pipe directly, which is cheaper and long proven.
+    """
+    if sys.platform == "win32":
+        while True:
+            zeile = await asyncio.to_thread(sys.stdin.buffer.readline)
+            if not zeile:
+                return
+            yield zeile
+    else:
+        schleife = asyncio.get_running_loop()
+        leser = asyncio.StreamReader()
+        await schleife.connect_read_pipe(
+            lambda: asyncio.StreamReaderProtocol(leser), sys.stdin
+        )
+        while True:
+            zeile = await leser.readline()
+            if not zeile:
+                return
+            yield zeile
+
+
 async def bedienen(
     servername: str,
     version: str,
@@ -86,16 +115,7 @@ async def bedienen(
     ausfuehren: Ausfuehrer,
 ) -> None:
     """Serves requests until standard input closes."""
-    schleife = asyncio.get_running_loop()
-    leser = asyncio.StreamReader()
-    await schleife.connect_read_pipe(
-        lambda: asyncio.StreamReaderProtocol(leser), sys.stdin
-    )
-
-    while True:
-        rohzeile = await leser.readline()
-        if not rohzeile:
-            break
+    async for rohzeile in _zeilen():
         text = rohzeile.decode("utf-8", "replace").strip()
         if not text:
             continue

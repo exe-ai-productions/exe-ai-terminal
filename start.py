@@ -16,6 +16,21 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Packaged without a console — the normal case on Windows, where a double
+# click opens no terminal — Python hands out None for the standard streams
+# instead of a file. Everything that asks a stream a question then dies on
+# it: uvicorn's log formatter asks isatty() before the service ever starts.
+# A sink costs nothing and keeps every later import honest, so it happens
+# here, before anything heavy is imported.
+if sys.stdout is None or sys.stderr is None:
+    import os
+
+    _leerlauf = open(os.devnull, "w")
+    if sys.stdout is None:
+        sys.stdout = _leerlauf
+    if sys.stderr is None:
+        sys.stderr = _leerlauf
+
 # The tool servers live next to each other and import each other by plain
 # name, exactly as they do when started as separate scripts.
 WURZEL = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))

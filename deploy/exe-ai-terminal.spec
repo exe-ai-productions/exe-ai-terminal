@@ -19,6 +19,8 @@ import re
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
 WURZEL = Path(SPECPATH).parent
 
 # The one version, read where it lives — a second number here would drift.
@@ -52,6 +54,12 @@ versteckt = [
     "app.main",
 ]
 
+# The IANA time-zone database ships as data files that zoneinfo reads at
+# runtime, not as an import — so the collector never sees them on its own.
+# macOS and Linux fall back to the operating system's copy; Windows has none,
+# and without these files the configured zone cannot resolve there.
+mitgeliefert += collect_data_files("tzdata")
+
 analyse = Analysis(
     [str(WURZEL / "start.py")],
     pathex=[str(WURZEL), str(WURZEL / "mcp")],
@@ -78,12 +86,19 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    # The program serves the browser; its own window would be a second one.
-    # On Windows that means no console — a black box next to the app reads
-    # as broken, and a failed start explains itself in the log files. On
-    # macOS and Linux the bare binary keeps talking to whoever starts it
-    # from a terminal; the double-click path goes through the app bundle
-    # below, which opens no terminal to begin with.
+    # The program serves the browser; its own window would be a second one,
+    # and a black box next to the app reads as broken.
+    #
+    # It is still built WITH a console on Windows, because the same binary
+    # is also its own tool server: started with --mcp it speaks JSON-RPC over
+    # the standard streams, and a windowed build has none to speak over —
+    # the handshake then runs into its timeout and every tool is lost, while
+    # the start drags out by the length of that timeout.
+    #
+    # `hide_console` keeps the window from ever being seen: the streams exist,
+    # the box does not. On macOS and Linux the bare binary keeps talking to
+    # whoever starts it from a terminal; the double-click path goes through
+    # the app bundle below, which opens no terminal to begin with.
     console=(sys.platform != "win32"),
     icon=str(WURZEL / "deploy" / "icon.ico") if sys.platform == "win32" else None,
     disable_windowed_traceback=False,

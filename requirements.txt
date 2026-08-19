@@ -14,3 +14,8 @@ pytest==8.3.4
 pytest-asyncio==0.25.0
 
 pypdf==6.14.2
+
+# The IANA time-zone database as a package. macOS and Linux carry it in the
+# operating system, so zoneinfo finds it there; Windows ships none, and
+# without this the first zoneinfo lookup fails and the program cannot start.
+tzdata==2025.2

@@ -166,13 +166,19 @@ class AppConfig(BaseModel):
     @field_validator("timezone")
     @classmethod
     def _zeitzone_bekannt(cls, wert: str | None) -> str | None:
+        # A single config value must never keep the program from starting. If
+        # the zone cannot be resolved — a mistyped name, or a host without the
+        # time-zone database — it is dropped with a warning instead of raising,
+        # and the alarm clock falls back to the host zone (the same behaviour
+        # as leaving the field empty).
         if wert is not None:
             from zoneinfo import ZoneInfo
 
             try:
                 ZoneInfo(wert)
-            except Exception as fehler:
-                raise ValueError(f"Unbekannte Zeitzone '{wert}'") from fehler
+            except Exception:
+                log.warning("Unknown time zone %r, falling back to host zone", wert)
+                return None
         return wert
 
     @field_validator("port")
