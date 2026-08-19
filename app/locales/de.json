@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Exe AI Terminal",
+    "name": "Exe AI",
     "bereit": "Bereit",
     "startet": "Dienst startet …",
     "schliessen": "Schließen",
@@ -61,6 +61,7 @@
   "eingabe": {
     "tps_einheit": "TPS",
     "platzhalter": "Nachricht schreiben …",
+    "los": "Womit fangen wir an?",
     "nachricht": "Nachricht",
     "senden": "Senden",
     "abbrechen": "Antwort abbrechen",
@@ -71,15 +72,16 @@
     "anhang_hinweis": "oder hineinziehen / einfügen",
     "anhang_entfernen": "Bild entfernen",
     "bild_titel": "Bild",
-    "bildmodus": "Bildmodus",
-    "bild_platzhalter": "Beschreibe das Bild …",
     "dokument_anhaengen": "Dokument anhängen",
     "dokument_hinweis": "PDF, TXT, MD — wird als Text gelesen",
     "dokument_entfernen": "Dokument entfernen",
     "denken": "Denken",
     "denken_an": "Denken: an",
     "denken_aus": "Denken: aus",
-    "denken_gesperrt": "Dieses Modell kann das Denken nicht schalten"
+    "mtp_aus": "Tempo-Modul aus",
+    "denken_gesperrt": "Dieses Modell kann das Denken nicht schalten",
+    "werkzeug_an": "Modell kann Werkzeuge rufen",
+    "werkzeug_aus": "Dieses Modell kann keine Werkzeuge rufen"
   },
   "maske": {
     "titel": "Maske",
@@ -119,7 +121,8 @@
     "vorgaben": "Vorgaben für das Bild-Fenster",
     "generator_holen": "Generator holen",
     "generator_satz": "Das kleine freie Programm, das die Bilder zeichnet. Es wird einmal geholt, landet neben deinen Modellen und bleibt dort.",
-    "generator_laedt": "Generator wird geholt…"
+    "generator_laedt": "Generator wird geholt…",
+    "masse_folgen_modell": "Größe und Schritte richten sich automatisch nach dem gewählten Modell."
   },
   "einbettung": {
     "titel": "In langen Dokumenten suchen",
@@ -138,6 +141,7 @@
     "lora_ordner": "LoRA-Ordner öffnen",
     "lora_keine": "Noch keine LoRA-Dateien im Ordner",
     "lora_unbekannt": "Eine LoRA mit diesem Namen gibt es nicht",
+    "begleiter_unbekannt": "Eine Begleitdatei mit diesem Namen gibt es nicht",
     "lora_eine_staerke": "sd.cpp wendet je LoRA eine Stärke an — die getrennten Werte für Modell und Clip sind ein ComfyUI-Begriff.",
     "startbild": "Von einem Bild ausgehen",
     "startbild_waehlen": "Bild wählen",
@@ -172,7 +176,41 @@
     "zeit_abgelaufen": "Das Bild hat zu lange gebraucht und wurde angehalten",
     "gescheitert": "Das Bild ließ sich nicht zeichnen",
     "abgebrochen": "Zeichnen abgebrochen",
-    "kein_platz": "Neben dem geladenen Sprachmodell ist zu wenig Speicher frei — es fehlen etwa {gb} GB"
+    "kein_platz": "Neben dem geladenen Sprachmodell ist zu wenig Speicher frei — es fehlen etwa {gb} GB",
+    "erweitert": "Erweitert",
+    "vae": "VAE (Farbe und Detail)",
+    "vae_keins": "Die des Modells",
+    "clip_skip": "Clip-Skip",
+    "adetailer": "Gesichter schärfen (ADetailer)",
+    "adetailer_keins": "Aus",
+    "ad_prompt": "Gesichts-Prompt",
+    "ad_prompt_platzhalter": "leer übernimmt den Haupt-Prompt",
+    "prompt_platzhalter": "Was soll im Bild sein? — in deiner Sprache",
+    "gruppe_masse": "Maße & Lauf",
+    "gruppe_feinschliff": "Feinschliff & Erweitert",
+    "gruppe_startbild": "Aus einem Bild starten",
+    "hires": "Hires-Fix (schärfere Details)",
+    "hires_faktor": "Faktor",
+    "hires_hinweis": "Malt einmal, dann größer für feinere Details — etwa doppelte Zeit.",
+    "turbo_aus": "Image-Turbo ist aus",
+    "turbo_ladefehler": "Image-Turbo konnte das Modell nicht rechtzeitig laden",
+    "turbo": {
+      "name": "Image-Turbo",
+      "icon_hinweis": "Image-Turbo an/aus — hält das Bildmodell geladen, damit die nächsten Bilder ohne Ladezeit kommen",
+      "kein_programm": "Image-Turbo ist auf diesem PC nicht eingerichtet",
+      "zustand_aus": "Image-Turbo ist aus",
+      "zustand_bereit": "Image-Turbo ist bereit",
+      "zustand_zeichnet": "Image-Turbo lädt oder zeichnet gerade",
+      "zustand_fehler": "Image-Turbo hatte einen Fehler"
+    },
+    "fortschritt_prozent": "{zahl} %",
+    "seed_fest": "Fest",
+    "seed_plus": "+1",
+    "seed_minus": "−1",
+    "seed_zuletzt": "zuletzt: {zahl}",
+    "seed_uebernehmen": "Diesen Startwert übernehmen und festhalten",
+    "clip_auto": "Auto",
+    "warteschlange": "{zahl} Bilder in Arbeit"
   },
   "waechter": {
     "titel": "Extended Workflow",
@@ -218,7 +256,10 @@
     "bild_sichern": "Sichern",
     "dokument_seiten": "{zahl} Seiten",
     "dokument_gekuerzt": "Dokument nach 24.000 Zeichen gekürzt",
-    "neu_senden": "Nochmal senden"
+    "neu_senden": "Nochmal senden",
+    "seed_label": "Seed {zahl}",
+    "seed_kopieren": "Seed kopieren",
+    "seed_kopiert": "Seed kopiert"
   },
   "werkzeug": {
     "immer_erlauben": "In diesem Chat immer erlauben",
@@ -336,6 +377,8 @@
     "server_unter_aus": "Aus — noch nichts gestartet",
     "kein_modell_satz": "Noch kein Modell — der Katalog hat eines für diesen PC ausgewählt.",
     "mtp_aktiv": "Tempo-Modul aktiv",
+    "mtp_fehler": "Tempo-Modul konfiguriert, aber nicht geladen",
+    "mtp_laedt": "Tempo-Modul lädt …",
     "mtp_label": "MTP",
     "im_speicher": "{gb} GB im Speicher",
     "kontext_kurz": "Kontext {n}",
@@ -374,7 +417,8 @@
     "feld_mlock_hilfe": "verhindert das Auslagern des Modells",
     "schichten_alle": "Alle",
     "feld_eew": "Extended-Workflow-Modell",
-    "feld_eew_hilfe": "das kleine Modell, das die Vorschläge schreibt"
+    "feld_eew_hilfe": "das kleine Modell, das die Vorschläge schreibt",
+    "eew_keiner": "ohne"
   },
   "parameter": {
     "titel": "Parameter",
@@ -406,8 +450,10 @@
     "erscheinungsbild": "Erscheinungsbild",
     "auto": "Auto",
     "auto_hinweis": "„Auto“ folgt der Einstellung des Geräts",
-    "hell": "Hell",
-    "dunkel": "Dunkel",
+    "hell": "Pearl",
+    "dunkel": "Exe",
+    "darkmatter": "Dark Matter",
+    "heaven": "Heaven",
     "kontur": "Nachrichten als Kontur",
     "kontur_hinweis": "Statt gefüllter Fläche nur eine Haarlinie",
     "oberflaeche": "Oberflächengröße",
@@ -455,8 +501,6 @@
     "bild_zu_gross": "Das Bild ist zu groß (höchstens 10 MB)",
     "bild_fehlt": "Bild nicht gefunden",
     "kein_vision": "Das gewählte Modell kann keine Bilder sehen",
-    "bildserver_fehlt": "Kein Bildserver erreichbar — schalte ihn ein, dann erscheint er hier von selbst",
-    "bilderzeugung_fehlt": "Unter dieser Kennung läuft keine Erzeugung",
     "dokument_typ": "Nur PDF-, TXT- und MD-Dateien werden angenommen",
     "dokument_zu_gross": "Das Dokument ist zu groß (max. 20 MB)",
     "dokument_unlesbar": "In diesem Dokument steht kein lesbarer Text",
@@ -662,15 +706,15 @@
     "eingebaut_unter": "Ins Programm eingebaut"
   },
   "bilder": {
-    "gesichert": "Bild-Server gesichert — gilt sofort",
-    "nicht_geladen": "Bild-Server-Konfiguration konnte nicht geladen werden",
-    "nicht_gesichert": "Bild-Server-Konfiguration konnte nicht gesichert werden",
-    "keine": "Kein Bild-Server eingetragen"
+    "titel": "Bilder",
+    "bildordner": "Bildordner",
+    "leer": "Noch keine Bilder erzeugt.",
+    "laedt": "Lädt …"
   },
   "beta": {
     "marke": "Beta",
     "nur_vollversion": "Nur in der Vollversion verfügbar",
-    "nur_vollversion_text": "Agenten, Anweisungen und Werkzeuge gehören zum vollen Exe AI Terminal. Während der öffentlichen Beta bleiben sie sichtbar, aber gesperrt."
+    "nur_vollversion_text": "Agenten, Anweisungen und Werkzeuge gehören zum vollen Exe AI. Während der öffentlichen Beta bleiben sie sichtbar, aber gesperrt."
   },
   "dateien": {
     "gesichert": "Gesichert. Wirkt beim nächsten Start.",
@@ -775,6 +819,7 @@
     "art_chat": "Chat",
     "art_einbettung": "Einbettung",
     "art_bild": "Bild",
+    "art_zubehoer": "Zubehör",
     "suchen": "Ganz Hugging Face durchsuchen …",
     "passt": "Passt auf deine {gb} GB",
     "n_kontext": "{n}k Kontext",
@@ -796,8 +841,6 @@
     "kann_auge": "Sieht Bilder",
     "kann_gluehbirne": "Denkt vor der Antwort",
     "kann_blitz": "Tempo-Modul (MTP)",
-    "satz_gemma31": "Das Flaggschiff der werkzeugrufenden Familie. Dicht, ruhig durch lange Agentenläufe, sieht Bilder.",
-    "lang_gemma31": "Das Flaggschiff der werkzeugrufenden Familie. Von Grund auf aufs Werkzeugrufen trainiert, dicht in jeder Antwort und ruhig durch lange Agentenläufe. Bringt Augen und ein eigenes Tempo-Modul mit — beides wird automatisch geholt und genau auf dieses Modell abgestimmt.",
     "satz_gemma12": "Dieselbe Familie, halbes Gewicht. Die Wahl für 16-GB-PCs — mit Werkzeugen, Augen und Tempo-Modul.",
     "lang_gemma12": "Dieselbe werkzeugrufende Familie bei halbem Gewicht — die Alltagswahl für einen 16-GB-PC. Dicht, sieht Bilder und bringt ein eigenes Tempo-Modul mit, automatisch geholt und abgestimmt.",
     "satz_bonsai": "Ein Bit pro Gewicht — ein 27B-Hirn in einer 3,8-GB-Datei. Unschlagbar pro Gigabyte, denkt vor der Antwort.",
@@ -807,7 +850,46 @@
     "satz_exeguard": "Unser eigenes Wächter-Modell — winzig, auf die Werkzeuge des Terminals trainiert.",
     "lang_exeguard": "Exe Guard Dynamic: unser selbst trainiertes Wächter-Modell. Erkennt gescheiterte Schritte und schlägt den einen richtigen Befehl vor. (Endbeschriftung kurz vor Release.)",
     "satz_exeturbo": "Unser kleines Kernmodell für schwache Rechner — MoE, auf das Terminal trainiert.",
-    "lang_exeturbo": "Exe Turbo S: unser selbst trainiertes Kernmodell für Rechner mit 6–8 GB. Rechnet pro Wort nur mit 1,5 von 8,3 Milliarden Parametern und kennt die Werkzeuge und Regeln des Terminals."
+    "lang_exeturbo": "Exe Turbo S: unser selbst trainiertes Kernmodell für Rechner mit 6–8 GB. Rechnet pro Wort nur mit 1,5 von 8,3 Milliarden Parametern und kennt die Werkzeuge und Regeln des Terminals.",
+    "satz_cyberrealisticxl": "Fotoreales SDXL — Haut, Licht und Linse, die aus der Nähe standhalten. Die erste Wahl für realistische Porträts und Szenen.",
+    "satz_juggernautxl": "Ein breiter, verlässlicher SDXL-Allrounder: fotoreal von Haus aus, aber in den meisten Stilen zu Hause.",
+    "satz_realisticvision": "Der kleine Fotoreal-Standard — SD 1.5, speicherleicht und trotzdem verblüffend echt. Eine solide Basis für realistische Szenen.",
+    "satz_anythingv5": "Der Anime-Klassiker auf SD 1.5 — klare Linien, kräftige Farben, leicht genug für fast jeden Rechner.",
+    "satz_toonyou": "Cartoon und stilisierte Figuren auf SD 1.5 — weiche Schattierung, ausdrucksstarke Gesichter, kleiner Download.",
+    "satz_animaginexl": "Anime in SDXL-Größe — schärfere Details und höhere Auflösung als die SD-1.5-Anime-Modelle, für einen stärkeren Rechner.",
+    "klasse_sdxl": "SDXL",
+    "klasse_sd15": "SD 1.5",
+    "einzeldatei": "Einzeldatei",
+    "sorte_vae": "VAE",
+    "sorte_lora": "LoRA",
+    "sorte_adetailer": "ADetailer",
+    "sorte_mmproj": "Vision (mmproj)",
+    "sorte_mtp": "Tempo (MTP)",
+    "satz_vae_sd15": "Die klassische SD-1.5-VAE — der Baustein, der das interne Zahlenbild des Modells in echte Pixel übersetzt. Sauberere Farben und Details bei Modellen ohne eingebaute VAE.",
+    "satz_vae_sdxl": "Die reparierte SDXL-VAE, die auch in fp16 nicht überläuft — klare Farben ohne die berüchtigten schwarzen Kacheln.",
+    "satz_lora_lcm_sd15": "Der LCM-Beschleuniger für SD 1.5 — brauchbare Bilder in wenigen Schritten statt in zwanzig.",
+    "satz_lora_lcm_sdxl": "Derselbe LCM-Beschleuniger für SDXL — wenige Schritte, deutlich schneller.",
+    "satz_adetailer_face": "Findet Gesichter im fertigen Bild und malt jedes einzeln nach — der große Hebel für saubere Porträts.",
+    "satz_mmproj_gemma": "Vision für Gemma 4 31B — der Projektor, der dem Sprachmodell erlaubt, Bilder zu sehen. Landet im Modell-Ordner.",
+    "satz_mtp_gemma": "Das Tempo-Modul für Gemma 4 31B — ein kleiner Mitläufer, der die nächsten Wörter vorschlägt und die Antworten beschleunigt.",
+    "ordner_zeigen": "Ordner",
+    "satz_zub_lora": "Ein Beschleuniger-LoRA — brauchbare Bilder in wenigen Schritten statt in zwanzig.",
+    "satz_zub_vae": "Eine VAE — übersetzt das interne Zahlenbild des Modells in echte Pixel, für sauberere Farben und Details.",
+    "satz_zub_adetailer": "Ein ADetailer-Detektor — findet Gesichter, Hände oder Personen im fertigen Bild und schärft sie einzeln nach.",
+    "satz_zub_mtp": "Ein Tempo-Modul (MTP) — läuft neben dem Sprachmodell mit und beschleunigt die Antworten. Landet im Modell-Ordner.",
+    "satz_zub_mmproj": "Vision — der Projektor, der einem Sprachmodell erlaubt, Bilder zu sehen. Landet im Modell-Ordner.",
+    "satz_qwen36": "Das Tempo-Flaggschiff — MoE mit eingebautem Tempo-Modul, Augen über das Vision-Zubehör.",
+    "lang_qwen36": "Ein Mixture-of-Experts-Modell: 35B auf der Platte, 3B aktiv pro Token, das Tempo-Modul steckt in der Datei, eine Viertelmillion Token Kontext. Der Vision-Projektor kommt beim Herunterladen mit.",
+    "satz_qwencoder": "Der Agenten-Coder — gebaut für Werkzeugrufe, lange Läufe und große Projekte.",
+    "lang_qwencoder": "Trainiert auf agentisches Programmieren: Werkzeugrufe, geduldige Mehrschritt-Läufe, ehrliche Diffs. MoE mit 3B aktiv pro Token — antwortet flott auf einem 32-GB-PC.",
+    "satz_execore": "Unser Kernmodell — trainiert auf das Verhalten, die Werkzeuge und die Regeln des Terminals.",
+    "lang_execore": "Ein feinabgestimmtes 27B, das dieses Terminal kennt: jedes eingebaute Werkzeug, die Ordnerregeln, die Grenzen — und es liest auch fremde Werkzeug-Schemata. Trainiert auf Verhalten, nicht auf Fakten.",
+    "satz_emb_qwen3": "Der moderne kompakte Einbetter — starke Suche, 32k Kontext.",
+    "satz_emb_nomic": "Der bewährte Allrounder für die lokale Suche — klein, schnell, verlässlich.",
+    "satz_emb_gemma": "Googles kleiner Einbetter — leicht, mehrsprachig, fix.",
+    "satz_emb_bgem3": "Das mehrsprachige Schwergewicht — hundert Sprachen, 8k Kontext.",
+    "satz_emb_mxbai": "Starke englische Suche in einer kleinen Datei.",
+    "satz_emb_minilm": "Der winzige Klassiker — sofort da, gut genug für schnelle Nachschläge."
   },
   "terminal": {
     "titel": "Terminal",
@@ -899,5 +981,18 @@
     "dock_weg": "Entfernen",
     "dock_weg_frage": "{name} aus dem Dock nehmen?",
     "anzahl": "{n} Notizen"
+  },
+  "speicherorte": {
+    "unbekannt": "Diesen Speicherort gibt es nicht.",
+    "leer": "Bitte einen Ordnerpfad angeben.",
+    "kein_ordner": "Dort liegt bereits eine Datei, kein Ordner.",
+    "nicht_anlegbar": "Der Ordner ließ sich dort nicht anlegen.",
+    "nicht_schreibbar": "In diesen Ordner darf das Programm nicht schreiben.",
+    "ueberschneidung": "Dieser Ordner wird schon von einem anderen Speicherort benutzt.",
+    "oeffnen": "Öffnen",
+    "aendern": "Speicherort ändern",
+    "frage": "Neuer Ordner:",
+    "geaendert": "Speicherort geändert.",
+    "neustart": "Neuer Ort gesetzt — wirkt für Modelle erst nach einem Neustart."
   }
 }

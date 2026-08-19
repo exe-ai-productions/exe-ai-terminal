@@ -73,7 +73,7 @@
   modellGesperrt={laeuft}
   leerText={auskunft ? t('einbettungsserver.kein_modell') : ''}
   katalogTat={() => katalogOeffnen('einbettung')}
-  ordnerOeffnen={() => api.einbettungOrdnerOeffnen().catch(() => {})}
+  speicherort="einbettung"
   tatText={laeuft ? t('einbettungsserver.stoppen') : t('einbettungsserver.starten')}
   tatPunkt={laeuft ? 'gruen' : 'still'}
   tatGesperrt={arbeitet || (!laeuft && !bereit)}

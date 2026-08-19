@@ -15,7 +15,7 @@
      not the tool catalogue, whose test forbids a drawn sign that maps to
      no tool.
 
-       winkel     calls tools           raster     the catalog grid
+       werkzeug   calls tools (wrench)  raster     the catalog grid
        auge       sees images           server     a model server (racks)
        gluehbirne thinks first          wolke      memory
        blitz      the speed module      buch       skills
@@ -55,8 +55,10 @@
   stroke-linejoin="round"
   aria-hidden="true"
 >
-  {#if zeichen === 'winkel'}
-    <path d="M9 6l6 6-6 6" stroke-width="2.5" />
+  {#if zeichen === 'werkzeug'}
+    <!-- The open-end wrench — it replaced the caret, which said
+         "terminal" when it meant "calls tools". -->
+    <path d="M7 10h3v-3l-3.5-3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1-3 3l-6-6a6 6 0 0 1-8-8l3.5 3.5" />
   {:else if zeichen === 'auge'}
     <path d="M2.5 12 C6 6.5, 18 6.5, 21.5 12 C18 17.5, 6 17.5, 2.5 12 Z" />
     <circle cx="12" cy="12" r="3" />
@@ -64,7 +66,7 @@
     <path d="M12 3 a6.3 6.3 0 0 1 3.4 11.6 c-.6.4-1 1-1 1.7 v.7 h-4.8 v-.7 c0-.7-.4-1.3-1-1.7 A6.3 6.3 0 0 1 12 3 Z" />
     <path d="M10 20.5 h4" />
   {:else if zeichen === 'blitz'}
-    <path d="M13 3 L6.5 13.5 H11 L9.5 21 L17.5 10.5 H13 Z" />
+    <path d="M13 3 L5 13.5 H10.5 L9.5 21 L17.5 10.5 H12 Z" />
   {:else if zeichen === 'raster'}
     <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
     <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />

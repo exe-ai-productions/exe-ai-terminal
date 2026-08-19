@@ -325,9 +325,10 @@
        read as THAT model's fill.
 
        The number needs no word. "Tokens" names the unit, not the thing —
-       what fills up is the context, and standing under the model name the
-       bar says so by itself. The full sentence is in the title, from the
-       catalogue, for anyone who cannot see the bar. -->
+       what fills up is the context. The bar itself has moved up to the seam
+       between header and chat, where it has the width of the window; what
+       stays here is the model and the plain figure beside it. The full
+       sentence is in the title for anyone who cannot see either. -->
   {#if zustand.bereich === 'chats'}
     <div
       class="statusfuss"
@@ -341,15 +342,7 @@
           {#if kontext.gesamt}{kurz(kontext.genutzt)} / {kurz(kontext.gesamt)}{:else}—{/if}
         </span>
       </div>
-      <div class="balken">
-        <div
-          style="width:{kontext.anteil}%; background:{kontext.anteil > 90
-            ? 'var(--rot)'
-            : kontext.anteil > 70
-              ? 'var(--gelb)'
-              : 'var(--text-leise)'}"
-        ></div>
-      </div>
+
     </div>
   {/if}
 </aside>
@@ -403,6 +396,17 @@
     background: var(--bg-seite);
     border-right: 1px solid var(--linie);
     transition: width 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+  /* Dark Matter only: a whisper of vertical depth so the sidebar isn't a flat
+     slab — a touch more violet up top, settling calm toward the foot. No
+     pattern, so the chat list stays clean to read. */
+  :global(:root[data-modus='darkmatter']) .seitenleiste {
+    background: linear-gradient(180deg, #221c46 0%, #1a1538 46%, #161130 100%);
+  }
+  /* Heaven, the same whisper mirrored into the light: a touch brighter up
+     top, settling toward the foot. */
+  :global(:root[data-modus='heaven']) .seitenleiste {
+    background: linear-gradient(180deg, #e2eaf6 0%, #dbe5f3 46%, #d5e0ef 100%);
   }
   /* While the hand drags the seam, the edge must sit under it — an easing
      that trails behind the pointer reads as lag, not as polish. */
@@ -480,7 +484,7 @@
     transition: background 0.16s, color 0.16s;
   }
   .bereiche button[aria-pressed='true'] {
-    background: var(--bg-erhoben);
+    background: var(--kontrast);
     color: var(--text);
     font-weight: 600;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -612,19 +616,6 @@
     color: var(--text-still);
     font-variant-numeric: tabular-nums;
   }
-  .balken {
-    height: 3px;
-    border-radius: 99px;
-    background: var(--linie);
-    overflow: hidden;
-    margin-top: 7px;
-  }
-  .balken > div {
-    height: 100%;
-    border-radius: 99px;
-    transition: width 0.35s ease, background 0.35s ease;
-  }
-
   .kontextmenue {
     position: fixed;
     z-index: 50;

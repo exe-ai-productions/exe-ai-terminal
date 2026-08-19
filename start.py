@@ -143,6 +143,12 @@ def _terminal_bedienen() -> int:
         host=konfiguration.app.host,
         port=port,
         reload=False,
+        # On SIGTERM (the window closing sends one) do not hang on a
+        # half-minute request still drawing a picture: cut it after a few
+        # seconds and run the shutdown, which is what stops the model,
+        # embedding and image servers. Without this, closing the window during
+        # a draw could time out and hard-kill the service, orphaning them.
+        timeout_graceful_shutdown=3,
     )
     return 0
 

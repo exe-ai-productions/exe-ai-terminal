@@ -47,6 +47,13 @@ async function ruf(pfad, optionen = {}) {
 
 const alsText = (wert) => JSON.stringify(wert)
 
+/* The storage-location list is read by every folder row — the pictures
+   module and the three server panels — which mount together. Share one
+   in-flight request so their near-simultaneous reads collapse into a single
+   call; it clears the moment it resolves, so a read after a change is always
+   fresh, never a stale cache. */
+let orteLauf = null
+
 export const api = {
   /* `frisch` asks the server to knock on every candidate first — for the
      moment right after something was started or added, when the regular
@@ -63,17 +70,28 @@ export const api = {
      `bildZeichnen` blocks for as long as the picture takes — half a minute
      is normal, so no caller may treat a slow answer as a hang. */
   bildmodelle: () => ruf('/bild/modelle'),
+  /* The starting values a model opens on — class-aware, so an SDXL model
+     comes back at 1024/28 and an SD-1.5 at 512/22. Asked whenever the
+     chosen model changes. */
+  bildVorgaben: (modell) => ruf(`/bild/vorgaben${modell ? `?modell=${encodeURIComponent(modell)}` : ''}`),
   bildordnerOeffnen: () => ruf('/bild/folder', { method: 'POST' }),
   bildZeichnenStoppen: () => ruf('/bild/stop', { method: 'POST' }),
-  loraOrdnerOeffnen: () => ruf('/bild/lora-folder', { method: 'POST' }),
+  /* Open a companion sub-folder in the file manager so a hand-picked file can
+     be dropped in. The picture side (vae/lora/adetailer) and the chat side
+     (mtp/vision) each have their own whitelisted route. */
+  bildBegleiterOrdner: (unter) => ruf(`/bild/begleiter-folder/${unter}`, { method: 'POST' }),
+  chatBegleiterOrdner: (unter) => ruf(`/runner/begleiter-folder/${unter}`, { method: 'POST' }),
   /* The generator program itself — fetched once on machines without one. */
   bildProgrammHolen: () => ruf('/bild/programm', { method: 'POST' }),
   bildProgrammStand: () => ruf('/bild/programm'),
   /* Asks the loaded LANGUAGE model to rewrite a picture prompt in English.
      Nothing to do with the generator — it only happens to serve the same
      window. */
-  bildPromptVerbessern: (prompt, endpointId) =>
-    ruf('/bild/prompt', { method: 'POST', body: alsText({ prompt, endpoint_id: endpointId || null }) }),
+  /* The running picture's honest step counter — feeds the filling frame. */
+  bildFortschritt: () => ruf('/bild/fortschritt'),
+
+  bildPromptVerbessern: (prompt, negativ, endpointId) =>
+    ruf('/bild/prompt', { method: 'POST', body: alsText({ prompt, negativ: negativ || '', endpoint_id: endpointId || null }) }),
 
   /* The embedding server: its own port, its own folder, its own buttons.
      Started and stopped independently of the language model's server —
@@ -84,6 +102,26 @@ export const api = {
     ruf('/einbettungsserver/start', { method: 'POST', body: alsText({ modell, port: port ?? null }) }),
   einbettungStoppen: () => ruf('/einbettungsserver/stop', { method: 'POST' }),
   einbettungOrdnerOeffnen: () => ruf('/einbettungsserver/folder', { method: 'POST' }),
+
+  /* The assets view: the saved pictures, and the storage locations behind
+     them — one place to see what was drawn and to move where it is kept. */
+  bilderListe: () => ruf('/bilder'),
+  speicherorteLesen: () => {
+    if (!orteLauf) orteLauf = ruf('/speicherorte').finally(() => { orteLauf = null })
+    return orteLauf
+  },
+  // A change drops the shared in-flight read, so the very next read starts
+  // fresh instead of joining a request begun before the change and handing
+  // back the pre-change list.
+  speicherortSetzen: (name, pfad) => {
+    orteLauf = null
+    return ruf(`/speicherorte/${name}`, { method: 'PUT', body: alsText({ pfad }) })
+  },
+  speicherortZuruecksetzen: (name) => {
+    orteLauf = null
+    return ruf(`/speicherorte/${name}`, { method: 'DELETE' })
+  },
+  speicherortOeffnen: (name) => ruf(`/speicherorte/${name}/folder`, { method: 'POST' }),
 
   /* Extended Workflow: the guardian's own small model. Its own routes for
      the same reason the embedding server has its own — two servers that
@@ -153,10 +191,13 @@ export const api = {
   /* A companion (mmproj/mtp) carries which model it belongs to and its
      role, so the service records the association in a manifest and the
      runner attaches it later without guessing from file names. */
-  modellHolen: (repo, datei, ziel = null, gehoert_zu = null, rolle = null, art = 'chat') =>
+  modellHolen: (
+    repo, datei, ziel = null, gehoert_zu = null, rolle = null, art = 'chat',
+    unterordner = null,
+  ) =>
     ruf('/runner/download', {
       method: 'POST',
-      body: alsText({ repo, datei, ziel, gehoert_zu, rolle, art }),
+      body: alsText({ repo, datei, ziel, gehoert_zu, rolle, art, unterordner }),
     }),
   modellHolenStand: () => ruf('/runner/download'),
   modellHolenAbbrechen: () => ruf('/runner/download', { method: 'DELETE' }),
@@ -187,11 +228,12 @@ export const api = {
       { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: datei },
     ),
   bildAdresse: (name) => `${BASIS}/images/${name}`,
-  bildEndpunkte: () => ruf('/images/endpoints'),
-  bildGenerieren: (daten) =>
-    ruf('/images/generate', { method: 'POST', body: alsText(daten) }),
-  bildStoppen: (generationId) =>
-    ruf('/images/stop', { method: 'POST', body: alsText({ generation_id: generationId }) }),
+  /* Image-Turbo: the optional persistent picture server. Off by default;
+     switched on from the plus menu, which then keeps the model loaded so
+     every picture after the first skips the load. */
+  turboStand: () => ruf('/bild/turbo'),
+  turboStarten: (modell) => ruf('/bild/turbo/start', { method: 'POST', body: alsText({ modell }) }),
+  turboStoppen: () => ruf('/bild/turbo/stop', { method: 'POST' }),
   werkzeugKonfiguration: () => ruf('/tools/config'),
   werkzeugKonfigurationSichern: (content) =>
     ruf('/tools/config', { method: 'PUT', body: alsText({ content }) }),

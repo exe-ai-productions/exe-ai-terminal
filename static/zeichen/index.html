@@ -68,6 +68,28 @@
     Neue Werkzeugzeichen entstehen über den Skill „exe-werkzeug-bauen".
   </div>
 
+  <div class="regeln" style="margin-top: 10px;">
+    <strong>Der Farbleitfaden des Hauses: eine Fähigkeit, eine Farbe — überall.</strong>
+    Wo immer ein Zeichen farbig auftaucht (Leiste, Katalog, Tabellen, Menüs),
+    trägt es exakt seinen Ton, damit der Blick sofort weiß, was gemeint ist:
+    <span style="color:#c9a227">■ Gold #c9a227 Reasoning/Glühbirne (+ EEW)</span> ·
+    <span style="color:#5b8dbe">■ Blau #5b8dbe Tempo/MTP-Blitz</span> ·
+    <span style="color:#8d78bd">■ Violett #8d78bd Vision/Auge</span> ·
+    <span style="color:#9aa05e">■ Oliv #9aa05e Tool-Using/Maulschlüssel</span> ·
+    <span style="color:#bd7a53">■ Kupfer #bd7a53 LoRA/Fliege</span> ·
+    <span style="color:#4e8f8b">■ Petrol #4e8f8b VAE/Malerpalette</span> ·
+    <span style="color:#b56d84">■ Altrosa #b56d84 ADetailer/Sucher</span>.
+    Grün <span style="color:#6b8e6f">#6b8e6f</span> und Rot
+    <span style="color:#b4544c">#b4544c</span> bleiben reine Zustandsfarben
+    (bereit/Fehler) und kennzeichnen nie eine Fähigkeit.
+    <br><br>
+    <strong>Dazu die Helligkeitsregel der Eingabeleiste:</strong> helles
+    Zeichen (<code>--text-leise</code>) = drückbar (Plus, Birne) · Lampengrau
+    (<code>--linie-stark</code>) = zeigt nur an (Schlüssel, Blitz, Auge; auch
+    die gesperrte Birne) · Farbe = an. Genau zwei Grautöne, nie ein dritter,
+    kein Transparenz-Dimmen; die Ringe bleiben immer im Linienton.
+  </div>
+
   <h2>Marken</h2>
   <div class="raster">
     <div class="karte">
@@ -164,6 +186,18 @@
       <div class="beschreibung">
         <div class="name">Reiter-Ordner <svg viewBox="0 0 64 64" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="klein"><path d="M11 50 V14 H27 L32 21 H53 V50 Z" stroke-width="5"/><path d="M11 26 H53" stroke-width="4.5"/></svg></div>
         <div class="ort">Arbeitsordner — Plus-Menü, Ordner-Pillen über dem Feld, Wähler-Maske. Eindeutigkeit vor Originalität, weil das Zeichen eine Freigabegrenze markiert.</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <defs><linearGradient id="tachoKat" x1="9" y1="0" x2="55" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#57a55f"/><stop offset="0.5" stop-color="#d8b23a"/><stop offset="1" stop-color="#d15448"/></linearGradient></defs>
+        <path d="M16.4 48.6 A22 22 0 1 1 47.6 48.6" stroke="url(#tachoKat)" stroke-width="5"/>
+        <g transform="rotate(135 32 33)"><line x1="32" y1="33" x2="32" y2="14" stroke="#d15448" stroke-width="5"/></g>
+        <circle cx="32" cy="33" r="3.2" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Turbo-Tacho <svg viewBox="0 0 64 64" width="14" height="14" fill="none" stroke-linecap="round" stroke-linejoin="round" class="klein"><defs><linearGradient id="tachoKatKlein" x1="9" y1="0" x2="55" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#57a55f"/><stop offset="0.5" stop-color="#d8b23a"/><stop offset="1" stop-color="#d15448"/></linearGradient></defs><path d="M16.4 48.6 A22 22 0 1 1 47.6 48.6" stroke="url(#tachoKatKlein)" stroke-width="5"/><g transform="rotate(135 32 33)"><line x1="32" y1="33" x2="32" y2="14" stroke="#d15448" stroke-width="5"/></g><circle cx="32" cy="33" r="3.2" fill="currentColor" stroke="none"/></svg></div>
+        <div class="ort">Image-Turbo-Schalter (Plus-Menü). Eigenes Bauteil <code>Turbozeichen.svelte</code> — nicht in Hauszeichen, weil animiert und mehrfarbig. Aus = grau, Nadel ruht bei Null; an = Nadel fährt einmal von links unten bis zum Anschlag rechts unten, schlägt auf und pendelt ein, Farbe grün→gold→rot. Löste den Blitz ab, der doppeldeutig auch für MTP stand.</div>
       </div>
     </div>
   </div>
@@ -275,6 +309,485 @@
     </div>
   </div>
 
+  <h2>Im Einsatz — Wartemarken (Chat, animiert)</h2>
+  <div class="regeln" style="margin-bottom: 12px;">
+    Aus <code>Wartezeile.svelte</code> — eigene Bauart: Breitformat
+    <code>viewBox 0 0 132 64</code>, Strichzug-Animation über 3,4&nbsp;s, danach
+    setzen sich die drei Punkte. Hier steht das fertige Standbild; im Chat
+    zeichnet sich die Marke. Der Rahmen ist immer derselbe (x4 y4 72×56 rx15) —
+    wer eine neue Marke baut, hält diese Kanten ein.
+  </div>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 132 64" width="100" height="48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="72" height="56" rx="15" stroke-width="5.5"/>
+        <path d="M20 22 L34 32 L20 42" stroke-width="5"/>
+        <path d="M42 42 H 58" stroke-width="5"/>
+        <circle cx="92" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="106" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="120" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Antwort</div>
+        <div class="ort">Wartezeile, Standardfall — die Chat-Marke: Rahmen, Pfeil, Grundlinie</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 132 64" width="100" height="48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 32 C17 11, 63 11, 76 32 C63 53, 17 53, 4 32 Z" stroke-width="5.5"/>
+        <circle cx="40" cy="32" r="11" stroke-width="5"/>
+        <circle cx="92" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="106" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="120" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Auge — Bild wird gelesen</div>
+        <div class="ort">Wartezeile <code>art="vision"</code> — die Nachricht trug ein Bild. Dieselbe Augenform wie das Fähigkeitszeichen (ein Auge im ganzen Haus), Pupille zeichnet sich als eigener Zug</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 132 64" width="100" height="48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 24 V15 Q18 8 32 8 Q46 8 46 15 V24" stroke-width="5"/>
+        <path d="M6 24 Q32 30 58 24" stroke-width="5"/>
+        <path d="M23 30 L27 33 L23 36" stroke-width="4.6"/>
+        <path d="M41 30 L37 33 L41 36" stroke-width="4.6"/>
+        <path d="M8 60 V51 Q8 42 19 39.5 L32 47 L45 39.5 Q56 42 56 51 V60" stroke-width="5"/>
+        <circle cx="92" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="106" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="120" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Agent arbeitet</div>
+        <div class="ort"><code>AgentenLademarke.svelte</code> — die Agentenmarke zeichnet sich selbst, in der Karte eines laufenden Auftrags</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Im Einsatz — Hauszeichen (Kacheln, Karten, Einstellungen · 24er-Raster)</h2>
+  <div class="regeln" style="margin-bottom: 12px;">
+    Aus <code>Hauszeichen.svelte</code> — eigene Bauart: <code>viewBox 0 0 24 24</code>,
+    Strich <code>2</code>, drei feste Größen (klein 15, mittel 19, groß 23&nbsp;px).
+    Ein Zeichen, das in Karte, Kachel und Einstellungszeile auftaucht, ist hier
+    dieselbe Zeichnung. Statische Wegweiser, keine Animation. Die vier
+    Fähigkeitszeichen daraus (Winkel, Auge, Glühbirne, Blitz) stehen unten im
+    Abschnitt „Fähigkeitszeichen".
+  </div>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2"/>
+        <rect x="13" y="3.5" width="7.5" height="7.5" rx="2"/>
+        <rect x="3.5" y="13" width="7.5" height="7.5" rx="2"/>
+        <rect x="13" y="13" width="7.5" height="7.5" rx="2"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Raster</div>
+        <div class="ort">Der Modellkatalog (Kachelraster)</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3.5" y="4" width="17" height="7" rx="2.5"/>
+        <rect x="3.5" y="13" width="17" height="7" rx="2.5"/>
+        <path d="M7 7.5 h.01 M7 16.5 h.01"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Server</div>
+        <div class="ort">Modellserver (Racks) — nur noch der; Bild- und Embedding-Server haben eigene Zeichen</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <circle cx="8.5" cy="9.5" r="1.6"/>
+        <path d="M4 17l4.5-5 3.5 4 3-2.5L20 17"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Bild</div>
+        <div class="ort">Bildserver — trägt das gerahmte Bild, das der Chat fürs Malen schon nutzt</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5.5 17.5 L12 5.5 L18.5 14.5 Z" stroke-width="1.4"/>
+        <path d="M5.5 17.5 h.01 M12 5.5 h.01 M18.5 14.5 h.01" stroke-width="4.2"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Einbettung</div>
+        <div class="ort">Embedding-Server — drei Punkte, von feinen Linien gehalten: ein kleiner Vektorraum</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6.3 17.5 h10.9 a3.3 3.3 0 0 0 .4-6.6 A5 5 0 0 0 7.9 9.6 A3.7 3.7 0 0 0 6.3 17.5 Z"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Wolke</div>
+        <div class="ort">Gedächtnis</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6 C9.5 5.1 6 5.1 3.6 5.9 V18.2 C6 17.4 9.5 17.4 12 18.9 C14.5 17.4 18 17.4 20.4 18.2 V5.9 C18 5.1 14.5 5.1 12 6.6 Z"/>
+        <path d="M12 6.6 V18.9"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Buch</div>
+        <div class="ort">Skills</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 5.5 H4 V15.5 H8 V19 L12.5 15.5 H20 Z"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Sprache</div>
+        <div class="ort">Spracheinstellung (Sprechblase)</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 3.5v1.8 M12 18.7v1.8 M3.5 12h1.8 M18.7 12h1.8 M6 6l1.3 1.3 M16.7 16.7 18 18 M18 6l-1.3 1.3 M7.3 16.7 6 18"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Erscheinung</div>
+        <div class="ort">Darstellung (Sonne)</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 20 l3.5-1 L19 7.5 a1.75 1.75 0 0 0-2.5-2.5 L5 16.5 Z"/>
+        <path d="M14 6.5 l3.5 3.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Feder</div>
+        <div class="ort">Die stehenden Anweisungen</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="3.6"/>
+        <path d="M5.5 19.5 a6.5 6.5 0 0 1 13 0"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Person</div>
+        <div class="ort">Ein Agent</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 L20.5 7.5 L12 12 L3.5 7.5 Z"/>
+        <path d="M3.5 7.5 V16 L12 20.5 L20.5 16 V7.5"/>
+        <path d="M12 12 V20.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Paket</div>
+        <div class="ort">Hugging Face — dasselbe Motiv wie das Werkzeugzeichen, im 24er-Raster</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8.5" cy="8.5" r="3.8"/>
+        <path d="M11.5 11.5 19.5 19.5 M16.5 16.5 19 14 M14 14 l2.5-2.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Schlüssel (24er)</div>
+        <div class="ort">Ein gespeicherter Schlüssel — kleiner Bruder des Bereichszeichens</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3.5 h8 l4 4 V20.5 H6 Z"/>
+        <path d="M14 3.5 V7.5 h4"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Dokument</div>
+        <div class="ort">Eine Konfigurationsdatei</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3.5 h8 l4 4 V20.5 H6 Z"/>
+        <path d="M14 3.5 V7.5 h4"/>
+        <path d="M10 12.5 l2.2 2.2-2.2 2.2"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Dokument mit Pfeil</div>
+        <div class="ort">Eine Rohlisten-Datei</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7 a2 2 0 0 1 2-2 h4 l2 2.5 h8 a2 2 0 0 1 2 2 V17 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 Z"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Ordner (24er)</div>
+        <div class="ort">Der Modellordner</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Im Einsatz — Modulzeichen (Modulleiste, 24er-Raster)</h2>
+  <div class="regeln" style="margin-bottom: 12px;">
+    Aus <code>Modulzeichen.svelte</code> — Modulstreifen und Leistenkopf zeigen
+    dieselbe Zeichnung. Ausnahme des Hauses: das goldene
+    <strong>EEW-Monogramm</strong> (<code>EEWzeichen.svelte</code>, Extended
+    Workflow) ist die einzige gefüllte Zeichnung mit Farbverlauf — bewusst kein
+    Strichzeichen, hier nur vermerkt.
+  </div>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Terminal</div>
+        <div class="ort">Modul Terminal — Winkel und Befehlszeile, ohne Rahmen</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Konsolenfenster</div>
+        <div class="ort">Modul Konsole — Rahmen mit Winkel darin</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Globus (24er)</div>
+        <div class="ort">Modul Browser — kleiner Bruder des Werkzeug-Globus</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Stift über Linie</div>
+        <div class="ort">Modul Notizen/Editor</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Im Einsatz — Fenster-Überschriften (100er-Raster, Strich 6,5)</h2>
+  <div class="regeln" style="margin-bottom: 12px;">
+    Gezeichnete Überschriften neben den Strichschrift-Zügen — eigene Bauart:
+    <code>viewBox 0 0 100 100</code>, Strich <code>6.5</code>.
+  </div>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 100 100" width="52" height="52" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="20" y="24" width="60" height="52" rx="11"/>
+        <path d="M35 40 h30 M35 50 h30 M35 60 h18"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Katalogkarte</div>
+        <div class="ort">Überschrift des Modellkatalogs — Karte mit drei Textzeilen</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 100 100" width="52" height="52" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="23.5" y="28.5" width="53" height="43" rx="11"/>
+        <path d="M34.7 42.2 L47.8 50 L34.7 57.8"/>
+        <path d="M51 57.5 H64.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Terminalfenster</div>
+        <div class="ort">Überschrift „Lokale Modelle"</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 100 100" width="52" height="52" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="50" cy="50" r="16"/>
+        <path d="M50 22 V32 M50 68 V78 M22 50 H32 M68 50 H78 M30 30 l7 7 M63 63 l7 7 M70 30 l-7 7 M37 63 l-7 7"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Sonnenrad</div>
+        <div class="ort">Überschrift des System-Prompt-Editors</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Im Einsatz — Dateizeichen (Blatt mit Inhalt)</h2>
+  <div class="regeln" style="margin-bottom: 12px;">
+    Aus <code>lib/dateiarten.js</code> — ein Blatt mit Eselsohr
+    (<code>BLATT</code>), der Inhalt sagt die Dateiart. Stehen bewusst still:
+    ein Zeichen, das sagt, was etwas IST, animiert nicht.
+  </div>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8 H38 L48 18 V56 H16 Z" stroke-width="5"/><path d="M38 8 V18 H48" stroke-width="4.5"/>
+        <path d="M24 32 H40 M24 42 H40" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Blatt · Zeilen</div>
+        <div class="ort">Prosa/Markdown</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8 H38 L48 18 V56 H16 Z" stroke-width="5"/><path d="M38 8 V18 H48" stroke-width="4.5"/>
+        <path d="M23 30 H41 M23 40 H41 M32 26 V46" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Blatt · Gitter</div>
+        <div class="ort">Tabellen (CSV/TSV)</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8 H38 L48 18 V56 H16 Z" stroke-width="5"/><path d="M38 8 V18 H48" stroke-width="4.5"/>
+        <path d="M29 32 L24 38 L29 44 M35 32 L40 38 L35 44" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Blatt · Klammern</div>
+        <div class="ort">HTML/XML</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8 H38 L48 18 V56 H16 Z" stroke-width="5"/><path d="M38 8 V18 H48" stroke-width="4.5"/>
+        <path d="M29 30 C26 30 27 37 24 37 C27 37 26 45 29 45" stroke-width="4.5"/>
+        <path d="M35 30 C38 30 37 37 40 37 C37 37 38 45 35 45" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Blatt · Geschweift</div>
+        <div class="ort">JSON/YAML</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8 H38 L48 18 V56 H16 Z" stroke-width="5"/><path d="M38 8 V18 H48" stroke-width="4.5"/>
+        <path d="M23 45 L29 37 L34 43 L38 39 L41 45 Z" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Blatt · Berg</div>
+        <div class="ort">Bilddateien (SVG)</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Im Einsatz — Bedienzeichen (24er-Raster, Strich 2–2,6)</h2>
+  <div class="regeln" style="margin-bottom: 12px;">
+    Die kleinen Griffe der Oberfläche. Winkel drehen sich beim Öffnen
+    (90°/180°), sonst steht alles still. Der Fluidbalken
+    (<code>Fluidbalken.svelte</code>, rollende Welle in der Kapsel) ist ein
+    Bauteil, kein Zeichen — hier nur vermerkt.
+  </div>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      <div class="beschreibung"><div class="name">Winkel rechts</div><div class="ort">Klappt auf (dreht 90°) — Denkblock, Auftragskarte, Werkzeugfrage, Modellserver</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      <div class="beschreibung"><div class="name">Winkel unten</div><div class="ort">Auswahlfeld, Werkzeugliste (dreht 180°)</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+      <div class="beschreibung"><div class="name">Winkel oben</div><div class="ort">StilleWahl (dreht 180°)</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+      <div class="beschreibung"><div class="name">Winkel links</div><div class="ort">Zurück-Knopf der Fenster</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 L9.5 18 L20 6.5" stroke-width="2.6"/></svg>
+      <div class="beschreibung"><div class="name">Haken</div><div class="ort">Gewählte Option, Ankreuzliste, Notiz speichern, Erfolgs-Meldung</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <div class="beschreibung"><div class="name">Plus</div><div class="ort">Überall „Neu" — gezeichnetes Strichpaar, nie ein getipptes Zeichen</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      <div class="beschreibung"><div class="name">Kreuz</div><div class="ort">Schließen/Entfernen — Meldungen, Warteschlange</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <div class="beschreibung"><div class="name">Lupe klein</div><div class="ort">Suchfelder — Seitenleiste, Ankreuzliste</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+      <div class="beschreibung"><div class="name">Papierkorb</div><div class="ort">Notizblock löschen</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4L8 20l-5 1 1-5L17 3z"/></svg>
+      <div class="beschreibung"><div class="name">Stift</div><div class="ort">Erststart — „wie soll ich dich ansprechen"</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/></svg>
+      <div class="beschreibung"><div class="name">Kreislauf-Pfeil</div><div class="ort">Erneut senden / Antwort neu erzeugen</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="M15 2l6 1-4 4"/></svg>
+      <div class="beschreibung"><div class="name">Rundlauf-Pfeil</div><div class="ort">Erststart — Sprachwahl</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h11a5 5 0 0 1 0 10h-6"/><path d="M8 5 4 9l4 4"/></svg>
+      <div class="beschreibung"><div class="name">Zurücknehmen</div><div class="ort">Bildfenster — Prompt-Verbesserung rückgängig</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      <div class="beschreibung"><div class="name">Senden-Pfeil</div><div class="ort">Absenden — Eingabeleiste (schlanker Start und Fußzeile)</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 V15"/><path d="M7 11 L12 16 L17 11"/><path d="M4 20 H20"/></svg>
+      <div class="beschreibung"><div class="name">Ablegen-Pfeil</div><div class="ort">Bild speichern — Eckabzeichen am Bildrahmen</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4 H4 V10"/><path d="M14 20 H20 V14"/></svg>
+      <div class="beschreibung"><div class="name">Ecken</div><div class="ort">Bild vergrößern — Eckabzeichen am Bildrahmen</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+      <div class="beschreibung"><div class="name">Kopieren</div><div class="ort">Zwei Blätter — eigene Blase und Antwort-Fußzeile</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3z"/></svg>
+      <div class="beschreibung"><div class="name">Nadel</div><div class="ort">Chat anpinnen — Chatzeile</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <div class="beschreibung"><div class="name">Balkenmenü</div><div class="ort">Seitenleiste auf/zu — Menüleiste</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 9a2.8 2.8 0 1 1 4 2.55c-.9.42-1.2 1.05-1.2 2.05v.4"/><path d="M12 17.6 V17.7"/></svg>
+      <div class="beschreibung"><div class="name">Fragezeichen</div><div class="ort">Hilfe — Menüleiste, öffnet die Doku</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12M8 3v4l4 5 4-5V3M8 21v-4l4-5 4 5v4"/></svg>
+      <div class="beschreibung"><div class="name">Sanduhr</div><div class="ort">Wartende Nachricht in der Warteschlange</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 11 L56 52 H8 Z"/><path d="M32 28 V38" stroke-width="4.5"/><path d="M32 44.5 V45"/></svg>
+      <div class="beschreibung"><div class="name">Warndreieck</div><div class="ort">Werkzeugfrage — warum ein Aufruf Bestätigung braucht (64er-Raster)</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      <div class="beschreibung"><div class="name">Hinweis-Kreis</div><div class="ort">Meldungen (Hinweis/Fehler), abgebrochene Antwort</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M12 18v3M5 12H2M22 12h-3M6.3 6.3l2 2M15.7 15.7l2 2M17.7 6.3l-2 2M8.3 15.7l-2 2"/></svg>
+      <div class="beschreibung"><div class="name">Strahlen</div><div class="ort">Bildfenster — „Prompt verbessern" (Sonne ohne Kern)</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 12 8" width="52" height="35" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5 6 1.5l5 5"/></svg>
+      <div class="beschreibung"><div class="name">Stufen-Winkel</div><div class="ort">Zahlenfeld — die zwei Stepper-Knöpfe (hoch/runter, eigene viewBox 12×8)</div></div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <div class="beschreibung"><div class="name">Ordner rund (24er)</div><div class="ort">Katalog — „Ordner öffnen" je Zubehör-Spalte</div></div>
+    </div>
+  </div>
+
   <h2>Hersteller-Logos — Kachel-Galerie (MCP-Server)</h2>
   <div class="regeln" style="margin-bottom: 12px;">
     Kein Hausstil: das sind die Markenzeichen der Anbieter (Pfaddaten aus der
@@ -331,8 +844,129 @@
     </div>
   </div>
 
+  <h2>Fähigkeitszeichen — Modell-Merkmale</h2>
+  <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 16 L32 32 L11 48 Z" stroke-width="5"/>
+        <path d="M53 16 L32 32 L53 48 Z" stroke-width="5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Fliege <svg viewBox="0 0 64 64" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="klein"><path d="M11 16 L32 32 L11 48 Z" stroke-width="5"/><path d="M53 16 L32 32 L53 48 Z" stroke-width="5"/></svg></div>
+        <div class="ort">LoRA-Adapter — breit → schmal → breit, die Niedrigrang-Mathematik als Form. Gewählt in der LoRA-Runde (August 2026), neben Auge (Vision) und Blitz (MTP-Drafter).</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="10" y="10" width="44" height="44" rx="6" stroke-width="5"/>
+        <path d="M25 26 V31 M39 26 V31" stroke-width="4.5"/>
+        <path d="M24 39 Q32 45 40 39" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Gesicht im Sucher <svg viewBox="0 0 64 64" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="klein"><rect x="10" y="10" width="44" height="44" rx="6" stroke-width="5"/><path d="M25 26 V31 M39 26 V31" stroke-width="4.5"/><path d="M24 39 Q32 45 40 39" stroke-width="4.5"/></svg></div>
+        <div class="ort">ADetailer — Erkennungsrahmen mit Gesicht: finden, dann fein nachmalen. Gewählt in der ADetailer-Runde (August 2026).</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 10h3v-3l-3.5-3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1-3 3l-6-6a6 6 0 0 1-8-8l3.5 3.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Maulschlüssel</div>
+        <div class="ort">Ruft Werkzeuge (Tool-Using) — ersetzte im August 2026 den Winkel, der schon „Terminal" hieß. Farbe: Oliv #9aa05e. Modellkarte, Modelldetail, Werkzeug-Lampe in der Leiste</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2.5 12 C6 6.5, 18 6.5, 21.5 12 C18 17.5, 6 17.5, 2.5 12 Z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Auge</div>
+        <div class="ort">DAS Augenzeichen des Hauses — es gibt nur eines (Festlegung des Hauses). Vision/mmproj: klein auf Modellkarte/Modelldetail (Hauszeichen.svelte), groß als Wartemarke „Bild wird gelesen" (Wartezeile.svelte, gleiche Form, Pupille als gezeichneter Kreis)</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 a6.3 6.3 0 0 1 3.4 11.6 c-.6.4-1 1-1 1.7 v.7 h-4.8 v-.7 c0-.7-.4-1.3-1-1.7 A6.3 6.3 0 0 1 12 3 Z"/>
+        <path d="M10 20.5 h4"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Glühbirne</div>
+        <div class="ort">Denkt zuerst (Reasoning)</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 3 L5 13.5 H10.5 L9.5 21 L17.5 10.5 H12 Z"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Blitz</div>
+        <div class="ort">Zwei Ämter: das Tempo-Modul (MTP-Drafter) auf Modellkarten — UND der Turbo-Schalter für den Bildserver im Plus-Menü der Eingabeleiste (blau = an). Auch der „Malen"-Knopf im Bildfenster</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M32 56 A24 24 0 1 1 56 30 C56 36.5 51 41 44.5 41 L38.5 41 C34.8 41 32.5 43.5 32.5 46.3 C32.5 47.9 33.2 49.3 34.2 50.4 C35.8 52.4 34.6 56 32 56 Z" stroke-width="5"/>
+        <circle cx="22.5" cy="28" r="2.8" stroke-width="4.2"/>
+        <circle cx="33.5" cy="20" r="2.8" stroke-width="4.2"/>
+        <circle cx="44.5" cy="28" r="2.8" stroke-width="4.2"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Malerpalette <svg viewBox="0 0 64 64" width="14" height="14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="klein"><path d="M32 56 A24 24 0 1 1 56 30 C56 36.5 51 41 44.5 41 L38.5 41 C34.8 41 32.5 43.5 32.5 46.3 C32.5 47.9 33.2 49.3 34.2 50.4 C35.8 52.4 34.6 56 32 56 Z" stroke-width="5"/><circle cx="22.5" cy="28" r="2.8" stroke-width="4.2"/><circle cx="33.5" cy="20" r="2.8" stroke-width="4.2"/><circle cx="44.5" cy="28" r="2.8" stroke-width="4.2"/></svg></div>
+        <div class="ort">VAE — das Farbwerk: macht aus dem Rohbild das fertige, farbige Bild. Lag als „Frei — ohne Amt" bereit (unterlag einst dem Tropfen bei der Darstellung), bekam ihr Amt in der VAE-Runde (August 2026)</div>
+      </div>
+    </div>
+  </div>
+
   <h2>Frei — schon gezeichnet, noch ohne Amt</h2>
   <div class="raster">
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 132 64" width="100" height="48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="72" height="56" rx="15" stroke-width="5.5"/>
+        <path d="M15 48 L32 30 L44 40 L56 28 L68 43" stroke-width="5"/>
+        <circle cx="29" cy="19" r="4.5" fill="currentColor" stroke="none"/>
+        <circle cx="92" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="106" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+        <circle cx="120" cy="42" r="2.75" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Bild entsteht (Wartemarke)</div>
+        <div class="ort">War <code>art="bild"</code> in der Wartezeile — Bilderzeugung mit Rahmen, Bergzug, Sonnentupf. Abgelöst vom Füllrahmen (Welle + %), seither toter Code und am 18.08.2026 entfernt</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M47 22 C34 9 13 17 15 34 C16 47 33 52 43 42 C50 35 46 26 38 28 C33 29 32 35 36 37" stroke-width="5"/>
+        <path d="M47 22 L56 15" stroke-width="5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Turbolader-Schnecke</div>
+        <div class="ort">Unterlag beim Image-Turbo — das wörtlichste Turbo-Zeichen (die Volute), bei 14 px aber zu dicht; Chris wählte den Tacho</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 18 L34 32 L20 46" stroke-width="5"/>
+        <path d="M36 18 L50 32 L36 46" stroke-width="5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Doppel-Chevron</div>
+        <div class="ort">Unterlag beim Image-Turbo — schneller Vorlauf, sehr sauber, aber generisch</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M34 17 L49 32 L34 47" stroke-width="5"/>
+        <path d="M12 32 H41" stroke-width="5"/>
+        <path d="M17 23 H32" stroke-width="5"/>
+        <path d="M17 41 H32" stroke-width="5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Speed-Pfeil</div>
+        <div class="ort">Unterlag beim Image-Turbo — Pfeil mit Bewegungslinien, bei 14 px zu unruhig</div>
+      </div>
+    </div>
     <div class="karte">
       <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="27" cy="27" r="15" stroke-width="5" />
@@ -423,18 +1057,6 @@
     </div>
     <div class="karte">
       <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M32 56 A24 24 0 1 1 56 30 C56 36.5 51 41 44.5 41 L38.5 41 C34.8 41 32.5 43.5 32.5 46.3 C32.5 47.9 33.2 49.3 34.2 50.4 C35.8 52.4 34.6 56 32 56 Z" stroke-width="5"/>
-        <circle cx="22.5" cy="28" r="2.8" stroke-width="4.2"/>
-        <circle cx="33.5" cy="20" r="2.8" stroke-width="4.2"/>
-        <circle cx="44.5" cy="28" r="2.8" stroke-width="4.2"/>
-      </svg>
-      <div class="beschreibung">
-        <div class="name">Malerpalette</div>
-        <div class="ort">Unterlag dem Tropfen bei der Darstellung</div>
-      </div>
-    </div>
-    <div class="karte">
-      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <path d="M39 9 A25 25 0 1 0 55 35 A20 20 0 0 1 39 9 Z" stroke-width="5"/>
       </svg>
       <div class="beschreibung">
@@ -508,6 +1130,106 @@
       <div class="beschreibung">
         <div class="name">Fingerabdruck</div>
         <div class="ort">Kandidat für Identität/Privatsphäre</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8" y="16" width="34" height="34" rx="4" stroke-width="5"/>
+        <rect x="36" y="8" width="18" height="18" rx="3" stroke-width="4.5" transform="rotate(12 45 17)"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Aufkleber</div>
+        <div class="ort">Unterlag der Fliege beim LoRA-Adapter — „kleines Extra auf großem Ding", aber auch als Plugin/Badge lesbar</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="10" y="36" width="44" height="18" rx="4" stroke-width="5"/>
+        <rect x="22" y="10" width="20" height="15" rx="3" stroke-width="5"/>
+        <path d="M27 25 V36 M37 25 V36" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Steckmodul</div>
+        <div class="ort">Unterlag der Fliege beim LoRA-Adapter — Baustein dockt an; Kandidat für Erweiterungen/Add-ons</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 8 V56" stroke-width="5"/>
+        <path d="M20 12 C36 12 44 15 44 22" stroke-width="4.5"/>
+        <rect x="37" y="22" width="14" height="14" rx="3" stroke-width="5"/>
+        <path d="M44 36 C44 43 36 50 20 50" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Umweg</div>
+        <div class="ort">Unterlag der Fliege beim LoRA-Adapter — das echte LoRA-Schaltbild (Nebenpfad um die Schicht), bei 14 px zu dicht</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="27" cy="37" r="17" stroke-width="5"/>
+        <path d="M21 33 V37 M33 33 V37" stroke-width="4.5"/>
+        <path d="M20 44 Q27 49 34 44" stroke-width="4.5"/>
+        <path d="M50 8 V24 M42 16 H58" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Gesicht mit Funken</div>
+        <div class="ort">Unterlag dem Sucher beim ADetailer — Gesicht wird veredelt; Kandidat für Verschönern/Retusche</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M28 14 L32.5 27.5 L46 32 L32.5 36.5 L28 50 L23.5 36.5 L10 32 L23.5 27.5 Z" stroke-width="5"/>
+        <path d="M50 10 V22 M44 16 H56" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Funkelstern</div>
+        <div class="ort">Unterlag dem Sucher beim ADetailer — das klassische „Enhance"-Zeichen; Kandidat für Verbessern/Upscale</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="27" cy="27" r="15" stroke-width="5"/>
+        <path d="M37.6 37.6 L53 53" stroke-width="5"/>
+        <path d="M27 20 V34 M20 27 H34" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Lupe mit Funken</div>
+        <div class="ort">Unterlag dem Sucher beim ADetailer — Detail finden und verfeinern; vierte Lupe im Katalog</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M32 10 L54 50 H10 Z" stroke-width="5"/>
+        <path d="M4 30 L20 35" stroke-width="4.5"/>
+        <path d="M47 34 L60 26 M48 40 L62 40 M47 46 L60 54" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Prisma</div>
+        <div class="ort">Unterlag der Malerpalette beim VAE — Strahl rein, Fächer raus; Kandidat für Wandler/Decoder</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8" y="16" width="48" height="32" rx="4" stroke-width="5"/>
+        <path d="M17 26 h.01 M25 26 h.01 M17 36 h.01 M25 36 h.01" stroke-width="5"/>
+        <path d="M33 40 L41 29 L49 40" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Punkte werden Berg</div>
+        <div class="ort">Unterlag der Malerpalette beim VAE — Latent links, Bild rechts; bei 14 px zu dicht</div>
+      </div>
+    </div>
+    <div class="karte">
+      <svg class="gross" viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="10" y="14" width="44" height="36" rx="4" stroke-width="5"/>
+        <path d="M16 41 H48" stroke-width="4.5"/>
+        <path d="M25 41 A7 7 0 0 1 39 41" stroke-width="4.5"/>
+        <path d="M32 23 V28 M21 27 L24.5 30.5 M43 27 L39.5 30.5" stroke-width="4.5"/>
+      </svg>
+      <div class="beschreibung">
+        <div class="name">Sonnenaufgang</div>
+        <div class="ort">Unterlag der Malerpalette beim VAE — „Bild wird hell"; Kandidat für Aufhellen/Nachbelichten</div>
       </div>
     </div>
   </div>

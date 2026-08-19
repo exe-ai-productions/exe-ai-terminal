@@ -53,7 +53,10 @@
      card grid breathes, and a touch taller — a gallery is looked at, not
      scanned down a side list. Still capped to the app area by the same
      min()/clamp() as the others. */
-  const BREITE = { frage: '460px', liste: '1040px', vorschau: '1200px', galerie: '1040px' }
+  // `bild` is wider than a question but keeps a question's content-height (no
+  // fixed body, no clipping): the picture window lays its controls in two
+  // columns so it is broad and short, not one endlessly long tube.
+  const BREITE = { frage: '460px', bild: '860px', liste: '1040px', vorschau: '1200px', galerie: '1040px' }
 
   /* `schrumpfen` closes the window the way the first-start window does:
      it collapses to a point instead of fading. Reserved for a window whose
@@ -66,7 +69,7 @@
      way back, not a second close button. */
   let {
     offen = $bindable(false), titel = '', art = 'frage', symbol, schrumpfen = false,
-    zurueck = null, children,
+    zurueck = null, kopf, children,
   } = $props()
 </script>
 
@@ -93,6 +96,12 @@
             <path d="M15 5 8 12l7 7" />
           </svg>
         </button>
+      {/if}
+      {#if kopf}
+        <!-- A caller-drawn control that rides in the header's top-right corner
+             (the picture window hangs its Image-Turbo there). Absolutely
+             placed so it never disturbs the title or the back-arrow. -->
+        <div class="fensterkopf">{@render kopf()}</div>
       {/if}
       {#if titel || symbol}
         <h3>{@render symbol?.()}{titel}</h3>
@@ -155,7 +164,7 @@
        2px ring the notifications wear, hung off var(--text) so it is light
        in the dark and black in the light. A ring ON the edge (box-shadow),
        not a border, so the window keeps its exact size. */
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 70%, transparent),
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fensterring, var(--text)) 70%, transparent),
       0 24px 60px rgba(0, 0, 0, 0.3);
     padding: 16px 18px 14px;
   }
@@ -166,6 +175,17 @@
     margin: 0 0 12px;
     font-size: 16px;
     font-weight: 600;
+  }
+  /* Snug under the top frame: a wide pill reads its top gap along its whole
+     width, so the gap above must be clearly smaller than the gap beside it
+     for the pill to sit IN the corner instead of floating below it. */
+  .fensterkopf {
+    position: absolute;
+    top: 8px;
+    right: 15px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
   }
 
   /* The body. For a question it follows the content; for a list window it is

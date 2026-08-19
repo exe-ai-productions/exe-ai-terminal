@@ -142,6 +142,21 @@ def test_bild_fragt_nur_sein_eigenes_etikett(client, katalog):
     assert [p.get("pipeline_tag") for p in FalscherKlient.alle_parameter] == ["text-to-image"]
 
 
+def test_bild_sucht_ohne_gguf_zwang(client, katalog):
+    """The shipped drawer reads safetensors too, and the big image
+    checkpoints live on HF almost only as safetensors — a gguf filter hid
+    exactly what people came for. Chat and embedding keep the filter."""
+    katalog([])
+    client.get("/api/v1/models/search?q=cyber&art=bild")
+    assert "filter" not in FalscherKlient.letzte_parameter
+    katalog([])
+    client.get("/api/v1/models/search?q=qwen&art=chat")
+    assert FalscherKlient.letzte_parameter["filter"] == "gguf"
+    katalog([])
+    client.get("/api/v1/models/search?q=nomic&art=einbettung")
+    assert FalscherKlient.letzte_parameter["filter"] == "gguf"
+
+
 def test_der_alte_name_gguf_zaehlt_als_chat(client, katalog):
     # A page from before the tabs still asks with art=gguf. It meant what
     # the chat tab means now, and it must not be told "unknown kind".

@@ -39,7 +39,6 @@ def test_meta_liefert_feature_flags(client):
     # The frontend reads it from here.
     assert set(daten["features"]) == {
         "mcp",
-        "image_generation",
         "document_upload",
         "beta_lock",
         "shell_tool",

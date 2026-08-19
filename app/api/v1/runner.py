@@ -21,7 +21,7 @@ from app import modellzuordnung
 from app.api.abhaengigkeiten import hole_sprache
 from app.config import EndpointConfig
 from app.i18n import t
-from app.modelldownload import DownloadFehler, Modelldownload
+from app.modelldownload import BILD_ENDUNGEN, DownloadFehler, Modelldownload
 from app.feineinstellungen import Feineinstellungen
 from app.modellrunner import Modellrunner, RunnerFehler, SCHLUESSEL_VARIABLE
 from app.systemspeicher import gesamt_gb
@@ -89,6 +89,12 @@ class Auskunft(BaseModel):
     # not off what was asked for, because the flag sent is always "auto".
     # None while nothing runs yet or the log has not reached that line.
     flash_aktiv: bool | None = None
+    # Whether the drafter (MTP / speculative decoding) actually engaged — read
+    # off the server's own log, not off the fact that one was configured.
+    # None → none asked for or still loading; "aktiv" → its init line passed
+    # (the bolt lights blue); "fehler" → the server came up without it, so a
+    # drafter was set but never took (the bolt turns red).
+    mtp_aktiv: str | None = None
     # The declared bond of each model to its companions, read from the folder
     # manifest and filtered to files that are still there. Keyed by model
     # file name; each value carries the projector and the draft, or null. The
@@ -163,6 +169,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         drafter=lauf.drafter if lauf else None,
         fein=lauf.fein.als_daten() if lauf and lauf.fein else None,
         flash_aktiv=runner.flash_attn_zustand(),
+        mtp_aktiv=runner.mtp_zustand(),
         zuordnung=_zuordnung(runner),
     )
 
@@ -227,6 +234,12 @@ class Holen(BaseModel):
     # an embedding model in the chat folder is invisible to the embedding
     # server and a broken entry in the chat list.
     art: Literal["chat", "einbettung", "bild"] = "chat"
+    # A companion lands in a sub-folder of its server, so it shows up where it
+    # belongs at once and its folder shows only its own kind: a VAE in vae/, a
+    # LoRA in lora/, a face detector in adetailer/ on the picture side; a
+    # drafter in mtp/, a projector in vision/ on the chat side. A closed
+    # whitelist, never a free path — the download can never write outside these.
+    unterordner: Literal["vae", "lora", "adetailer", "mtp", "vision"] | None = None
 
 
 class Fortschritt(BaseModel):
@@ -268,11 +281,21 @@ def holen(
     download: Modelldownload = Depends(hole_download),
     sprache: str = Depends(hole_sprache),
 ) -> Fortschritt:
-    ordner = request.app.state.modellordner_je_art.get(daten.art)
+    wurzel = request.app.state.modellordner_je_art.get(daten.art)
+    # A companion goes into its sub-folder of the same art. The whitelist on
+    # the field is what makes the join safe — no "../" can reach this point.
+    # The manifest stays with the model (the art root), not in the sub-folder,
+    # so the runner reads the bond from where the model lies.
+    ordner = wurzel
+    if wurzel is not None and daten.unterordner:
+        ordner = str(Path(wurzel) / daten.unterordner)
+    # An image model may be safetensors; a chat or embedding model is GGUF
+    # only — the one form the runner can start.
+    endungen = BILD_ENDUNGEN if daten.art == "bild" else (".gguf",)
     try:
         download.starten(
             daten.repo, daten.datei, daten.ziel, daten.gehoert_zu, daten.rolle,
-            ordner=ordner,
+            ordner=ordner, endungen=endungen, manifest_ordner=wurzel,
         )
     except DownloadFehler as fehler:
         lage = {
@@ -365,6 +388,27 @@ def ordner_zeigen(
     """
     try:
         ordner_oeffnen(runner.ordner)
+    except OeffnenNichtMoeglich:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, t("fehler.ordner_oeffnen", sprache)
+        ) from None
+    return True
+
+
+@router.post("/begleiter-folder/{unterordner}", response_model=bool,
+             summary="Begleiter-Ordner zeigen")
+def begleiterordner_zeigen(
+    unterordner: Literal["mtp", "vision"],
+    runner: Modellrunner = Depends(hole_runner),
+    sprache: str = Depends(hole_sprache),
+) -> bool:
+    """Open the drafter or projector sub-folder of the model folder so a file
+    can be dropped in by hand. Created if missing; the whitelist on the path is
+    what keeps this from opening anything but a companion folder."""
+    ordner = runner.ordner / unterordner
+    ordner.mkdir(parents=True, exist_ok=True)
+    try:
+        ordner_oeffnen(ordner)
     except OeffnenNichtMoeglich:
         raise HTTPException(
             status.HTTP_501_NOT_IMPLEMENTED, t("fehler.ordner_oeffnen", sprache)

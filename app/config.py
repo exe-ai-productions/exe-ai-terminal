@@ -116,6 +116,13 @@ class AppConfig(BaseModel):
     language: str = "de"
     data_dir: str = "./data"
     log_dir: str = "./logs"
+    # Where the pictures the generator draws are written. A field of its own
+    # (not data_dir + "bilder" spelled out at each call site) so the storage
+    # locations module (app/speicherorte.py) has one path to hand out and,
+    # later, one path to let the user move. Empty means "under data_dir" — so
+    # it follows a moved data folder exactly as the old datenverzeichnis/"bilder"
+    # did, instead of a hardcoded path that would strand old pictures.
+    bilder_verzeichnis: str = ""
     # Where the system prompt lives. Exactly one file for the whole program —
     # it is read fresh on every request and prepended to the history.
     # Deliberately a file and not a database field: the same place should
@@ -205,7 +212,6 @@ class FeatureFlags(BaseModel):
     # the latch kicked in there unintentionally. Turning it on happens
     # explicitly in config.yaml, not silently in the schema.
     beta_lock: bool = False
-    image_generation: bool = False
     document_upload: bool = False
     # The shell tool (app/tools/shell.py): lets the model run commands in the
     # folders the user shared with a chat. Shipped on, because the guard sits
@@ -230,18 +236,6 @@ class MCPConfig(BaseModel):
     auth_file: str = "./data/mcp_auth.json"
 
 
-class ImageConfig(BaseModel):
-    """Address of the image interface (phase 4.2).
-
-    Whether ComfyUI/Forge answers there directly, or an upstream arbiter that
-    alternates between the language model and the image AI, is
-    indistinguishable to this program — it is HTTP either way.
-    """
-
-    base_url: str = "http://127.0.0.1:7861"
-    timeout_seconds: int = 300
-
-
 class DiscoveryConfig(BaseModel):
     interval_seconds: int = 15
     timeout_seconds: int = 3
@@ -258,32 +252,11 @@ class LoggingConfig(BaseModel):
     file_count: int = 5
 
 
-class BildEndpunktConfig(BaseModel):
-    """An image generator — just an address, like the
-    model endpoints: nothing is hardwired to a specific server."""
-
-    id: str
-    dialect: Literal["comfyui", "openai_images"]
-    base_url: str
-    # comfyui only: workflow file in API format with {{PROMPT}}/{{NEGATIV}}/
-    # {{SEED}} placeholders, relative to the project root.
-    workflow: str | None = None
-    # Access key for paid services (fal.ai, Recraft, OpenAI images). Holds
-    # the NAME of the variable in .env, never the key itself - same rule as
-    # the model endpoints. Leave empty for a local server that wants none.
-    api_key_env: str | None = None
-    enabled: bool = True
-
-
 class Config(BaseModel):
     app: AppConfig = Field(default_factory=AppConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
     endpoints: list[EndpointConfig] = Field(default_factory=list)
-    # Image generators live directly here, not in a separate file:
-    # one configuration, one editor tab.
-    image_servers: list[BildEndpunktConfig] = Field(default_factory=list)
-    image: ImageConfig = Field(default_factory=ImageConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

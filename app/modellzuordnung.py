@@ -33,6 +33,11 @@ UNFERTIG = ".teil"
 # role this manifest knows and is left alone.
 ROLLEN = ("mmproj", "mtp")
 
+# Each role's file lives in its own sub-folder of the model folder. Mirrors
+# MTP_ORDNER/VISION_ORDNER in modellrunner; kept as a plain literal here to
+# avoid importing the runner (which imports this module).
+UNTERORDNER = {"mmproj": "vision", "mtp": "mtp"}
+
 
 def _sicher(name: str | None) -> str | None:
     """A plain ``.gguf`` basename, or nothing when the name reaches outside.
@@ -120,7 +125,7 @@ def fuer(ordner: Path, modell: str) -> dict:
         return ergebnis
     for rolle in ROLLEN:
         name = _sicher(eintrag.get(rolle))
-        if name and (ordner / name).is_file():
+        if name and (ordner / UNTERORDNER[rolle] / name).is_file():
             ergebnis[rolle] = name
     return ergebnis
 

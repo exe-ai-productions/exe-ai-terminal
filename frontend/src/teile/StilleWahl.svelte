@@ -90,11 +90,31 @@
     if (!knopf || !menue) return
     const r = knopf.getBoundingClientRect()
     const h = menue.offsetHeight
-    const nachUnten = r.top - 12 < h
+    const luftOben = r.top - 12
+    const luftUnten = window.innerHeight - r.bottom - 12
+
+    /* Upward when it fits there, downward when it fits there instead. Both
+       sides are measured, not just the one: a cloud catalogue runs to over a
+       hundred entries, and a menu that only checked upward would unfold
+       downward out of the window with nothing to scroll it back.
+
+       Fitting nowhere it takes the roomier side and is capped to it — the
+       list then scrolls inside the window instead of past its edge. */
+    let nachUnten
+    if (luftOben >= h) nachUnten = false
+    else if (luftUnten >= h) nachUnten = true
+    else nachUnten = luftUnten > luftOben
+
+    const hoehe = Math.min(h, Math.max(120, nachUnten ? luftUnten : luftOben))
     const links = rechts
       ? Math.max(16, r.right - menue.offsetWidth)
       : Math.max(16, Math.min(r.left, window.innerWidth - menue.offsetWidth - 16))
-    ort = { oben: nachUnten ? r.bottom + 8 : r.top - 8 - h, links, nachUnten }
+    ort = {
+      oben: nachUnten ? r.bottom + 8 : r.top - 8 - hoehe,
+      links,
+      nachUnten,
+      hoehe,
+    }
   }
 
   function waehlen(id) {
@@ -138,7 +158,7 @@
     class:rechts
     role="listbox"
     tabindex="-1"
-    style="top:{ort.oben}px; left:{ort.links}px"
+    style="top:{ort.oben}px; left:{ort.links}px; max-height:{ort.hoehe}px"
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => { if (e.key === 'Escape') offen = false }}
   >
@@ -224,6 +244,11 @@
     padding: 5px;
     width: 320px;
     max-width: calc(100vw - 32px);
+    /* A column so the list inside can shrink with the frame: the height is
+       set per opening from the room actually left on screen, and a list with
+       a fixed height of its own would push straight through it again. */
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
     animation: aufgehen 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
     transform-origin: bottom left;
@@ -243,6 +268,8 @@
 
   .liste {
     max-height: 300px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;

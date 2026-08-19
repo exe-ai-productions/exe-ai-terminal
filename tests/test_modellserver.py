@@ -16,9 +16,12 @@ def test_mtp_bausteine_sind_keine_modelle(tmp_path):
 def test_mtp_bausteine_sind_eigene_liste(tmp_path):
     # The modules show up in their own list, with sizes, and a vision
     # projector does not sneak in even when its name carries the marker.
-    (tmp_path / "mtp-gemma-4-12B-it.gguf").write_bytes(b"x" * 2048)
+    (tmp_path / "mtp").mkdir()
+    (tmp_path / "mtp" / "mtp-gemma-4-12B-it.gguf").write_bytes(b"x" * 2048)
     (tmp_path / "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf").write_bytes(b"x")
-    (tmp_path / "mtp-gemma-4-12B-mmproj-F16.gguf").write_bytes(b"x")
+    # A projector that carries the mtp marker still must not sneak into the
+    # draft list, even lying in the mtp folder.
+    (tmp_path / "mtp" / "mtp-gemma-4-12B-mmproj-F16.gguf").write_bytes(b"x")
     from app.modellrunner import mtp_auflisten
 
     module = mtp_auflisten(tmp_path)

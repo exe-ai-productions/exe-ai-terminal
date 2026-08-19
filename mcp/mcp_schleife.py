@@ -79,7 +79,7 @@ async def anfrage_behandeln(
     return _fehler(kennung, -32601, f"Unbekannte Methode: {methode}")
 
 
-async def _zeilen(): # -> AsyncIterator[bytes]
+async def _zeilen():
     """Standard input, line by line, on every system.
 
     Windows needs its own way in. Its event loop hands every read to the

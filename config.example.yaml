@@ -36,6 +36,11 @@ app:
   # Directory for the database, uploaded documents and generated images.
   data_dir: "./data"
   log_dir: "./logs"
+  # Where the pictures the generator draws are written. A named storage
+  # location (app/speicherorte.py). Empty means "under data_dir" (so it
+  # follows a moved data folder); set an absolute path to keep your pictures
+  # on another drive.
+  bilder_verzeichnis: ""
   # Response length when neither the request nor the chat specifies one. Keep it
   # generous: models with a long reasoning pass spend part of it before the
   # actual answer even begins — too small a value shows up as an empty bubble.
@@ -81,7 +86,6 @@ database:
 # Turn features on and off without changing code.
 features:
   mcp: true                  # Tool calls through MCP servers
-  image_generation: true     # Image generation (phase 4.2)
   document_upload: true      # Per-chat document upload (phase 4.1)
   # Beta: settings, tools and agents are read-only. Set to false to hand the
   # full app back.
@@ -162,36 +166,6 @@ mcp:
   # from .env, which holds fixed keys.
   auth_file: "./data/mcp_auth.json"
 
-# Image generation (phase 4.2). Deliberately just one address: whether ComfyUI
-# or Forge sits behind it directly, or an arbiter that lets the language model
-# and the image model take turns on the GPU, makes no difference to this
-# program — both are an HTTP interface. Without an arbiter, put your backend
-# here directly. That way there is no special case in the code.
-image:
-  base_url: "http://127.0.0.1:7861"
-  timeout_seconds: 300
-
-# ─────────────────────────────────────────────────────────────────────────
-#  image servers
-#
-#  dialect       comfyui        ComfyUI API, needs a workflow file
-#                openai_images  POST /v1/images/generations
-#  api_key_env   name of the variable in .env, never the key itself.
-#                Leave out for a local server that wants none.
-#
-#   - id: "comfyui"
-#     dialect: "comfyui"
-#     base_url: "http://127.0.0.1:8188"
-#     workflow: "./mein-workflow.json"   # your own workflow, required for ComfyUI
-#     enabled: true
-#
-#   - id: "openai"
-#     dialect: "openai_images"
-#     base_url: "https://api.openai.com/v1"
-#     api_key_env: "OPENAI_API_KEY"
-#     enabled: true
-# ─────────────────────────────────────────────────────────────────────────
-image_servers: []
 
 # How often endpoint reachability is checked, in seconds.
 discovery:

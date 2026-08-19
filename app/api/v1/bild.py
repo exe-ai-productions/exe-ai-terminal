@@ -18,13 +18,17 @@ import asyncio
 import secrets
 import threading
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from app.api.abhaengigkeiten import hole_config, hole_sprache
+from app.api.abhaengigkeiten import hole_config, hole_repositories, hole_sprache
+from app import bildvorgabenwahl
+from app.bildturbo import Bildturbo, BildturboFehler
 from app.bildrunner import (
     Auftrag, BildFehler, Bildrunner, LoRA, loras, lora_pfad, modelle, modell_pfad,
+    vaes, vae_pfad, yolos, yolo_pfad,
 )
 from app import bildwahlen
 from app import bildlauf, bildspeicher, systemspeicher
@@ -33,6 +37,7 @@ from pathlib import Path
 from app.config import Config
 from app.i18n import t
 from app.ordner_oeffnen import OeffnenNichtMoeglich, ordner_oeffnen
+from app.speicherorte import ort
 from app.sddownload import Sddownload, SddownloadFehler
 
 router = APIRouter(tags=["bild"])
@@ -85,6 +90,17 @@ class BildWunsch(BaseModel):
     staerke: float = bildwahlen.STAERKE_VORGABE
     # The mask, by the name this server gave it — like the starting image.
     maske: str | None = None
+    # The quality companions, all optional. -1 clip-skip means "let the class
+    # decide"; an empty VAE/detector name means the pass is simply off. Names,
+    # never paths — resolved against their own folders like a LoRA is.
+    clip_skip: int = -1
+    vae: str | None = None
+    ad_modell: str | None = None
+    ad_prompt: str = Field(default="", max_length=2000)
+    # Highres fix: a second pass at a larger size for finer detail. Off by
+    # default; the scale is how much larger.
+    hires: bool = False
+    hires_scale: float = Field(default=2.0, ge=1.0, le=4.0)
 
 
 class BildAntwort(BaseModel):
@@ -97,6 +113,8 @@ class BildAntwort(BaseModel):
 class BildmodellAntwort(BaseModel):
     modelle: list[str]
     loras: list[str] = Field(default_factory=list)
+    vaes: list[str] = Field(default_factory=list)
+    yolos: list[str] = Field(default_factory=list)
     sampler: list[str] = Field(default_factory=list)
     scheduler: list[str] = Field(default_factory=list)
     programm_da: bool
@@ -113,7 +131,13 @@ def _kante(wert: int) -> int:
 
 
 def _bildordner(config: Config) -> Path:
-    return config.pfad(config.app.bildmodelle_verzeichnis)
+    return ort(config, "bildmodelle")
+
+
+def _bilderziel(config: Config) -> Path:
+    """Where a finished picture is written and read back from — one named
+    location, so the folder is asked for and never spelled out."""
+    return ort(config, "bilder")
 
 
 def _runner(request: Request) -> Bildrunner:
@@ -134,6 +158,8 @@ def bildmodelle(request: Request, config: Config = Depends(hole_config)) -> Bild
     return BildmodellAntwort(
         modelle=gefunden,
         loras=loras(_bildordner(config)),
+        vaes=vaes(_bildordner(config)),
+        yolos=yolos(_bildordner(config)),
         sampler=list(bildwahlen.SAMPLER),
         scheduler=list(bildwahlen.SCHEDULER),
         programm_da=programm_da,
@@ -144,6 +170,99 @@ def bildmodelle(request: Request, config: Config = Depends(hole_config)) -> Bild
             else "bereit" if gefunden
             else "kein_modell"
         ),
+    )
+
+
+# --- Image-Turbo: the optional persistent server ---------------------------
+
+
+def _turbo(request: Request) -> Bildturbo:
+    return request.app.state.bildturbo
+
+
+class TurboAntwort(BaseModel):
+    # aus (grey) | bereit (green) | zeichnet (blue) | fehler (red)
+    zustand: str
+    modell: str | None = None
+    programm_da: bool
+
+
+def _turbo_stand(turbo: Bildturbo) -> TurboAntwort:
+    return TurboAntwort(
+        zustand=turbo.zustand(), modell=turbo.modell,
+        programm_da=turbo.programm is not None,
+    )
+
+
+@router.get("/bild/turbo", response_model=TurboAntwort, summary="Image-Turbo — Zustand")
+def turbo_stand(request: Request) -> TurboAntwort:
+    return _turbo_stand(_turbo(request))
+
+
+class TurboStart(BaseModel):
+    modell: str
+
+
+@router.post("/bild/turbo/start", response_model=TurboAntwort, summary="Image-Turbo einschalten")
+def turbo_starten(
+    daten: TurboStart, request: Request,
+    config: Config = Depends(hole_config), sprache: str = Depends(hole_sprache),
+) -> TurboAntwort:
+    turbo = _turbo(request)
+    try:
+        pfad = modell_pfad(_bildordner(config), daten.modell)
+    except BildFehler as fehler:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, t(fehler.grund, sprache)) from fehler
+    try:
+        # Switched on by hand on a bare Gespann — just the model, no VAE and no
+        # detector yet. The LoRA folder is pointed at from the start, so a LoRA
+        # picture works straight away without a restart; a request that later
+        # wants a VAE or a detector restarts onto that Gespann on its own.
+        turbo.starten(pfad, lora_ordner=_bildordner(config) / bildwahlen.LORA_ORDNER)
+    except BildturboFehler as fehler:
+        raise HTTPException(
+            status.HTTP_412_PRECONDITION_FAILED, t(fehler.grund, sprache)
+        ) from fehler
+    return _turbo_stand(turbo)
+
+
+@router.post("/bild/turbo/stop", response_model=TurboAntwort, summary="Image-Turbo ausschalten")
+def turbo_stoppen(request: Request) -> TurboAntwort:
+    turbo = _turbo(request)
+    turbo.stoppen()
+    return _turbo_stand(turbo)
+
+
+class BildVorgabenAntwort(BaseModel):
+    breite: int
+    hoehe: int
+    schritte: int
+    sampler: str = ""
+    scheduler: str = ""
+    klasse: str
+
+
+@router.get("/bild/vorgaben", response_model=BildVorgabenAntwort, summary="Startwerte je Modell")
+def bild_vorgaben(
+    modell: str | None = None,
+    repositories=Depends(hole_repositories),
+) -> BildVorgabenAntwort:
+    """The values the picture window opens on for a given model.
+
+    Class-aware: an SDXL model comes back at 1024/28, an SD-1.5 at 512/22,
+    and a stored override — global, per-model or per-chat — wins over the
+    class default. The window asks again whenever the chosen model changes,
+    so switching from an SD-1.5 to an SDXL model moves the fields with it
+    instead of drawing the big model at the small model's resolution.
+    """
+    aufgeloest = bildvorgabenwahl.vorgaben(repositories, modell=modell)
+    return BildVorgabenAntwort(
+        breite=aufgeloest.get("breite", 512),
+        hoehe=aufgeloest.get("hoehe", 512),
+        schritte=aufgeloest.get("schritte", 22),
+        sampler=aufgeloest.get("sampler", ""),
+        scheduler=aufgeloest.get("scheduler", ""),
+        klasse=bildwahlen.klasse_aus_name(modell or ""),
     )
 
 
@@ -239,22 +358,52 @@ def generator_holen(
     return stand
 
 
+class FortschrittAntwort(BaseModel):
+    """The running picture's honest step counter, for the filling frame.
+
+    `laeuft` False means: nothing to show — the interface keeps its quiet
+    wave without a number. The share is overall across the run's passes
+    (base, highres, detailer), capped just under one until the file truly
+    exists."""
+
+    laeuft: bool
+    anteil: float = 0.0
+    schritt: int = 0
+    gesamt: int = 0
+
+
+@router.get("/bild/fortschritt", response_model=FortschrittAntwort, summary="Bildfortschritt")
+def bild_fortschritt(request: Request) -> FortschrittAntwort:
+    stand = _runner(request).fortschritt() or _turbo(request).fortschritt()
+    if not stand:
+        return FortschrittAntwort(laeuft=False)
+    return FortschrittAntwort(laeuft=True, **stand)
+
+
 @router.post("/bild/stop", response_model=bool, summary="Bild abbrechen")
 def bild_stoppen(request: Request) -> bool:
     """Ends the running picture. False when there was none.
 
     No id and no body: one picture runs at a time, so there is exactly one
-    thing this can mean.
+    thing this can mean. Both paths are reached: the sd-cli runner, and a
+    turbo draw — which blocks in an HTTP call with no cancel, so ending its
+    server is what breaks it off.
     """
-    return _runner(request).stoppen()
+    gestoppt = _runner(request).stoppen()
+    return _turbo(request).abbrechen() or gestoppt
 
 
-@router.post("/bild/lora-folder", response_model=bool, summary="LoRA-Ordner zeigen")
-def loraordner_zeigen(
-    config: Config = Depends(hole_config), sprache: str = Depends(hole_sprache)
+@router.post("/bild/begleiter-folder/{unterordner}", response_model=bool,
+             summary="Begleiter-Ordner zeigen")
+def begleiterordner_zeigen(
+    unterordner: Literal["vae", "lora", "adetailer"],
+    config: Config = Depends(hole_config), sprache: str = Depends(hole_sprache),
 ) -> bool:
-    """Its own folder too — a stack nobody can fill is not a stack."""
-    ordner = _bildordner(config) / bildwahlen.LORA_ORDNER
+    """Open one of the picture server's companion sub-folders so a file can be
+    dropped in by hand — a stack nobody can fill is not a stack, so the folder
+    is created if it is not there yet. The whitelist on the path is what keeps
+    this from opening anything but a companion folder."""
+    ordner = _bildordner(config) / unterordner
     ordner.mkdir(parents=True, exist_ok=True)
     try:
         ordner_oeffnen(ordner)
@@ -317,9 +466,16 @@ async def bild_erzeugen(
         maske=maske,
         # Without a starting image the strength has nothing to act on.
         staerke=max(0.0, min(1.0, float(wunsch.staerke))) if startbild else 1.0,
+        # The quality companions, each resolved against its own folder.
+        clip_skip=max(-1, min(12, int(wunsch.clip_skip))),
+        vae=_begleiter(vae_pfad, config, wunsch.vae, sprache),
+        ad_modell=_begleiter(yolo_pfad, config, wunsch.ad_modell, sprache),
+        ad_prompt=wunsch.ad_prompt,
+        hires=bool(wunsch.hires),
+        hires_scale=max(1.0, min(4.0, float(wunsch.hires_scale))),
     )
     name = uuid.uuid4().hex + ".png"
-    ziel = config.datenverzeichnis / "bilder" / name
+    ziel = _bilderziel(config) / name
 
     # The run appears in the chat's little history the moment it starts, so a
     # picture that takes half a minute is visible as work rather than as
@@ -328,8 +484,64 @@ async def bild_erzeugen(
 
     # The generator is a separate program that runs for half a minute; run
     # in a thread so the service keeps answering while it draws.
+    #
+    # Image-Turbo takes the picture when it is up AND the request stays within
+    # what the persistent server can carry. LoRA, an external VAE and ADetailer
+    # now ride along: LoRA travels in the prompt (the server is always started
+    # with the LoRA folder), VAE and detector are the "Gespann" the server is
+    # started on. A request wanting a different Gespann (other model, VAE or
+    # detector) restarts the turbo ONCE with the new flags — the load is paid a
+    # single time, then the whole series runs warm. What still falls to sd-cli:
+    # a starting image, a mask, highres fix and clip-skip — those are not clean
+    # per-request fields on this server's HTTP body, so the authoritative path
+    # keeps them and the turbo never quietly drops a control.
+    turbo = request.app.state.bildturbo
+    turbo_faehig = not (
+        auftrag.startbild or auftrag.maske or auftrag.hires or auftrag.clip_skip > 0
+    )
+    ueber_turbo = turbo_faehig and turbo.laeuft()
     try:
-        await asyncio.to_thread(runner.erzeugen, auftrag, ziel)
+        if ueber_turbo:
+            # The turbo path borrows the runner's one-picture lock: a second
+            # request cannot restart the server under a running draw, and a
+            # turbo picture and an sd-cli picture can never run at once.
+            runner.reservieren()
+            try:
+                if not turbo.passt_zu(
+                    wunsch.modell, wunsch.vae or None,
+                    wunsch.ad_modell or None, auftrag.ad_prompt,
+                ):
+                    # A different Gespann — bring the server up on it and wait
+                    # for the model to load before the first draw. Both steps
+                    # block, so they run off the event loop.
+                    await asyncio.to_thread(
+                        turbo.starten, pfad,
+                        vae=auftrag.vae, ad_modell=auftrag.ad_modell,
+                        ad_prompt=auftrag.ad_prompt, lora_ordner=auftrag.lora_ordner,
+                    )
+                    if not await asyncio.to_thread(turbo.bereit_abwarten):
+                        raise BildturboFehler("bild.turbo_ladefehler")
+                daten = await asyncio.to_thread(turbo.zeichnen, _turbo_auftrag(auftrag))
+                ziel.parent.mkdir(parents=True, exist_ok=True)
+                ziel.write_bytes(daten)
+            finally:
+                runner.freigeben()
+        else:
+            await asyncio.to_thread(runner.erzeugen, auftrag, ziel)
+    except BildturboFehler as fehler:
+        if fehler.grund == "bild.abgebrochen":
+            # A stop pressed during a turbo draw ends the server, which breaks
+            # off the draw. Asked for, not gone wrong — the same silent 499 the
+            # sd-cli path returns, so the window says nothing and the working
+            # message just disappears.
+            bildlauf.beenden(lauf, abgebrochen=True)
+            code = (status.HTTP_499_CLIENT_CLOSED_REQUEST
+                    if hasattr(status, "HTTP_499_CLIENT_CLOSED_REQUEST") else 499)
+            raise HTTPException(code, t(fehler.grund, sprache)) from fehler
+        bildlauf.beenden(lauf, gescheitert=True)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, t(fehler.grund, sprache)
+        ) from fehler
     except BildFehler as fehler:
         schluessel = fehler.grund
         bildlauf.beenden(
@@ -345,7 +557,12 @@ async def bild_erzeugen(
             if hasattr(status, "HTTP_499_CLIENT_CLOSED_REQUEST")
             else 499,
         }.get(schluessel, status.HTTP_503_SERVICE_UNAVAILABLE)
-        raise HTTPException(code, t(schluessel, sprache)) from fehler
+        satz = t(schluessel, sprache)
+        if getattr(fehler, "protokoll", None):
+            # The painter's REAL last words, verbatim below the sentence —
+            # no rewritten error catalogue, the raw log is the truth.
+            satz = f"{satz}\n\n{fehler.protokoll}"
+        raise HTTPException(code, satz) from fehler
     except BaseException:
         bildlauf.beenden(lauf, gescheitert=True)
         raise
@@ -355,14 +572,41 @@ async def bild_erzeugen(
     # carries the prompt, the answer carries the image. Exactly as the
     # picture server's path next door does it, so the history shows both
     # kinds the same way and no second display path is needed.
-    frage_id, antwort_id = _ins_gespraech(request, wunsch, name, sprache)
+    frage_id, antwort_id = _ins_gespraech(request, wunsch, name, sprache, auftrag.seed)
     return BildAntwort(
         bild=name, seed=auftrag.seed, frage_id=frage_id, antwort_id=antwort_id
     )
 
 
+def _turbo_auftrag(auftrag: Auftrag) -> dict:
+    """The A1111 txt2img body Image-Turbo speaks. The base fields, plus the
+    LoRA stack written into the prompt in WebUI syntax — the same way sd-cli
+    takes it (``<lora:name:strength>``), which the server resolves against the
+    ``--lora-model-dir`` it was started with. VAE and detector are NOT here:
+    they are bound to the running server as start flags, not per-request body
+    fields. Starting image, mask, highres and clip-skip never reach this path
+    at all — a request with them took sd-cli instead."""
+    prompt = auftrag.prompt
+    for lora in auftrag.loras:
+        prompt += f" <lora:{Path(lora.name).stem}:{lora.staerke}>"
+    body = {
+        "prompt": prompt,
+        "width": auftrag.breite,
+        "height": auftrag.hoehe,
+        "steps": auftrag.schritte,
+        "cfg_scale": auftrag.cfg,
+        "seed": auftrag.seed,
+        "sampler_name": auftrag.sampler,
+    }
+    if auftrag.negativ:
+        body["negative_prompt"] = auftrag.negativ
+    if auftrag.scheduler:
+        body["scheduler"] = auftrag.scheduler
+    return body
+
+
 def _ins_gespraech(
-    request: Request, wunsch: BildWunsch, name: str, sprache: str
+    request: Request, wunsch: BildWunsch, name: str, sprache: str, seed: int
 ) -> tuple[str | None, str | None]:
     if not wunsch.chat_id:
         return None, None
@@ -378,8 +622,12 @@ def _ins_gespraech(
     frage = repositories.messages.speichern(
         chat_id=chat.id, role="user", content=wunsch.prompt
     )
+    # The seed rides along in the message's stats (no schema change needed),
+    # so every saved picture carries the number it was drawn with — shown
+    # under the picture and copyable, exactly like the chat's own values.
     antwort = repositories.messages.speichern(
-        chat_id=chat.id, role="assistant", content="", bild=name
+        chat_id=chat.id, role="assistant", content="", bild=name,
+        stats={"seed": seed},
     )
     repositories.chats.zeitstempel_auffrischen(chat.id)
     return frage.id, antwort.id
@@ -399,6 +647,19 @@ def _loras(config: Config, wunsch: BildWunsch, sprache: str) -> tuple[LoRA, ...]
     return tuple(gewaehlt)
 
 
+def _begleiter(aufloeser, config: Config, name: str | None, sprache: str) -> Path | None:
+    """A VAE or detector NAME turned into a path, or None when unset — every
+    name checked against the folder it must lie in, like a LoRA."""
+    if not name:
+        return None
+    try:
+        return aufloeser(_bildordner(config), name)
+    except BildFehler as fehler:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, t(fehler.grund, sprache)
+        ) from fehler
+
+
 def _startbild(config: Config, name: str | None, sprache: str) -> Path | None:
     """A picture to start from — by the name this server gave it.
 
@@ -410,7 +671,7 @@ def _startbild(config: Config, name: str | None, sprache: str) -> Path | None:
         return None
     if "/" in name or "\\" in name or name != Path(name).name:
         raise HTTPException(status.HTTP_404_NOT_FOUND, t("bild.startbild_fehlt", sprache))
-    pfad = config.datenverzeichnis / "bilder" / name
+    pfad = _bilderziel(config) / name
     if not pfad.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, t("bild.startbild_fehlt", sprache))
     return pfad

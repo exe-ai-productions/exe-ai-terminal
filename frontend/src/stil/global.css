@@ -7,21 +7,32 @@
 */
 
 :root {
-  /* Light mode is the mirror of dark, not its absence: there the raised
-     surface is LIGHTER than the ground, here it is WHITER. Ground and tile
-     used to share one white, which left a tile with no surface of its own —
-     a hairline had to carry the whole distinction, and the mode read flat.
-     The ground takes the quiet tone now, the tile keeps the pure white. */
-  --bg: #f7f6f2;
-  --bg-leiste: #f2f1ec;
-  --bg-seite: #f2f1ec;
-  --bg-erhoben: #fff;
-  --linie: #e2e0d8;
-  --linie-stark: #cbc8bd;
-  --text: #1a1a18;
-  --text-leise: #6f6d66;
-  --text-still: #9a978e;
-  --blase: #f1efe9;
+  /* Light mode is the mirror of dark, not its absence: the raised surface is
+     LIGHTER than the ground, but no longer a cold pure white. The skin is
+     pearl/cream — a warm ground, soft pearl tiles, warm-greige lines and
+     warm-dark ink — so the light mode reads soft instead of blinding. The
+     tile still carries its own surface (lighter than the ground); it just
+     stops at pearl rather than paper-white. */
+  --bg: #e0d7c3;
+  --bg-leiste: #d9cfba;
+  --bg-seite: #d9cfba;
+  --bg-erhoben: #ece4d3;
+  --linie: #cabfa6;
+  --linie-stark: #b1a687;
+  /* The unified contrast accent: one warm taupe for every NEUTRAL emphasis —
+     the selected chat, the active tab, the input frame. NOT the status colours
+     (green/yellow/blue/red stay status-only) and NOT the primary send button
+     (that keeps its strong dark). Its own token, per theme, so light and dark
+     are tuned apart. */
+  --kontrast: #b1a687;
+  --text: #201c14;
+  --text-leise: #625a4b;
+  --text-still: #7a7157;
+  --blase: #dbd2bd;
+  /* Watermark opacity. Dark ink on the cream ground needs more than the 2 %
+     a light mark gets on a dark ground, or it disappears — the dark modes
+     reset it to 0.02 below. */
+  --wz-blass: 0.05;
   --radius: 10px;
   /* The four colours mean STATE, never decoration. That rule was already
      lived everywhere; writing it down makes it arguable.
@@ -44,10 +55,15 @@
   --gelb: #c9a227;
   --blau: #5b8dbe;
   --rot: #b4544c;
+  /* Vision. One capability, one colour, everywhere — the violet eye in the
+     input bar, on the catalogue's mmproj cards, in every future table. */
+  --violett: #8d78bd;
+  /* Tool use. Same rule: the olive wrench, wherever it appears. */
+  --oliv: #9aa05e;
 
   /* Code design: muted instead of glowing. */
-  --code-bg: #fbfaf7;
-  --code-text: #2b2a27;
+  --code-bg: #eae1cf;
+  --code-text: #2a2620;
   --sx-schl: #8a5a2b;
   --sx-text: #3f6b4a;
   /* One step more distinct than
@@ -74,10 +90,12 @@
   --bg-erhoben: #1f1f1d;
   --linie: #2e2e2a;
   --linie-stark: #3d3d38;
+  --kontrast: #3d3d38;
   --text: #ecebe6;
   --text-leise: #a3a099;
   --text-still: #6f6d66;
   --blase: #232320;
+  --wz-blass: 0.02;
   --code-bg: #191918;
   --code-text: #dedbd3;
   --sx-schl: #d9a05b;
@@ -95,10 +113,12 @@
     --bg-erhoben: #1f1f1d;
     --linie: #2e2e2a;
     --linie-stark: #3d3d38;
+    --kontrast: #3d3d38;
     --text: #ecebe6;
     --text-leise: #a3a099;
     --text-still: #6f6d66;
     --blase: #232320;
+    --wz-blass: 0.02;
     --code-bg: #191918;
     --code-text: #dedbd3;
     --sx-schl: #d9a05b;
@@ -107,6 +127,138 @@
     --sx-zahl: #c1a3d8;
     --sx-ruf: #8ab4d8;
   }
+}
+
+/* Dark Matter: a pale lilac shimmer at the top of the window that runs down
+   into black — the nebula look, not a flat violet wash. The gradient rides
+   on the window ground (body); --bg stays a SOLID dark point so color-mix and
+   every component that reads it as a colour keep working. Placed AFTER the
+   auto-dark block on purpose — at equal specificity the later rule wins, so
+   Dark Matter holds whether the system sits in light or dark. Its tokens
+   carry the tint into every surface, line, bubble and code block through the
+   same variables the other modes use, so no component has to know it exists.
+   The four state colours and the two capability colours are lifted a touch
+   brighter than the neutral modes' — on a coloured ground the muted forms
+   would sink into it, and blau/violett have to stay legible against violet. */
+:root[data-modus='darkmatter'] {
+  --bg: #0b0817;
+  /* The header band sits darker than the nebula it caps — a near-black violet
+     for the menu bar (--bg-leiste), the wordmark row (--kopf-bg) and a soft
+     shadow (--kopf-schatten) that gives it a hard lower edge. Only Dark Matter
+     sets the two --kopf- tokens; the other modes leave the header transparent
+     as before. */
+  --bg-leiste: #120e26;
+  --kopf-bg: #120e26;
+  /* A soft, diffuse fall instead of a hard step — the header lifts gently off
+     the field rather than cutting a line across it. */
+  --kopf-schatten: 0 10px 26px -10px rgba(0, 0, 0, 0.45);
+  /* The sidebar joins the header and the right rail as ONE calm, dark frame
+     (all the same deep tone) around the luminous nebula in the middle. It used
+     to sit lighter than the content's lower half, which made it float instead
+     of frame. */
+  --bg-seite: #1a1538;
+  /* Raised surfaces (input field, cards, tiles, popovers) sit clearly LIGHTER
+     than the nebula ground so they step out of it instead of dissolving into
+     it — the third brightness between the dark frame and the glowing middle. */
+  --bg-erhoben: #241d46;
+  /* Lines run a touch brighter than the surfaces here on purpose: on the
+     lilac shimmer a near-black hairline vanishes, and the header would lose
+     its lower edge — the "missing top boundary". Lifted, every frame (header,
+     sidebar, fields, cards) keeps a clean edge against the nebula. */
+  --linie: #2f2858;
+  --linie-stark: #443a76;
+  --kontrast: #4a4176;
+  /* The window ring is violet here, not the near-white --text — otherwise a
+     modal frame reads like the neutral dark theme's. Dimmed a touch so it
+     glows lilac instead of glaring. */
+  --fensterring: #7d6cba;
+  --text: #e9e6f7;
+  --text-leise: #a99fce;
+  --text-still: #837b9f;
+  --blase: #201a3a;
+  --wz-blass: 0.02;
+  /* The user's own chat bubble ships in a calm lavender here (deliberately
+     NOT the vision violet #b18cff — that colour means "sees images"). Only
+     this one surface; a user's own pick in the settings still overrides it. */
+  --blase-eigen-standard: #cbbcee;
+  --blase-eigen-text-standard: #1a1a18;
+  --gruen: #5fbe86;
+  --gelb: #d6b13f;
+  /* The active accent runs brighter here so the send button, the "running"
+     dots and the model status truly glow against the violet ground instead of
+     sinking into it. Still the same blau that means "active" everywhere — just
+     lifted for the darker skin, not a new decorative colour. */
+  --blau: #8bb8ff;
+  --rot: #e0687e;
+  --violett: #b18cff;
+  --oliv: #a9ae6f;
+  --code-bg: #140f2b;
+  --code-text: #e3def5;
+  --sx-schl: #e0a86a;
+  --sx-text: #8fd6a8;
+  --sx-komm: #8781a8;
+  --sx-zahl: #c9a3f0;
+  --sx-ruf: #8ab8f5;
+}
+/* Dark Matter's ground is a deep near-black; the flowing violet field itself
+   is the Materiefeld component (teile/Materiefeld.svelte), a fixed vector wash
+   behind the app that paints only under this skin. */
+:root[data-modus='darkmatter'] body {
+  background: linear-gradient(180deg, #100c22 0%, #0a0818 55%, #05040d 100%);
+}
+
+/* Heaven: Dark Matter's light mirror — a pastel sky instead of a nebula.
+   Same build: a soft gradient on the body, a fixed vector field behind the
+   app (teile/Himmelfeld.svelte, only under this skin), and one ladder of
+   sky tones through the shared tokens. The frame (header + both rails)
+   sits a step DEEPER than the luminous middle so it frames instead of
+   floating; raised surfaces step out towards white. Lines and the still
+   subtitle tone are lifted against the blue tint so edges and captions
+   stay readable on a coloured light ground. Placed after the auto-dark
+   block for the same reason Dark Matter is: the later rule wins, so
+   Heaven holds whether the system sits in light or dark. */
+:root[data-modus='heaven'] {
+  --bg: #e8eef8;
+  --bg-leiste: #d3dff0;
+  --kopf-bg: #d3dff0;
+  --kopf-schatten: 0 10px 26px -10px rgba(64, 92, 138, 0.3);
+  --bg-seite: #dbe5f3;
+  --bg-erhoben: #f6f9fd;
+  --linie: #c2d1e7;
+  --linie-stark: #a2b7d8;
+  --kontrast: #8fa8d0;
+  /* The window ring in a soft periwinkle instead of the near-black ink —
+     a modal on a sky ground should glow blue, not stamp black. */
+  --fensterring: #7e96c6;
+  --text: #22304a;
+  --text-leise: #51617f;
+  /* The subtitles: tuned against the blue tint, one step bluer and darker
+     than the pearl theme's still tone would land here. */
+  --text-still: #6d7d9d;
+  --blase: #dbe5f4;
+  --wz-blass: 0.05;
+  /* The user's own bubble ships in a clear light periwinkle (dark ink on
+     it via the auto threshold); a pick in the settings still overrides. */
+  --blase-eigen-standard: #c8d8f5;
+  --blase-eigen-text-standard: #1a1a18;
+  /* The state and capability colours in their light-ground forms — set
+     here explicitly so the auto-dark block can never seep through. */
+  --gruen: #5f8a68;
+  --gelb: #b9952b;
+  --blau: #4a7fc1;
+  --rot: #b4544c;
+  --violett: #7f68b8;
+  --oliv: #8f955a;
+  --code-bg: #e2eaf6;
+  --code-text: #253248;
+  --sx-schl: #8a5a2b;
+  --sx-text: #3f6b4a;
+  --sx-komm: #78809a;
+  --sx-zahl: #7a5c8f;
+  --sx-ruf: #2f5d80;
+}
+:root[data-modus='heaven'] body {
+  background: linear-gradient(180deg, #f2f7fd 0%, #e7effa 50%, #d9e5f4 100%);
 }
 
 * {

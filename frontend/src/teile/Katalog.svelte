@@ -22,7 +22,10 @@
   import { weg, zurueckgehen } from '../lib/fensterweg.svelte.js'
   import { t } from '../lib/texte.svelte.js'
   import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
-  import { ARTEN, kartePasst, katalogFuer, passendeFassung } from '../lib/modellempfehlungen.js'
+  import {
+    ARTEN, ZUBEHOER_ZIEL, SPALTEN_ZUBEHOER, ZUBEHOER_ORDNER, SUCHBARE_ARTEN,
+    kartePasst, katalogFuer, passendeFassung,
+  } from '../lib/modellempfehlungen.js'
   import { modellMarke } from '../lib/anbieterzeichen.js'
 
   let { offen = $bindable(false) } = $props()
@@ -31,11 +34,34 @@
      them, always switchable back to Chat: the search below is scoped to
      this, and so is the curated gallery. */
   let art = $state('chat')
+  /* Whether this tab searches at all, and whether it is the accessory tab
+     (five columns instead of the plain grid). */
+  const suchbar = $derived(SUCHBARE_ARTEN.includes(art))
+  const istZubehoer = $derived(art === 'zubehoer')
   function artWaehlen(neu) {
     if (neu === art) return
     art = neu
     detail = null
-    if (suchAktiv) suchen()
+    // Leaving for a tab without a search: clear the field and its results,
+    // or a stale term would keep the gallery dimmed on a tab that cannot search.
+    if (!SUCHBARE_ARTEN.includes(neu)) {
+      suchbegriff = ''
+      treffer = null
+      offenesRepo = null
+    } else if (suchAktiv) {
+      suchen()
+    }
+  }
+
+  /* Open the file manager at one accessory folder — the picture side and the
+     chat side each have their own whitelisted route. */
+  function ordnerOeffnen(sorte) {
+    const ziel = ZUBEHOER_ORDNER[sorte]
+    if (!ziel) return
+    const ruf = ziel.seite === 'chat'
+      ? api.chatBegleiterOrdner(ziel.unter)
+      : api.bildBegleiterOrdner(ziel.unter)
+    ruf.catch(() => {})
   }
 
   /* A server panel can send the user here with its own tab already open —
@@ -82,11 +108,14 @@
   const wirdGeholt = (datei) => laedt && stand?.datei === datei
 
   function dran(f) {
-    return wirdGeholt(f.datei) || (f.mmproj_ziel && wirdGeholt(f.mmproj_ziel)) || (f.drafter_ziel && wirdGeholt(f.drafter_ziel))
+    // An accessory keeps its local name in `ziel` (the remote file is named
+    // the same across repositories); the progress and the presence check must
+    // follow that name, not the remote one, or a renamed card never registers.
+    return wirdGeholt(f.ziel ?? f.datei) || (f.mmproj_ziel && wirdGeholt(f.mmproj_ziel)) || (f.drafter_ziel && wirdGeholt(f.drafter_ziel))
   }
   function status(f) {
     if (dran(f)) return 'laedt'
-    if (istDa(f.datei)) return 'bereit'
+    if (istDa(f.ziel ?? f.datei)) return 'bereit'
     return 'neu'
   }
   function fortschritt(f) {
@@ -114,17 +143,48 @@
         tempoMessen(stand && !stand.fertig && !stand.fehler ? stand : null)
         const auskunft = await api.runnerAuskunft()
         maschineGb = auskunft.speicher_gb ?? null
-        vorhanden = [
+        // Collected fully, assigned ONCE at the end: an intermediate
+        // assignment made every card flip to "download" for a blink on
+        // each 2-second poll while the picture list was still in flight.
+        const liste = [
           ...auskunft.modelle.map((m) => m.name),
           ...(auskunft.mmproj ?? []),
           ...(auskunft.mtp ?? []).map((m) => m.name),
         ]
+        // Picture checkpoints and accessories land in the picture side's own
+        // folders, which the runner's list does not see. On those two tabs,
+        // add what the picture side already has, or a downloaded model keeps
+        // offering itself and a second click only earns a "already there"
+        // error (found live with CyberRealistic XL on the picture tab).
+        if (art === 'zubehoer' || art === 'bild') {
+          try {
+            const bild = await api.bildmodelle()
+            liste.push(
+              ...(bild.modelle ?? []),
+              ...(bild.vaes ?? []), ...(bild.loras ?? []), ...(bild.yolos ?? []),
+            )
+          } catch {
+            // No picture server yet — cards just show as not installed.
+          }
+        }
+        // Embedding models land in the embedding server's own folder, which
+        // the runner's list does not see either — same story as the picture
+        // side, same fix, or a finished download keeps offering itself.
+        if (art === 'einbettung') {
+          try {
+            const einbettung = await api.einbettungAuskunft()
+            liste.push(...(einbettung.modelle ?? []))
+          } catch {
+            // No embedding server yet — cards just show as not installed.
+          }
+        }
+        vorhanden = liste
         if (stand?.fertig && !stand.fehler && nachzuege.length) {
           while (nachzuege.length && vorhanden.includes(nachzuege[0].ziel)) nachzuege.shift()
           const n = nachzuege.shift()
           if (n) {
             try {
-              stand = await api.modellHolen(n.repo, n.datei, n.ziel ?? null, n.gehoert_zu ?? null, n.rolle ?? null, n.art ?? 'chat')
+              stand = await api.modellHolen(n.repo, n.datei, n.ziel ?? null, n.gehoert_zu ?? null, n.rolle ?? null, n.art ?? 'chat', n.unterordner ?? null)
             } catch {
               // A broken link ends the chain; the button offers the rest.
               nachzuege = []
@@ -149,25 +209,40 @@
     if (f.drafter) jobs.push({ repo: f.drafter_repo ?? f.id, datei: f.drafter, ziel: f.drafter_ziel, gehoert_zu: f.datei, rolle: 'mtp' })
     return jobs
   }
-  async function starteJob(job, rest) {
+  /* Where a card downloads to. An accessory card carries its own destination
+     by its sorte (folder art + sub-folder, or a companion role in the model
+     folder); everything else lands in the open tab's art. */
+  function routing(karte) {
+    if (karte?.zubehoer) return ZUBEHOER_ZIEL[karte.sorte] ?? { art }
+    return { art }
+  }
+  async function starteJob(job, rest, ziel) {
     try {
-      stand = await api.modellHolen(job.repo, job.datei, job.ziel ?? null, job.gehoert_zu ?? null, job.rolle ?? null, art)
-      nachzuege = rest.map((j) => ({ ...j, art }))
+      stand = await api.modellHolen(
+        job.repo, job.datei, job.ziel ?? null,
+        job.gehoert_zu ?? null, job.rolle ?? ziel.rolle ?? null,
+        ziel.art, ziel.unterordner ?? null,
+      )
+      nachzuege = rest.map((j) => ({ ...j, art: ziel.art, unterordner: ziel.unterordner ?? null }))
     } catch (fehler) {
       melde(fehler.message, 'fehler')
     }
   }
   /* Fetch what is missing — the model, or only the companions that never
      arrived. The follow-up list lives in memory, so a reopen mid-download
-     never strands a model without its projector or its draft. */
-  async function fassungHolen(f) {
+     never strands a model without its projector or its draft. An accessory
+     names its local file with `ziel` (two LoRA repositories share a file
+     name), so the presence check follows that name, not the remote one. */
+  async function fassungHolen(f, karte) {
+    const ziel = routing(karte)
     const fehlend = begleiterJobs(f).filter((j) => !istDa(j.ziel))
-    if (!istDa(f.datei)) {
-      await starteJob({ repo: f.id, datei: f.datei, ziel: null }, fehlend)
+    const lokal = f.ziel ?? f.datei
+    if (!istDa(lokal)) {
+      await starteJob({ repo: f.id, datei: f.datei, ziel: f.ziel ?? null }, fehlend, ziel)
       return
     }
     const [erst, ...rest] = fehlend
-    if (erst) await starteJob(erst, rest)
+    if (erst) await starteJob(erst, rest, ziel)
   }
 
   async function abbrechen() {
@@ -183,13 +258,19 @@
      ready, and everyday defaults for context and port. */
   async function starten(f) {
     try {
-      await api.runnerStarten({
-        modell: f.datei,
-        kontext: 32768,
-        schichten: 99,
-        port: 8080,
-        drafter: f.drafter_ziel && istDa(f.drafter_ziel) ? f.drafter_ziel : null,
-      })
+      if (art === 'einbettung') {
+        // An embedding model belongs to the embedding server, not the chat
+        // runner — the chat runner would refuse it as outside its folder.
+        await api.einbettungStarten(f.datei)
+      } else {
+        await api.runnerStarten({
+          modell: f.datei,
+          kontext: 32768,
+          schichten: 99,
+          port: 8080,
+          drafter: f.drafter_ziel && istDa(f.drafter_ziel) ? f.drafter_ziel : null,
+        })
+      }
       await modelleLaden(true)
       offen = false
       zustand.lokalOffen = true
@@ -271,7 +352,9 @@
       const ziel = augenZiel(d.datei, repoAugen.datei)
       if (!istDa(ziel)) jobs.push({ repo, datei: repoAugen.datei, ziel, gehoert_zu: d.datei, rolle: 'mmproj' })
     }
-    await starteJob({ repo, datei: d.datei, ziel: null }, jobs)
+    // A search hit downloads into the open tab's art (search runs only on the
+    // searchable tabs); the routing argument is what starteJob now requires.
+    await starteJob({ repo, datei: d.datei, ziel: null }, jobs, { art })
   }
   function suchDran(d) {
     const ziel = repoAugen ? augenZiel(d.datei, repoAugen.datei) : null
@@ -321,43 +404,73 @@
         statusFuer={status}
         fortschrittFuer={fortschritt}
         onClose={() => (detail = null)}
-        onDownload={(f) => fassungHolen(f)}
+        onDownload={(f) => fassungHolen(f, detail)}
         onCancel={abbrechen}
         onStart={(f) => starten(f)}
       />
     </div>
   {:else}
-    <input
-      class="suchfeld"
-      bind:value={suchbegriff}
-      placeholder={t('katalog.suchen')}
-      oninput={tippt}
-      onkeydown={(e) => { if (e.key === 'Enter') suchen() }}
-    />
+    {#if suchbar}
+      <input
+        class="suchfeld"
+        bind:value={suchbegriff}
+        placeholder={t('katalog.suchen')}
+        oninput={tippt}
+        onkeydown={(e) => { if (e.key === 'Enter') suchen() }}
+      />
+    {/if}
+
+    {#snippet karteBlock(karte)}
+      {@const f = passendeFassung(karte, maschineGb)}
+      <Modellkarte
+        {karte}
+        fassung={f}
+        passt={kartePasst(karte, maschineGb)}
+        {maschineGb}
+        status={status(f)}
+        fortschritt={fortschritt(f)}
+        onOeffnen={() => (detail = karte)}
+        onDownload={() => fassungHolen(f, karte)}
+        onCancel={abbrechen}
+        onStart={() => starten(f)}
+      />
+    {/snippet}
 
     <div class="rollbereich">
-      <div class="raster" class:gedimmt={suchAktiv}>
-        {#each karten as karte (karte.id)}
-          {@const f = passendeFassung(karte, maschineGb)}
-          <Modellkarte
-            {karte}
-            fassung={f}
-            passt={kartePasst(karte, maschineGb)}
-            {maschineGb}
-            status={status(f)}
-            fortschritt={fortschritt(f)}
-            onOeffnen={() => (detail = karte)}
-            onDownload={() => fassungHolen(f)}
-            onCancel={abbrechen}
-            onStart={() => starten(f)}
-          />
-        {/each}
-      </div>
-      {#if !karten.length && !suchAktiv}
-        <p class="leer">{t('katalog.keine_kuratierten')}</p>
+      {#if istZubehoer}
+        <!-- One column per accessory kind, each with its own "open folder"
+             button; no search box on this tab. -->
+        <div class="spaltenraster">
+          {#each SPALTEN_ZUBEHOER as sorte (sorte)}
+            <div class="zspalte">
+              <div class="zkopf">
+                <span class="ztitel">{t(`katalog.sorte_${sorte}`)}</span>
+                <button class="ordnerknopf" onclick={() => ordnerOeffnen(sorte)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  </svg>
+                  {t('katalog.ordner_zeigen')}
+                </button>
+              </div>
+              {#each karten.filter((k) => k.sorte === sorte) as karte (karte.id)}
+                {@render karteBlock(karte)}
+              {/each}
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="raster" class:gedimmt={suchAktiv}>
+          {#each karten as karte (karte.id)}
+            {@render karteBlock(karte)}
+          {/each}
+        </div>
+        {#if !karten.length && !suchAktiv}
+          <p class="leer">{t('katalog.keine_kuratierten')}</p>
+        {/if}
       {/if}
 
-      {#if suchAktiv}
+      {#if suchbar && suchAktiv}
         <div class="suchteil">
           <h4 class="abschnitt">{t('katalog.von_hf')}</h4>
           {#if sucht}
@@ -539,6 +652,62 @@
   .raster.gedimmt {
     opacity: 0.32;
     pointer-events: none;
+  }
+
+  /* The accessory tab: one column per kind, each a vertical stack. Below the
+     wide breakpoints the columns wrap into fewer, then one. */
+  .spaltenraster {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .spaltenraster { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 700px) {
+    .spaltenraster { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 480px) {
+    .spaltenraster { grid-template-columns: 1fr; }
+  }
+  .zspalte {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .zkopf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 0 2px 2px;
+  }
+  .ztitel {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-leise);
+  }
+  .ordnerknopf {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--linie-stark);
+    background: var(--bg-leiste);
+    color: var(--text-leise);
+    font: inherit;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ordnerknopf:hover {
+    color: var(--text);
+    border-color: var(--text-still);
   }
 
   .suchteil {

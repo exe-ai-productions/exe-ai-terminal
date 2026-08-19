@@ -38,6 +38,18 @@ ANWEISUNG = (
     "no explanation."
 )
 
+# The negative prompt gets its own, narrower instruction: it is a list of
+# things to KEEP OUT of the picture. Translating is wanted, inventing is
+# not — an expanded negative would quietly forbid things the user never
+# named.
+ANWEISUNG_NEGATIV = (
+    "You rewrite the NEGATIVE prompt for a Stable-Diffusion image model — "
+    "the list of things to avoid in the picture. Translate it to English "
+    "and tidy it into concise comma-separated phrases. Stay faithful: do "
+    "not add new concepts and do not drop any. Return ONLY the list, with "
+    "no preamble, no quotes and no explanation."
+)
+
 # Long enough for a rich prompt, short enough that a model which starts
 # writing an essay is cut off rather than left running. The generous half of
 # that room exists for thinking models whose thinking cannot be switched
@@ -85,12 +97,15 @@ async def verbessern(
     modell: str | None,
     prompt: str,
     zusatz: dict | None = None,
+    anweisung: str = ANWEISUNG,
 ) -> str:
     """Asks the loaded language model for an English version of ``prompt``.
 
     Streams and collects rather than waiting for a whole response, because
     that is the one way every provider in the house can be asked; the caller
-    gets the finished text.
+    gets the finished text. ``anweisung`` picks the role: the default
+    expands a positive prompt, ``ANWEISUNG_NEGATIV`` only translates and
+    tidies the avoid-list.
     """
     eingabe = prompt.strip()
     if not eingabe:
@@ -100,7 +115,7 @@ async def verbessern(
 
     anfrage = Generierungsanfrage(
         nachrichten=[
-            ChatNachricht(role="system", content=ANWEISUNG),
+            ChatNachricht(role="system", content=anweisung),
             ChatNachricht(role="user", content=eingabe),
         ],
         modell=modell,

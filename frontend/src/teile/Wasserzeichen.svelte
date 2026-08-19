@@ -56,7 +56,10 @@
       transform var(--anlauf-dauer) var(--anlauf-schwung);
   }
   .zeichen.blass {
-    opacity: 0.02;
+    /* Per theme: dark ink on a cream ground needs more than the 2% that a
+       light mark on a dark ground does, or the watermark vanishes. Dark modes
+       keep the walked-to 0.02 via the fallback. */
+    opacity: var(--wz-blass, 0.02);
   }
   /* The entrance: grown out from the center, not faded in. */
   .zeichen.weg {

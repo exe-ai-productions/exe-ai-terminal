@@ -27,6 +27,7 @@
   import Hauszeichen from './Hauszeichen.svelte'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
   import Standpille from './Standpille.svelte'
+  import Speicherortzeile from './Speicherortzeile.svelte'
   import { t } from '../lib/texte.svelte.js'
 
   let {
@@ -46,6 +47,12 @@
        moment the panel cannot help itself. */
     katalogTat = null,
     ordnerOeffnen = null,
+    /* The storage location this panel keeps its models in ('bildmodelle',
+       'modelle', 'einbettung'). When given, the foot shows the shared folder
+       row — path, open, move — in place of the plain open-folder button, so
+       a folder can be moved from the same spot it was only opened before. */
+    speicherort = null,
+    onOrtGeaendert = null,
     tatText = '',
     tatPunkt = 'still',
     tatGesperrt = false,
@@ -90,11 +97,20 @@
 
   {@render mitte?.()}
 
+  {#if speicherort}
+    <!-- The folder as a full row: seen, opened and moved from one place. -->
+    <div class="ortzeile">
+      <Speicherortzeile name={speicherort} onaendern={onOrtGeaendert} />
+    </div>
+  {/if}
+
   <div class="fuss">
-    <button class="still" onclick={ordnerOeffnen}>
-      <Hauszeichen zeichen="ordner" groesse="klein" />
-      {t('modell.ordner_oeffnen')}
-    </button>
+    {#if !speicherort && ordnerOeffnen}
+      <button class="still" onclick={ordnerOeffnen}>
+        <Hauszeichen zeichen="ordner" groesse="klein" />
+        {t('modell.ordner_oeffnen')}
+      </button>
+    {/if}
     <button class="tat" disabled={tatGesperrt} onclick={onTat}>
       <Leuchtpunkt farbe={tatPunkt} groesse={7} />
       {tatText}
@@ -165,6 +181,13 @@
   }
   .zumkatalog:hover {
     background: var(--linie);
+  }
+  /* The folder row sits in a tile of its own, above the action, so a long
+     path never crowds the button that starts the server. */
+  .ortzeile {
+    border: 1px solid var(--linie);
+    border-radius: 10px;
+    padding: 9px 12px;
   }
   .fuss {
     display: flex;

@@ -8,7 +8,7 @@
 */
 
 import { api } from './api.js'
-import { ohneWeg } from './fensterweg.svelte.js'
+import { ausFenster, ohneWeg } from './fensterweg.svelte.js'
 import { klingen } from './klaenge.svelte.js'
 import { t } from './texte.svelte.js'
 import { befundeVergessen } from './waechter.svelte.js'
@@ -20,6 +20,21 @@ export const zustand = $state({
   nachrichten: [],
   version: '',
   aktiverChat: null,
+  /* The chat that is drawing a picture right now, or null. The working
+     message that carries the filling frame is only a local placeholder — it
+     is not on the server yet — so leaving and reopening the chat reloads the
+     server's messages without it. This remembers where a picture is in
+     flight so the placeholder can be put back on reopen. */
+  bildLaeuftChat: null,
+  /* The ordered size of the picture in flight. The working frame stands at
+     75% of the finished display size and needs the ordered dimensions for
+     that — also when the placeholder is put back on reopen. */
+  bildMasse: null,
+  /* How many more pictures are queued behind the one being drawn. Pressing
+     "draw" again while one runs adds to the queue instead of being ignored;
+     this count feeds the little house-style badge that says how many are
+     still to come. */
+  bildWarteschlange: 0,
   modellId: localStorage.getItem('modell') || '',
   suche: '',
   laeuft: null, // { abbruch, generationId } while an answer is running
@@ -38,7 +53,11 @@ export const zustand = $state({
   // Feature switches from the config (GET /meta, interface milestone C).
   // Until the answer arrives, everything counts as on — otherwise the
   // menu entries would flash away at startup and then back on.
-  features: { mcp: true, image_generation: true, document_upload: true },
+  features: { mcp: true, document_upload: true },
+  /* The image model chosen last — the image window and the image-server page
+     write it, the plus-menu Image-Turbo toggle reads it, so switching the
+     turbo on loads the model you were about to draw with. */
+  bildModell: '',
   // Look of the speech bubbles: filled or outline only (3.11).
   kontur: localStorage.getItem('kontur') === 'an',
   schrift: localStorage.getItem('schrift') || 'standard',
@@ -108,10 +127,16 @@ export function menueFensterOeffnen(name) {
 }
 
 /* From an empty server panel straight to where its models are: the
-   catalogue, already on the right tab. */
+   catalogue, already on the right tab. The panels live inside the local
+   window, so this leaves a way back INTO it — the same trail the catalogue
+   tile in that window lays down, so the arrow at the top leads home instead
+   of vanishing the way a plain menu jump would. */
 export function katalogOeffnen(art) {
   zustand.katalogArtWunsch = art
-  menueFensterOeffnen('katalog')
+  ausFenster(
+    () => { zustand.lokalOffen = false; zustand.katalogOffen = true },
+    () => { zustand.katalogOffen = false; zustand.lokalOffen = true },
+  )
 }
 
 /* A prompt dialog in the house style. Returns a promise:
@@ -397,6 +422,17 @@ export async function chatOeffnen(id) {
     zustand.nachrichten = []
     melde(t('chat.nicht_geoeffnet'), 'fehler')
     return
+  }
+  /* A picture still being drawn for this chat: its working message lives only
+     here, not on the server, so the reload above dropped it. Put it back, so
+     the filling frame is there again instead of a chat that looks finished
+     while the indicator below still turns. */
+  if (zustand.bildLaeuftChat === id
+      && !zustand.nachrichten.some((n) => n.bildLaeuft)) {
+    zustand.nachrichten.push({
+      id: null, role: 'assistant', content: '', bildLaeuft: true, stats: {}, werkzeuge: [],
+      bildMasse: zustand.bildMasse,
+    })
   }
   const chat = aktuellerChat()
   if (chat?.endpoint_id && zustand.modelle.some((m) => m.id === chat.endpoint_id)) {

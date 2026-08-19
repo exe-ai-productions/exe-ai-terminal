@@ -49,6 +49,7 @@ from app.events import Ereignisse, bus
 from app.generationen import Generierung, Generierungsverwaltung
 from app.i18n import t
 from app import denkschalter
+from app.speicherorte import ort
 from app.providers import ChatNachricht, Generierungsanfrage, ProviderFehler
 from app.tools import WerkzeugRegistry, WerkzeugVerboten
 from app.tools import dateiwerkzeuge, frage_werkzeug
@@ -640,7 +641,7 @@ async def completions(
                 # would be delivered with a wrong declaration.
                 raise ValueError(f"unbekannter Bildtyp {mime}")
             name = uuid4().hex + endung
-            verzeichnis = request.app.state.config.datenverzeichnis / "bilder"
+            verzeichnis = ort(request.app.state.config, "bilder")
             verzeichnis.mkdir(parents=True, exist_ok=True)
             (verzeichnis / name).write_bytes(base64.b64decode(daten_b64))
             werkzeug_bilder.append(name)

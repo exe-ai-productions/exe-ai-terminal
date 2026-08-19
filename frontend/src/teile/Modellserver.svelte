@@ -246,9 +246,12 @@
   /* The same folder the chat model comes from — a small model is a model.
      The list is not narrowed by size: what counts as small enough is a
      judgement the measurements made, not one a filter can make. */
-  const eewauswahl = $derived(
-    (auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
-  )
+  const eewauswahl = $derived([
+    // "Without" first, so Extended Workflow can run with no small model of
+    // its own — the same escape the speed module offers a line above.
+    { wert: '', text: t('modell.eew_keiner') },
+    ...(auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
+  ])
 
   const drafterauswahl = $derived([
     { wert: '', text: t('modell.drafter_keiner') },
@@ -263,9 +266,23 @@
     try {
       auskunft = await api.runnerAuskunft()
       if (!modell) {
-        modell = auskunft.modell || auskunft.modelle[0]?.name || ''
-        const z = auskunft.zuordnung?.[modell]
-        if (z?.mtp) drafter = z.mtp
+        /* The mask remembers the hand: a running server wins, then the model
+           last STARTED here (if its file is still in the folder), then the
+           first in the list. The drafter follows the remembered per-model
+           choice — including a remembered "none" — before the catalogue's
+           recorded pairing gets to guess. */
+        const gemerkt = localStorage.getItem('runner:modell')
+        modell =
+          auskunft.modell ||
+          (gemerkt && auskunft.modelle.some((m) => m.name === gemerkt) ? gemerkt : '') ||
+          auskunft.modelle[0]?.name || ''
+        const drafterGemerkt = localStorage.getItem('runner:drafter:' + modell)
+        if (drafterGemerkt !== null) {
+          drafter = drafterGemerkt
+        } else {
+          const z = auskunft.zuordnung?.[modell]
+          if (z?.mtp) drafter = z.mtp
+        }
       }
       if (auskunft.laeuft) {
         kontext = auskunft.kontext
@@ -299,10 +316,12 @@
     return () => clearInterval(takt)
   })
 
-  /* Picking a model pre-picks its recorded speed module — the association
-     the catalogue wrote when it fetched them, so nothing is guessed. */
+  /* Picking a model pre-picks its speed module: first the choice the hand
+     made last time for THIS model (a remembered "none" counts), then the
+     association the catalogue wrote when it fetched them. */
   function modellGewaehlt() {
-    drafter = auskunft?.zuordnung?.[modell]?.mtp ?? ''
+    const gemerkt = localStorage.getItem('runner:drafter:' + modell)
+    drafter = gemerkt !== null ? gemerkt : (auskunft?.zuordnung?.[modell]?.mtp ?? '')
   }
 
   async function starten() {
@@ -311,6 +330,10 @@
       auskunft = await api.runnerStarten({
         modell, kontext, schichten, port, drafter: drafter || null, fein: feindaten,
       })
+      /* Remember what actually started — the model, and the drafter choice
+         for exactly this model (an empty string is a remembered "none"). */
+      localStorage.setItem('runner:modell', modell)
+      localStorage.setItem('runner:drafter:' + modell, drafter || '')
       protokollOffen = true
       await modelleLaden(true)
     } catch (fehler) {
@@ -334,9 +357,6 @@
 
   function programmHolen() {
     api.serverProgrammHolen().then((s) => (programmStand = s)).catch((f) => melde(f.message, 'fehler'))
-  }
-  function ordnerOeffnen() {
-    api.modellordnerOeffnen().catch((f) => melde(f.message, 'fehler'))
   }
 </script>
 
@@ -415,7 +435,7 @@
       modellGeaendert={modellGewaehlt}
       leerText={t('modell.kein_modell_da')}
       katalogTat={() => katalogOeffnen('chat')}
-      ordnerOeffnen={ordnerOeffnen}
+      speicherort="modelle"
       tatText={laeuft ? t('modell.server_anhalten_kurz') : t('modell.server_starten_kurz')}
       tatPunkt={laeuft ? 'gruen' : 'still'}
       tatGesperrt={arbeitet || (!laeuft && !modell)}
@@ -442,15 +462,23 @@
                  — it marks which module the row belongs to, it does not
                  lead the line and break the column of names. -->
             <label for="rs-eew">
-              {t('modell.feld_eew')}<span class="eew-hinten"><EEWzeichen groesse={16} /></span><span>{t('modell.feld_eew_hilfe')}</span>
+              {t('modell.feld_eew')}<span>{t('modell.feld_eew_hilfe')}</span>
             </label>
-            <Auswahlfeld
-              id="rs-eew"
-              wert={eew.modell}
-              eintraege={eewauswahl}
-              beschriftung={t('modell.feld_eew')}
-              gewaehlt={eewModellWaehlen}
-            />
+            <!-- The sign moves off the heading to ride at the dropdown's left,
+                 vertically centred and a size larger — it reads as the mark of
+                 the control it belongs to instead of a footnote on the name. -->
+            <div class="eew-zeile">
+              <span class="eew-marke" aria-hidden="true"><EEWzeichen groesse={20} /></span>
+              <div class="eew-feld">
+                <Auswahlfeld
+                  id="rs-eew"
+                  wert={eew.modell}
+                  eintraege={eewauswahl}
+                  beschriftung={t('modell.feld_eew')}
+                  gewaehlt={eewModellWaehlen}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -678,16 +706,21 @@
     font-size: 11.5px;
     color: var(--text-still);
   }
-  /* The sign rides behind the name, in the label's own quiet colour: it
-     marks which module the row belongs to, it does not lead the line and
-     break every row's names off their shared left edge. Its own rule
-     because `label span` above would otherwise flatten it into a block of
-     help text. */
-  .eew-hinten {
-    display: inline-flex;
+  /* The Extended-Workflow sign sits at the dropdown's left, vertically
+     centred with it, a size larger than the row names. The field takes the
+     rest of the width; min-width:0 lets it shrink instead of overflowing. */
+  .eew-zeile {
+    display: flex;
     align-items: center;
-    vertical-align: -3px;
-    margin-left: 6px;
+    gap: 9px;
+  }
+  .eew-marke {
+    flex: none;
+    display: inline-flex;
+  }
+  .eew-feld {
+    flex: 1;
+    min-width: 0;
   }
   .kontextzeile {
     display: flex;

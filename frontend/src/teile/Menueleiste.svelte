@@ -1,6 +1,7 @@
 <script>
   import { fly } from 'svelte/transition'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
+  import Bildwarteschlange from './Bildwarteschlange.svelte'
   import { t } from '../lib/texte.svelte.js'
   import { api } from '../lib/api.js'
   import {
@@ -196,6 +197,10 @@
        the app — it should be able to stay open next to the app. As an
        icon at the right edge so it no longer occupies menu space. -->
   <span class="serverblick">
+    <!-- The picture count reflows in here on its own: it shows only while
+         pictures are being made, so it never collides with the VRAM figure,
+         which shows only while a model server runs. -->
+    <Bildwarteschlange />
     {#if serverBlick.laeuft && serverBlick.belegt}
       <span class="blickwort">{t('modell.vram_belegt')}:</span>
       <span class="blickwert">{serverBlick.belegt} GB</span>
@@ -306,9 +311,6 @@
     font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--text);
     white-space: nowrap;
-  }
-  .blickwort + .blickwort {
-    margin-left: 6px;
   }
   /* The house's status dot, nothing built by hand. Green while the server
      runs, grey while it does not: "off" is a fact about the machine, not a

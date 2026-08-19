@@ -15,7 +15,7 @@
   import EEWzeichen from './EEWzeichen.svelte'
   import { t } from '../lib/texte.svelte.js'
   import { LOGOS } from '../lib/logos.js'
-  import { passt, brauchtMaschine, passendeFassung } from '../lib/modellempfehlungen.js'
+  import { passt, brauchtMaschine, passendeFassung, FAEHIGKEIT_FARBE, SORTE_FARBE, SORTE_LABEL as SORTE } from '../lib/modellempfehlungen.js'
 
   let {
     karte,
@@ -28,13 +28,15 @@
     onStart,
   } = $props()
 
+  const KLASSE = { sdxl: 'katalog.klasse_sdxl', sd15: 'katalog.klasse_sd15' }
   const KANN = {
-    winkel: 'katalog.kann_winkel',
+    werkzeug: 'katalog.kann_winkel',
     auge: 'katalog.kann_auge',
     gluehbirne: 'katalog.kann_gluehbirne',
     blitz: 'katalog.kann_blitz',
     eew: 'katalog.kann_eew',
   }
+  const farbe = $derived(SORTE_FARBE[karte.sorte] ?? 'var(--text-leise)')
 
   const marke = $derived(karte.marke ? LOGOS[karte.marke] : null)
   const empfohlen = $derived(passendeFassung(karte, maschineGb))
@@ -66,13 +68,24 @@
       <div class="unter">{karte.von} · {aktuelle.datei.replace(/\.gguf$/i, '')}</div>
     </div>
     <div class="zeichenreihe">
-      {#each karte.faehigkeiten as f (f)}
-        <span class="zeichen" title={t(KANN[f])}>{#if f === 'eew'}<EEWzeichen groesse={22} />{:else}<Hauszeichen zeichen={f} groesse="mittel" />{/if}</span>
-      {/each}
+      {#if karte.zubehoer}
+        <span style={`color:${farbe};border:1px solid ${farbe}55;background:${farbe}18;border-radius:99px;padding:2px 10px;font-size:11.5px;font-weight:600`}>{t(SORTE[karte.sorte] ?? 'katalog.sorte_vae')}</span>
+        {#if karte.klasse}
+          <!-- Class-bound accessories say their class right here too — the
+               detail view must answer SD 1.5 vs SDXL as fast as the card. -->
+          <span style="color:var(--text);border:1px solid var(--text-still);border-radius:99px;padding:2px 10px;font-size:11.5px;font-weight:600">{t(KLASSE[karte.klasse] ?? 'katalog.klasse_sd15')}</span>
+        {/if}
+      {:else}
+        {#each karte.faehigkeiten ?? [] as f (f)}
+          <span class="zeichen" title={t(KANN[f])} style={FAEHIGKEIT_FARBE[f] ? `color:${FAEHIGKEIT_FARBE[f]}` : undefined}>{#if f === 'eew'}<EEWzeichen groesse={22} />{:else}<Hauszeichen zeichen={f} groesse="mittel" />{/if}</span>
+        {/each}
+      {/if}
     </div>
   </div>
 
-  <div class="satzlang">{t(karte.langsatz)}</div>
+  <!-- Bild and accessory cards have no long sentence; fall back to the short
+       one so the view never renders an undefined key. -->
+  <div class="satzlang">{t(karte.langsatz ?? karte.satz)}</div>
 
   {#each karte.fassungen as f (f.id + f.datei)}
     <button class="fassung" class:gewaehlt={f === aktuelle} onclick={() => (gewaehlt = f)}>

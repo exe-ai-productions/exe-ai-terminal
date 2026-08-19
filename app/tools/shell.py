@@ -273,13 +273,34 @@ def _kuerzen(text: str) -> str:
 MARKE = "\x1e"
 
 
+# Windows' command processor cannot echo a control character, so there the
+# folder line carries a word instead. Long and unlikely enough that ordinary
+# output never starts a line with it.
+MARKE_WIN = "__exe_ai_ordner__"
+
+
+def ordnermarke() -> str:
+    """Whichever marker this system's shell can actually write."""
+    return MARKE_WIN if os.name == "nt" else MARKE
+
+
 def _mit_ordnermarke(befehl: str) -> str:
     """The command, followed by a line that names the folder it ended in.
 
-    POSIX only. Under Windows the command stays as it is and every call starts
-    in the same folder, as before — a second, platform-specific way of doing
-    this is not worth a remembered `cd`.
+    Both shells do the same three things: run the command, keep its exit
+    code, then write the folder they ended up in. Only the spelling differs.
+
+    Windows needs delayed expansion for the exit code — everything on one
+    line is expanded before the first command runs, so %ERRORLEVEL% would
+    still hold the value from before. `echo|set /p=` writes the marker
+    without a line break, and the `cd` that follows completes the line with
+    the folder and its newline.
     """
+    if os.name == "nt":
+        return (
+            f"({befehl}) & set \"__exe_rc=!ERRORLEVEL!\" & "
+            f'(echo|set /p="{MARKE_WIN}") & cd & exit /b !__exe_rc!'
+        )
     return (
         "{ " + befehl + "\n} ; __exe_rc=$? ; "
         f"printf '\\n\\036%s' \"$PWD\" ; exit $__exe_rc"
@@ -307,9 +328,10 @@ async def _mitlesen(strom, lauf, sammlung: list[str], name: str) -> str | None:
             for _ in range(zurueckgehalten):
                 ausgeben("")
             return ordner_danach
-        text = roh.decode("utf-8", errors="replace").rstrip("\n")
-        if text.startswith(MARKE):
-            ordner_danach = text[len(MARKE) :]
+        text = roh.decode("utf-8", errors="replace").rstrip("\r\n")
+        marke = ordnermarke()
+        if text.startswith(marke):
+            ordner_danach = text[len(marke) :]
             zurueckgehalten = max(0, zurueckgehalten - 1)
             continue
         if not text:
@@ -419,23 +441,22 @@ async def _starten(befehl: str, wurzel: Path):
     shell reads -c. Handed the wrong switch it ignores the command entirely
     and opens an interactive session instead: the caller then gets a version
     banner back and nothing was ever run. COMSPEC names whichever processor
-    the system actually uses.
+    the system actually uses, and /v:on turns on the delayed expansion the
+    folder marker needs to read the exit code after the command, not before.
 
     PYTHONUNBUFFERED keeps a python one-liner from withholding its output.
     """
     if os.name == "nt":
         programm = os.environ.get("COMSPEC") or "cmd.exe"
-        schalter = "/c"
-        text = befehl
+        schalter = ["/v:on", "/c"]
     else:
         programm = os.environ.get("SHELL") or "/bin/sh"
-        schalter = "-c"
-        text = _mit_ordnermarke(befehl)
+        schalter = ["-c"]
 
     return await asyncio.create_subprocess_exec(
         programm,
-        schalter,
-        text,
+        *schalter,
+        _mit_ordnermarke(befehl),
         cwd=str(wurzel),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

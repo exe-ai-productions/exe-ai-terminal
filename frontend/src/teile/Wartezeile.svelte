@@ -22,19 +22,13 @@
          outer geometry — frame always x4 y4 72×56 rx15, the eye spans
          the same width and lies on the same center line (y 32). Whoever
          builds a new mark here keeps to these edges. -->
-    {#if art === 'bild'}
-      <!-- Image generation: frame, mountain line, sun (variant C) — the
-           frame is the same as the logo mark's, only the motif changes. -->
-      <rect class="strich rahmen" x="4" y="4" width="72" height="56" rx="15"
-            stroke-width="5.5" style="--laenge:250" />
-      <path class="strich zug2" d="M15 48 L32 30 L44 40 L56 28 L68 43" stroke-width="5" style="--laenge:77" />
-      <circle class="tupf sonne" cx="29" cy="19" r="4.5" fill="currentColor" stroke="none" />
-    {:else if art === 'vision'}
-      <!-- Image recognition: the free-standing eye with pupil — the
-           message carried an
-           image. -->
-      <path class="strich zug2" d="M4 32 Q40 6 76 32 Q40 58 4 32 Z" stroke-width="5.5" style="--laenge:150" />
-      <circle class="tupf sonne" cx="40" cy="32" r="5.5" fill="currentColor" stroke="none" />
+    {#if art === 'vision'}
+      <!-- Image recognition: the message carried an image. The SAME eye as
+           the capability sign in Hauszeichen.svelte, scaled to the waiting
+           mark's width — the house has exactly one eye drawing. The pupil is
+           an outlined circle like the sign's, drawn as a stroke of its own. -->
+      <path class="strich zug2" d="M4 32 C17 11, 63 11, 76 32 C63 53, 17 53, 4 32 Z" stroke-width="5.5" style="--laenge:160" />
+      <circle class="strich zug3" cx="40" cy="32" r="11" stroke-width="5" style="--laenge:70" />
     {:else}
       <!-- Answer: the chat mark, frame with arrow and baseline. -->
       <rect class="strich rahmen" x="4" y="4" width="72" height="56" rx="15"
@@ -90,8 +84,6 @@
     transform-box: fill-box;
     transform-origin: center;
   }
-  .sonne { animation: sonnentupf 3.4s cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
-  @keyframes sonnentupf { 0%, 34% { opacity: 0; transform: scale(0.35); } 42%, 100% { opacity: 1; transform: scale(1); } }
   .t1 { animation: tupfen1 3.4s cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
   .t2 { animation: tupfen2 3.4s cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
   .t3 { animation: tupfen3 3.4s cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }

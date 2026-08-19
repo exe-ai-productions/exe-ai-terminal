@@ -89,6 +89,49 @@ RASTER = 64
 MIN_SCHRITTE = 1
 MAX_SCHRITTE = 80
 
+# The two model classes this build draws with, and what each is BUILT for.
+# An SDXL model asked to draw at 512×512 gives a muddy, half-formed picture —
+# it was trained at 1024 and only makes sense there; an SD-1.5 model pushed to
+# 1024 doubles faces and limbs. One default for both is what made every SDXL
+# picture here look worse than the same model in another program: it was drawn
+# at a third of the resolution it needs.
+KLASSE_SD15 = "sd15"
+KLASSE_SDXL = "sdxl"
+
+# The starting values per class — resolution the class was trained at, and
+# enough steps that the picture is finished rather than still noisy. These are
+# STARTING points a control opens on, never a limit: the window can move them.
+VORGABE_JE_KLASSE = {
+    KLASSE_SD15: {"breite": 512, "hoehe": 512, "schritte": 22},
+    KLASSE_SDXL: {"breite": 1024, "hoehe": 1024, "schritte": 28},
+}
+
+
+# Names that mean SDXL without carrying "xl" — the big SDXL-derived families
+# people download most. A catalogue card states the class outright and is the
+# real authority; this list only helps a file dropped in by hand.
+SDXL_NAMEN = ("xl", "pony", "illustrious", "noob", "animagine")
+
+
+def klasse_aus_name(name: str) -> str:
+    """Guess a model's class from its file name — SDXL or SD 1.5.
+
+    A heuristic, and named as one: the file itself does not say its class
+    without being loaded, so the name is what we have for a hand-placed file.
+    Most SDXL builds carry "xl" (CyberRealisticXL, Juggernaut-XL, sd_xl_base),
+    and the big SDXL-derived families that do not (Pony, Illustrious, NoobAI,
+    Animagine) are named here; anything else is treated as SD 1.5, the smaller
+    and safer default. A catalogue card states the class outright and overrides
+    this — this is only the fallback for a file dropped in by hand.
+    """
+    klein = (name or "").lower()
+    return KLASSE_SDXL if any(wort in klein for wort in SDXL_NAMEN) else KLASSE_SD15
+
+
+def vorgabe_fuer_klasse(klasse: str) -> dict[str, int]:
+    """The starting resolution and steps a class opens on."""
+    return dict(VORGABE_JE_KLASSE.get(klasse, VORGABE_JE_KLASSE[KLASSE_SD15]))
+
 
 def kante_pruefen(wert: object) -> int | None:
     """One edge of the picture, clamped onto the grid, or None if it is not a number."""

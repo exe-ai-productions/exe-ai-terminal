@@ -84,11 +84,24 @@ def test_zwei_laeufe_gleichzeitig_gibt_es_nicht(daten: Path, monkeypatch):
     drin = threading.Event()
     weiter = threading.Event()
 
+    class Strom:
+        """An exhausted pipe — the runner's readers stop at once."""
+
+        def read(self, n=-1):
+            return ""
+
     class Prozess:
         """A generator that takes its time and can be asked to stop."""
 
         returncode = 0
         pid = 4242
+        stdout = Strom()
+        stderr = Strom()
+
+        def wait(self, timeout=None):
+            drin.set()
+            weiter.wait(5)
+            return 0
 
         def communicate(self, timeout=None):
             drin.set()
@@ -308,3 +321,114 @@ def test_der_zustand_einer_anwendung_wird_gelesen():
     zustand.modellrunner = Runner(4.0)
     zustand.eewrunner = Runner(2.0)
     assert bildspeicher.gehaltene_gb(zustand) == 6.0
+
+
+# --- The quality companions (block D) -------------------------------------
+
+
+def test_flash_attention_ist_an_seit_gemessen(daten: Path, monkeypatch):
+    """On by default now that it is measured on the shipped build: the highres
+    fix's second pass drops from ~30 s to ~3.5 s per step with it. It can still
+    be switched off explicitly for a swapped-in binary that does not know the
+    flag."""
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    an = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x"), daten / "a.png"
+    )
+    assert "--diffusion-fa" in an
+    aus = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x", diffusion_fa=False), daten / "a.png"
+    )
+    assert "--diffusion-fa" not in aus
+
+
+def test_die_begleiter_fallen_weg_wenn_ungesetzt(daten: Path, monkeypatch):
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    befehl = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x"), daten / "a.png"
+    )
+    for weg in ("--clip-skip", "--vae", "--ad-model", "--ad-prompt"):
+        assert weg not in befehl
+
+
+def test_clip_skip_reist_nur_wenn_gesetzt(daten: Path, monkeypatch):
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    runner = Bildrunner(daten)
+    aus = runner.befehl(Auftrag(modell=daten / "klein.gguf", prompt="x", clip_skip=-1), daten / "a.png")
+    assert "--clip-skip" not in aus
+    an = runner.befehl(Auftrag(modell=daten / "klein.gguf", prompt="x", clip_skip=2), daten / "a.png")
+    assert "--clip-skip" in an and "2" in an
+
+
+def test_vae_und_detektor_stehen_im_befehl(daten: Path, monkeypatch):
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    befehl = Bildrunner(daten).befehl(
+        Auftrag(
+            modell=daten / "klein.gguf", prompt="x",
+            vae=daten / "vae" / "besser.safetensors",
+            ad_modell=daten / "adetailer" / "face.pt", ad_prompt="detailed face",
+        ),
+        daten / "a.png",
+    )
+    assert "--vae" in befehl and str(daten / "vae" / "besser.safetensors") in befehl
+    assert "--ad-model" in befehl and str(daten / "adetailer" / "face.pt") in befehl
+    assert "--ad-prompt" in befehl and "detailed face" in befehl
+
+
+def test_ad_prompt_faellt_ohne_detektor_weg(daten: Path, monkeypatch):
+    """A face prompt without a detector has nothing to steer."""
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    befehl = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x", ad_prompt="face"),
+        daten / "a.png",
+    )
+    assert "--ad-prompt" not in befehl
+
+
+def test_vae_und_yolo_liegen_in_eigenen_ordnern(daten: Path):
+    (daten / "vae").mkdir()
+    (daten / "vae" / "besser.safetensors").write_bytes(b"x")
+    (daten / "adetailer").mkdir()
+    (daten / "adetailer" / "face.pt").write_bytes(b"x")
+    assert bildrunner.vaes(daten) == ["besser.safetensors"]
+    assert bildrunner.yolos(daten) == ["face.pt"]
+    assert bildrunner.vae_pfad(daten, "besser.safetensors").name == "besser.safetensors"
+    assert bildrunner.yolo_pfad(daten, "face.pt").name == "face.pt"
+
+
+def test_ein_begleiter_ist_nie_ein_pfad(daten: Path):
+    (daten / "vae").mkdir()
+    (daten / "vae" / "besser.safetensors").write_bytes(b"x")
+    for versuch in ("../klein.gguf", "unter/besser.safetensors", "", "gibtsnicht.safetensors"):
+        with pytest.raises(BildFehler) as fehler:
+            bildrunner.vae_pfad(daten, versuch)
+        assert fehler.value.grund == "bild.begleiter_unbekannt"
+
+
+def test_hires_fix_faellt_ohne_schalter_weg(daten: Path, monkeypatch):
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    befehl = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x"), daten / "a.png"
+    )
+    assert "--hires" not in befehl and "--hires-scale" not in befehl
+
+
+def test_hires_fix_traegt_massstab_und_schritte(daten: Path, monkeypatch):
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    befehl = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x", hires=True, hires_scale=2.0, hires_steps=10),
+        daten / "a.png",
+    )
+    assert "--hires" in befehl
+    assert "--hires-scale" in befehl and "2.0" in befehl
+    assert "--hires-steps" in befehl and "10" in befehl
+
+
+def test_vae_tiling_ist_stilles_plumbing(daten: Path, monkeypatch):
+    monkeypatch.setattr(bildrunner.shutil, "which", lambda _: "/irgendwo/sd-cli")
+    aus = Bildrunner(daten).befehl(Auftrag(modell=daten / "klein.gguf", prompt="x"), daten / "a.png")
+    assert "--vae-tiling" not in aus
+    an = Bildrunner(daten).befehl(
+        Auftrag(modell=daten / "klein.gguf", prompt="x", vae_tiling=True), daten / "a.png"
+    )
+    assert "--vae-tiling" in an

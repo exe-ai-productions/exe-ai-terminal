@@ -47,7 +47,21 @@ ARTEN = {
     "chat": [],
     "einbettung": ["feature-extraction", "sentence-similarity"],
     "bild": ["text-to-image"],
+    # Accessories (VAE, LoRA, face detectors, drafters, projectors) have no
+    # honest Hugging Face tag to search by — a tagless query would just spill
+    # chat models into the tab. The tab is curated only; its search returns
+    # nothing on purpose (see `suchen`).
+    "zubehoer": [],
 }
+
+# The file format each tab restricts to, or None for no restriction. Chat and
+# embedding models must be GGUF — that is the one form the program can fetch as
+# a single file and start by itself. Image models are the exception: the
+# shipped drawer (sd.cpp) reads safetensors AND gguf, and the big image
+# checkpoints live on Hugging Face almost only as safetensors. A gguf filter
+# on the image tab hid exactly the models people came for; the text-to-image
+# tag keeps the tab to image models without it.
+DATEIFILTER = {"chat": "gguf", "einbettung": "gguf", "bild": None, "zubehoer": None}
 
 # The kinds a tagless chat query must drop so the tabs stay separate.
 KEIN_CHAT = {tag for tags in ARTEN.values() for tag in tags}
@@ -93,6 +107,10 @@ async def suchen(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, t("fehler.modellsuche_art", sprache)
         )
+    # The accessories tab is curated only — there is no meaningful Hugging Face
+    # query for it, so it never reaches the live search.
+    if art == "zubehoer":
+        return []
 
     import os
 
@@ -103,11 +121,12 @@ async def suchen(
 
     grund = {
         "search": q,
-        "filter": "gguf",
         "sort": "downloads",
         "direction": "-1",
         "limit": anzahl,
     }
+    if DATEIFILTER[art]:
+        grund["filter"] = DATEIFILTER[art]
     # One query per tag; the chat tab is the one tagless query.
     anfragen = (
         [grund]

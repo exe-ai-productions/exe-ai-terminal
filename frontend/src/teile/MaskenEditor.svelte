@@ -23,6 +23,11 @@
   let radiert = $state(false)
   let etwasGemalt = $state(false)
   let letzter = null
+  // Where the brush hovers, in stage pixels — feeds the dashed circle that
+  // shows WHERE and HOW BIG the next stroke will land. Null while the
+  // pointer is off the picture: no phantom circle in a corner.
+  let zeiger = $state(null)
+  let massstab = $state(1)
 
   /* The mask is created at the STARTING PICTURE's size, not at the size it
      is shown in. The window scales to fit; the strokes belong to the
@@ -71,11 +76,23 @@
   }
 
   function ziehen(ereignis) {
+    zeigerFolgen(ereignis)
     if (!letzter || !ereignis.currentTarget.hasPointerCapture?.(ereignis.pointerId)) return
     const jetzt = aufFlaeche(ereignis, anzeige, flaeche)
     strich(flaeche, letzter, jetzt, groesse, radiert)
     letzter = jetzt
     zeichnenAufSicht()
+  }
+
+  /* The dashed circle rides on the pointer at the brush's true size: the
+     stroke is measured in the PICTURE's pixels, the circle in the shown
+     ones, so the display scale is read from the picture element each move
+     (it changes with every window resize, cheaper read than tracked). */
+  function zeigerFolgen(ereignis) {
+    if (!flaeche || !anzeige) return
+    const kasten = anzeige.getBoundingClientRect()
+    massstab = kasten.width / flaeche.width
+    zeiger = { x: ereignis.clientX - kasten.left, y: ereignis.clientY - kasten.top }
   }
 
   function loslassen(ereignis) {
@@ -115,7 +132,19 @@
       onpointermove={ziehen}
       onpointerup={loslassen}
       onpointercancel={loslassen}
+      onpointerenter={zeigerFolgen}
+      onpointerleave={() => (zeiger = null)}
     ></canvas>
+    <!-- The brush shown before it lands: a dashed ring at the true stroke
+         size. Dashed and two-toned (light dash on a dark ring) so it stays
+         visible on the blue mask, on bright cloth and in shadow alike. -->
+    {#if zeiger}
+      <div
+        class="pinselring"
+        style={`left:${zeiger.x}px;top:${zeiger.y}px;width:${groesse * massstab}px;height:${groesse * massstab}px`}
+        aria-hidden="true"
+      ></div>
+    {/if}
   </div>
 
   <div class="werkzeuge">
@@ -186,11 +215,23 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    cursor: crosshair;
+    /* The dashed ring IS the cursor — a second marker would only argue
+       with it about where the stroke lands. */
+    cursor: none;
     touch-action: none;
     /* Translucent, because a mask you cannot see through is a mask you
        cannot aim. Blue is the house colour for "active". */
     opacity: 0.5;
+  }
+  .pinselring {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1.5px dashed rgba(255, 255, 255, 0.95);
+    /* A dark ring under the light dashes: one of the two reads on any
+       ground — blue mask, white dress, deep shadow. */
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
   }
   .werkzeuge {
     display: flex;

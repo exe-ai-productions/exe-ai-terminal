@@ -195,10 +195,10 @@ class EndpunktZustand:
     def _capabilities_aufloesen(self) -> dict[str, Any]:
         """Merge configuration and native detection.
 
-        An explicit entry in the config ALWAYS wins — even a "no"
-        (safety rule: Gemma's tool_calls-off must not be overruled by
-        detection). Only where the config is silent does the sniffed
-        result count.
+        An explicit entry in the config ALWAYS wins — even a "no", so an
+        operator can pin a capability off regardless of what detection
+        says. Only where the config is silent does the sniffed result
+        count.
         """
         caps = self.endpunkt.capabilities.model_dump()
         erkannt = self.faehigkeiten_erkannt or {}

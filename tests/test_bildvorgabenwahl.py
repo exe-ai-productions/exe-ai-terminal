@@ -90,3 +90,140 @@ def test_die_vorgabe_haelt_ihre_eigenen_grenzen_ein():
     assert bildvorgabenwahl.wahl_pruefen(dict(bildvorgabenwahl.VORGABE)) == {
         k: v for k, v in bildvorgabenwahl.VORGABE.items()
     }
+
+
+# --- Class-aware defaults -------------------------------------------------
+
+
+@pytest.mark.parametrize("name,klasse", [
+    ("CyberRealisticXL_v5.safetensors", "sdxl"),
+    ("Juggernaut-XL.gguf", "sdxl"),
+    ("sd_xl_base_1.0.safetensors", "sdxl"),
+    ("cyberrealistic_v9.safetensors", "sd15"),
+    ("dreamshaper_8.gguf", "sd15"),
+    ("", "sd15"),
+])
+def test_die_klasse_kommt_aus_dem_namen(name, klasse):
+    from app.bildwahlen import klasse_aus_name
+    assert klasse_aus_name(name) == klasse
+
+
+def test_sdxl_oeffnet_gross_sd15_klein():
+    from app.bildwahlen import vorgabe_fuer_klasse
+    assert vorgabe_fuer_klasse("sdxl") == {"breite": 1024, "hoehe": 1024, "schritte": 28}
+    assert vorgabe_fuer_klasse("sd15") == {"breite": 512, "hoehe": 512, "schritte": 22}
+
+
+class _FalscheEinstellungen:
+    """A single stored value in the GLOBAL scope, or none."""
+    def __init__(self, gespeichert=None):
+        self._gespeichert = gespeichert
+
+    def kette(self, schluessel, *, modell=None, chat=None):
+        aus = ["global"]
+        if modell:
+            aus.append(f"m:{modell}")
+        if chat:
+            aus.append(f"c:{chat}")
+        return aus
+
+    def holen(self, bereich, schluessel):
+        return self._gespeichert if bereich == "global" else None
+
+    def zusammengefuehrt(self, schluessel, *, vorgabe, modell=None, chat=None):
+        if self._gespeichert is None:
+            return vorgabe
+        return {**vorgabe, **self._gespeichert}
+
+
+class _FalscheRepos:
+    def __init__(self, gespeichert=None):
+        self.einstellungen = _FalscheEinstellungen(gespeichert)
+
+
+def test_ein_sdxl_modell_bekommt_die_grosse_vorgabe():
+    v = bildvorgabenwahl.vorgaben(_FalscheRepos(), modell="CyberRealisticXL.safetensors")
+    assert (v["breite"], v["hoehe"], v["schritte"]) == (1024, 1024, 28)
+
+
+def test_ein_sd15_modell_bekommt_die_kleine_vorgabe():
+    v = bildvorgabenwahl.vorgaben(_FalscheRepos(), modell="dreamshaper_8.gguf")
+    assert (v["breite"], v["hoehe"], v["schritte"]) == (512, 512, 22)
+
+
+def test_ohne_modell_gilt_die_klassenfreie_basis():
+    v = bildvorgabenwahl.vorgaben(_FalscheRepos(), modell=None)
+    assert (v["breite"], v["hoehe"], v["schritte"]) == (512, 512, 22)
+
+
+def test_eine_globale_breite_wird_fuer_die_klasse_ignoriert():
+    """A global resolution cannot be right for both classes, so the class base
+    holds — the per-model case that DOES win is tested further down."""
+    v = bildvorgabenwahl.vorgaben(
+        _FalscheRepos(gespeichert={"breite": 768}), modell="CyberRealisticXL.safetensors"
+    )
+    assert v["breite"] == 1024
+    assert v["hoehe"] == 1024
+
+
+class _GeschichteteEinstellungen:
+    """Layers by scope, so global and per-model can differ — the real cascade."""
+    def __init__(self, je_bereich):
+        self._je_bereich = je_bereich  # {bereich: dict}
+
+    def kette(self, schluessel, *, modell=None, chat=None):
+        aus = ["global"]
+        if modell:
+            aus.append(f"modell:{modell}")
+        if chat:
+            aus.append(f"chat:{chat}")
+        return aus
+
+    def holen(self, bereich, schluessel):
+        return self._je_bereich.get(bereich)
+
+    def zusammengefuehrt(self, schluessel, *, vorgabe, modell=None, chat=None):
+        zusammen = dict(vorgabe)
+        for bereich in self.kette(schluessel, modell=modell, chat=chat):
+            g = self._je_bereich.get(bereich)
+            if isinstance(g, dict):
+                zusammen.update(g)
+        return zusammen
+
+
+class _GeschichteteRepos:
+    def __init__(self, je_bereich):
+        self.einstellungen = _GeschichteteEinstellungen(je_bereich)
+
+
+def test_die_globale_altlast_schlaegt_die_klasse_NICHT():
+    """The regression this fix exists for: a leftover global 512/12 from the
+    single-default era must not defeat the class-aware SDXL default."""
+    repos = _GeschichteteRepos({"global": {"breite": 512, "hoehe": 512, "schritte": 12}})
+    v = bildvorgabenwahl.vorgaben(repos, modell="CyberRealisticXL.safetensors")
+    assert (v["breite"], v["hoehe"], v["schritte"]) == (1024, 1024, 28)
+
+
+def test_ein_globaler_sampler_gilt_weiterhin():
+    """Sampler is class-independent — a global choice still applies."""
+    repos = _GeschichteteRepos({"global": {"sampler": "dpm++2m", "breite": 512}})
+    v = bildvorgabenwahl.vorgaben(repos, modell="CyberRealisticXL.safetensors")
+    assert v["sampler"] == "dpm++2m"
+    assert v["breite"] == 1024  # but the global resolution is ignored
+
+
+def test_ein_pro_modell_wert_darf_die_klasse_setzen():
+    """A per-model resolution IS intentional and wins over the class base."""
+    repos = _GeschichteteRepos({
+        "global": {"breite": 512},
+        "modell:CyberRealisticXL.safetensors": {"breite": 768},
+    })
+    v = bildvorgabenwahl.vorgaben(repos, modell="CyberRealisticXL.safetensors")
+    assert v["breite"] == 768
+
+
+@pytest.mark.parametrize("name", ["ponyDiffusionV6.safetensors", "Illustrious-XL.gguf",
+                                   "noobaiXL.safetensors", "animagine_v3.safetensors"])
+def test_sdxl_ableger_ohne_xl_werden_erkannt(name):
+    from app.bildwahlen import klasse_aus_name
+    assert klasse_aus_name(name) == "sdxl"

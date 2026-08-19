@@ -90,9 +90,6 @@
   const dialektName = (d) =>
     d === 'openai' ? t('modell.eigener_unter') : ({ llama_cpp: 'llama.cpp', mlx: 'MLX' }[d] ?? d)
 
-  /* The running server carries the blue speed-module bolt when a module is
-     active — blue is the house colour for running. */
-  const mtpAktiv = (m) => m.anbieter === 'runner' && Boolean(auskunft?.drafter)
 </script>
 
 <Fenster bind:offen art="liste">
@@ -146,9 +143,6 @@
               {/snippet}
               {#snippet unter()}
                 {#if m.context_tokens}{kurz(m.context_tokens)} · {/if}{dialektName(m.dialekt)}
-                {#if mtpAktiv(m)}
-                  <span class="mtp" title={t('modell.mtp_aktiv')}><Hauszeichen zeichen="blitz" groesse="klein" /></span>
-                {/if}
               {/snippet}
               {#snippet rechts()}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -338,10 +332,6 @@
     color: var(--text-still);
     padding: 4px 6px 8px;
     line-height: 1.5;
-  }
-  .mtp {
-    display: inline-flex;
-    color: var(--blau);
   }
   .pfeil {
     color: var(--text-still);

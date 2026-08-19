@@ -25,7 +25,6 @@
   import { katalogOeffnen, melde, zustand } from '../lib/zustand.svelte.js'
   import Auswahlfeld from './Auswahlfeld.svelte'
   import Servertafel from './Servertafel.svelte'
-  import Zahlenfeld from './Zahlenfeld.svelte'
 
   let stand = $state(null)
   let gewaehlt = $state('')
@@ -33,14 +32,23 @@
   /* What the picture window starts out with. Only the starting values —
      changing them here changes what the window OFFERS, never what it can
      do, and a picture already ordered is untouched. */
-  let vorgaben = $state({ breite: 512, hoehe: 512, schritte: 12, sampler: '', scheduler: '' })
+  /* Only the class-free defaults live here now — the sampler and scheduler.
+     Resolution and steps belong to the model's class (an SDXL model opens at
+     1024, an SD-1.5 at 512); a single global number for them could not be
+     right for both, so the picture window sets them per model and this panel
+     no longer offers a control that would do nothing. */
+  let vorgaben = $state({ sampler: '', scheduler: '' })
   let vorgabenGeladen = $state(false)
 
   async function vorgabenLaden() {
     try {
       const antwort = await api.einstellungAufgeloest(BILDVORGABEN)
-      if (antwort?.wert && typeof antwort.wert === 'object' && Object.keys(antwort.wert).length) {
-        vorgaben = { ...vorgaben, ...antwort.wert }
+      const w = antwort?.wert
+      if (w && typeof w === 'object') {
+        // Only the two keys this panel still owns — a stored resolution from
+        // before the class-aware defaults is left where it lies, ignored.
+        if (typeof w.sampler === 'string') vorgaben.sampler = w.sampler
+        if (typeof w.scheduler === 'string') vorgaben.scheduler = w.scheduler
       }
     } catch {
       /* No stored defaults is the normal first case, not an error. */
@@ -58,11 +66,17 @@
      being typed into passes through 5, 51, 512, and three writes for one
      answer is three chances for the last one to lose a race. */
   $effect(() => {
-    const _ = [vorgaben.breite, vorgaben.hoehe, vorgaben.schritte, vorgaben.sampler]
+    const _ = [vorgaben.sampler, vorgaben.scheduler]
     if (!vorgabenGeladen) return
     const uhr = setTimeout(vorgabenSichern, 600)
     return () => clearTimeout(uhr)
   })
+  /* Share the chosen model so the plus-menu Image-Turbo toggle starts the
+     one you last picked here. */
+  $effect(() => {
+    if (gewaehlt) zustand.bildModell = gewaehlt
+  })
+
   let probe = $state(null) // { bild, sekunden }
   let arbeitet = $state(false)
 
@@ -154,7 +168,8 @@
   modellGesperrt={arbeitet}
   leerText={stand ? t('bildserver.kein_modell_lang') : ''}
   katalogTat={() => katalogOeffnen('bild')}
-  ordnerOeffnen={() => api.bildordnerOeffnen().catch(() => {})}
+  speicherort="bildmodelle"
+  onOrtGeaendert={laden}
   tatText={arbeitet ? t('bildserver.probe_laeuft') : t('bildserver.probelauf')}
   tatPunkt={arbeitet ? 'blau' : 'still'}
   tatGesperrt={arbeitet || !gewaehlt || programmFehlt}
@@ -177,27 +192,12 @@
     {#if vorgabenGeladen}
       <div class="vorgaben">
         <div class="gruppenname">{t('bildserver.vorgaben')}</div>
-        <div class="paar">
-          <label>{t('bild.breite')}
-            <Zahlenfeld bind:wert={vorgaben.breite} min={256} max={1536} schritt={64}
-                        gesperrt={arbeitet} />
-          </label>
-          <label>{t('bild.hoehe')}
-            <Zahlenfeld bind:wert={vorgaben.hoehe} min={256} max={1536} schritt={64}
-                        gesperrt={arbeitet} />
-          </label>
-        </div>
-        <div class="paar">
-          <label>{t('bild.schritte')}
-            <Zahlenfeld bind:wert={vorgaben.schritte} min={1} max={80}
-                        gesperrt={arbeitet} />
-          </label>
-          <label>{t('bild.sampler')}
-            <Auswahlfeld bind:wert={vorgaben.sampler} eintraege={samplerauswahl}
-                         gesperrt={arbeitet} beschriftung={t('bild.sampler')}
-                         gewaehlt={vorgabenSichern} />
-          </label>
-        </div>
+        <label>{t('bild.sampler')}
+          <Auswahlfeld bind:wert={vorgaben.sampler} eintraege={samplerauswahl}
+                       gesperrt={arbeitet} beschriftung={t('bild.sampler')}
+                       gewaehlt={vorgabenSichern} />
+        </label>
+        <p class="masse_hinweis">{t('bildserver.masse_folgen_modell')}</p>
       </div>
     {/if}
     {#if probe}
@@ -275,18 +275,19 @@
     text-transform: uppercase;
     color: var(--text-leise);
   }
-  .paar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .paar label {
+  .vorgaben label {
     display: flex;
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    color: var(--text-still);
+    color: var(--text-leise);
     min-width: 0;
+  }
+  .masse_hinweis {
+    margin: 8px 0 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-still);
   }
   .probe {
     display: flex;

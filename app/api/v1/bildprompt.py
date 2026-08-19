@@ -13,12 +13,14 @@ returning the prompt unchanged would look like a button that did nothing.
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app import denkschalter
 from app.api.abhaengigkeiten import hole_sprache
-from app.bildprompt import PromptFehler, verbessern
+from app.bildprompt import ANWEISUNG_NEGATIV, PromptFehler, verbessern
 from app.discovery import Discovery
 from app.i18n import t
 from app.providers import ProviderFehler
@@ -32,6 +34,10 @@ def hole_discovery(request: Request) -> Discovery:
 
 class PromptWunsch(BaseModel):
     prompt: str = Field(min_length=1)
+    # The negative prompt rides along: it needs the same translation to
+    # English (picture models read it just as literally), only tidied
+    # instead of expanded. Empty means there is nothing to rewrite.
+    negativ: str = ""
     # Which language model to ask. Empty means: whichever one is reachable —
     # the picture window has no model picker of its own and should not grow
     # one for this.
@@ -40,6 +46,7 @@ class PromptWunsch(BaseModel):
 
 class PromptAntwort(BaseModel):
     prompt: str
+    negativ: str = ""
 
 
 @router.post(
@@ -54,9 +61,23 @@ async def prompt_verbessern(
 ) -> PromptAntwort:
     zustand, modellname = _sprachmodell(discovery, wunsch.endpoint_id, sprache)
     try:
-        ergebnis = await verbessern(
+        # The negative goes through its own, narrower instruction — and only
+        # when there is one: an empty field stays an empty field. The two
+        # rewrites are independent of each other, so they run side by side
+        # instead of one after the other.
+        negativ = wunsch.negativ.strip()
+        laeufe = [verbessern(
             zustand.provider, modellname, wunsch.prompt, denkschalter.zusatz(False, zustand)
-        )
+        )]
+        if negativ:
+            laeufe.append(verbessern(
+                zustand.provider, modellname, negativ,
+                denkschalter.zusatz(False, zustand), anweisung=ANWEISUNG_NEGATIV,
+            ))
+        antworten = await asyncio.gather(*laeufe)
+        ergebnis = antworten[0]
+        if negativ:
+            negativ = antworten[1]
     except PromptFehler as fehler:
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, t("bild.prompt_fehlgeschlagen", sprache)
@@ -65,7 +86,7 @@ async def prompt_verbessern(
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, t("bild.prompt_fehlgeschlagen", sprache)
         ) from fehler
-    return PromptAntwort(prompt=ergebnis)
+    return PromptAntwort(prompt=ergebnis, negativ=negativ)
 
 
 def _sprachmodell(discovery: Discovery, kennung: str | None, sprache: str):

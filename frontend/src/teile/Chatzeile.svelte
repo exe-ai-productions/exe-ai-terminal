@@ -92,7 +92,7 @@
     color: var(--text);
   }
   .chat.aktiv {
-    background: var(--linie-stark);
+    background: var(--kontrast);
     color: var(--text);
   }
   .titel {

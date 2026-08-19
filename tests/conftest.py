@@ -70,7 +70,7 @@ def config(tmp_path) -> Config:
                 "servers_file": str(tmp_path / "mcp_servers.json"),
                 "auth_file": str(tmp_path / "mcp_auth.json"),
             },
-            "features": {"mcp": False, "image_generation": True, "document_upload": True},
+            "features": {"mcp": False, "document_upload": True},
             "discovery": {"interval_seconds": 3600, "timeout_seconds": 1},
             "endpoints": [
                 {

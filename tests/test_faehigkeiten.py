@@ -134,20 +134,6 @@ def test_document_upload_aus_sperrt_die_api(client):
         client.app.state.config.features.document_upload = True
 
 
-def test_image_generation_aus_sperrt_die_api(client):
-    client.app.state.config.features.image_generation = False
-    try:
-        chat = _chat(client)
-        antwort = client.post(
-            "/api/v1/images/generate",
-            json={"chat_id": chat["id"], "prompt": "ein Berg"},
-        )
-        assert antwort.status_code == 403
-    finally:
-        client.app.state.config.features.image_generation = True
-
-
 def test_meta_traegt_die_schalter(client):
     daten = client.get("/api/v1/meta").json()
     assert daten["features"]["document_upload"] is True
-    assert daten["features"]["image_generation"] is True

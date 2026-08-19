@@ -741,6 +741,7 @@ dependencies = [
 name = "exe-ai-terminal-fenster"
 version = "1.0.2"
 dependencies = [
+ "libc",
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",

@@ -1,5 +1,6 @@
 <script>
   import { rollfade } from '../lib/rollfade.js'
+  import Klappwahl from './Klappwahl.svelte'
   /* The settings window — one window, grouped like a real settings app.
 
      The left column is no longer a flat list but raised, named boxes:
@@ -39,7 +40,14 @@
   import { zustand, aktuellerChat, chatAendern, konturSetzen, schriftSetzen, oberflaecheSetzen, codefarbenSetzen, blasenfarbeSetzen, melde, frage, modelleLaden } from '../lib/zustand.svelte.js'
 
   function blasenStandard() {
-    const wert = getComputedStyle(document.documentElement).getPropertyValue('--blase').trim()
+    // The picker's "current default" swatch must match what an untouched
+    // bubble actually shows — a theme may ship its own default (Dark Matter's
+    // lavender), so prefer that over the plain house bubble.
+    const stil = getComputedStyle(document.documentElement)
+    const wert = (
+      stil.getPropertyValue('--blase-eigen-standard').trim() ||
+      stil.getPropertyValue('--blase').trim()
+    )
     return /^#[0-9a-fA-F]{6}$/.test(wert) ? wert : '#232320'
   }
   import {
@@ -82,6 +90,8 @@
     ['auto', 'einstellungen.auto'],
     ['hell', 'einstellungen.hell'],
     ['dunkel', 'einstellungen.dunkel'],
+    ['darkmatter', 'einstellungen.darkmatter'],
+    ['heaven', 'einstellungen.heaven'],
   ]
 
   /* The switches that decide whether the memory travels. */
@@ -552,11 +562,11 @@ once the question is answered.
                 {t('einstellungen.erscheinungsbild')}
                 <span class="hinweis">{t('einstellungen.auto_hinweis')}</span>
               </div>
-              <div class="segment">
-                {#each MODI as [wert, beschriftung] (wert)}
-                  <button aria-pressed={modus === wert} onclick={() => (modus = wert)}>{t(beschriftung)}</button>
-                {/each}
-              </div>
+              <Klappwahl
+                optionen={MODI.map(([wert, schluessel]) => [wert, t(schluessel)])}
+                bind:wert={modus}
+                beschriftung={t('einstellungen.erscheinungsbild')}
+              />
             </div>
             <div class="einstellkachel">
               <div class="zeilentext">

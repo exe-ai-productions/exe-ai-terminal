@@ -26,7 +26,7 @@
 const BREITE_MIN = 260
 const BREITE_MAX = 900
 
-export const MODULE = ['terminal', 'cli', 'vorschau', 'notiz', 'waechter']
+export const MODULE = ['terminal', 'cli', 'vorschau', 'notiz', 'bilder', 'waechter']
 
 export const leiste = $state({
   /* Open, closed and which module: remembered like the sidebar's state on

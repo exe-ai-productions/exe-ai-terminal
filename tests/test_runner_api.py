@@ -46,6 +46,9 @@ class StummerRunner:
     def flash_attn_zustand(self):
         return None
 
+    def mtp_zustand(self):
+        return None
+
     def starten(self, modell, *, kontext=8192, schichten=99, port=8080, drafter=None,
                 fein=None):
         # The advanced settings are kept so a test can look at what arrived.
@@ -89,6 +92,58 @@ def test_ein_fehlstart_meldet_nichts_an(client):
     antwort = client.post("/api/v1/runner/start", json={"modell": "fehlt.gguf"})
     assert antwort.status_code == 404
     assert "runner" not in client.app.state.discovery.zustaende
+
+
+def test_download_legt_zubehoer_in_den_unterordner(client):
+    """A companion with `unterordner` lands in that sub-folder of its art — the
+    endpoint joins the folder before handing the download off, so a VAE reaches
+    data/bildmodelle/vae/ and shows up in the picture window at once."""
+    from app.modelldownload import Fortschritt
+
+    gefangen = {}
+
+    class FangDownload:
+        def starten(self, repo, datei, ziel=None, gehoert_zu=None, rolle=None,
+                    ordner=None, endungen=(".gguf",), manifest_ordner=None):
+            gefangen["ordner"] = ordner
+            return Fortschritt(datei=datei, geladen=0, gesamt=0)
+
+        def stand(self):
+            return Fortschritt(datei="vae.safetensors", geladen=0, gesamt=1)
+
+    client.app.state.modelldownload = FangDownload()
+    client.app.state.modellordner_je_art = {
+        "bild": "/data/bildmodelle", "chat": "/data/modelle",
+    }
+    antwort = client.post(
+        "/api/v1/runner/download",
+        json={"repo": "r", "datei": "vae.safetensors", "art": "bild", "unterordner": "vae"},
+    )
+    assert antwort.status_code == 200
+    assert gefangen["ordner"] == "/data/bildmodelle/vae"
+
+
+def test_download_ohne_unterordner_bleibt_in_der_wurzel(client):
+    from app.modelldownload import Fortschritt
+
+    gefangen = {}
+
+    class FangDownload:
+        def starten(self, repo, datei, ziel=None, gehoert_zu=None, rolle=None,
+                    ordner=None, endungen=(".gguf",), manifest_ordner=None):
+            gefangen["ordner"] = ordner
+            return Fortschritt(datei=datei, geladen=0, gesamt=0)
+
+        def stand(self):
+            return Fortschritt(datei="m.gguf", geladen=0, gesamt=1)
+
+    client.app.state.modelldownload = FangDownload()
+    client.app.state.modellordner_je_art = {"chat": "/data/modelle"}
+    antwort = client.post(
+        "/api/v1/runner/download", json={"repo": "r", "datei": "m.gguf", "art": "chat"}
+    )
+    assert antwort.status_code == 200
+    assert gefangen["ordner"] == "/data/modelle"
 
 
 def test_der_modellordner_laesst_sich_zeigen(client, tmp_path, monkeypatch):

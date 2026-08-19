@@ -41,12 +41,25 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
     """
     gleich_erlaubt = {
         # Proper names and marks.
-        "app.name", "beta.marke", "app.ok",
+        "app.name", "beta.marke", "app.ok", "bild.turbo.name",
+        # Image model class names — SDXL and SD 1.5 are the technical names
+        # of the two families in both languages, not text to translate.
+        "katalog.klasse_sdxl", "katalog.klasse_sd15",
+        # A number with a percent sign is written the same in both languages.
+        "bild.fortschritt_prozent",
+        # Bare step marks — plus or minus one is no language at all.
+        "bild.seed_plus", "bild.seed_minus",
+        # "Seed" is the technical term, the same word in both languages.
+        "nachricht.seed_label",
+        # Accessory kinds — VAE, LoRA, ADetailer and Vision (mmproj) are
+        # technical names, the same word in both languages.
+        "katalog.sorte_vae", "katalog.sorte_lora", "katalog.sorte_adetailer",
+        "katalog.sorte_mmproj",
         # Words English and German share unchanged.
         "chat.alle", "menue.chat", "menue.cloud", "jobs.bereich_chats",
         "editor.quelle_tools", "werkzeuge.eingebaut", "modell.server_offline",
         "editor.gruppe_app", "editor.gruppe_prompts", "jobs.agent_waehlen",
-        "einstellungen.auto", "parameter.aus_global",
+        "einstellungen.auto", "parameter.aus_global", "bild.clip_auto",
         # Language names stand in their own language, on purpose.
         "einstellungen.sprache_deutsch", "einstellungen.sprache_englisch",
         # Pure units and placeholders.
@@ -106,6 +119,11 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         "einstellungen.codefarben_exe",
         "einstellungen.codefarben_tokyo",
         "einstellungen.codefarben_onelight",
+        # The skins carry proper names now — Pearl, Exe, Dark Matter,
+        # Heaven — kept the same in both languages, like the colour packs
+        # above.
+        "einstellungen.hell", "einstellungen.dunkel",
+        "einstellungen.darkmatter", "einstellungen.heaven",
         # CLI is the name of the panel in both languages, and "Chat" is the
         # same word — the status line names both.
         "cli.titel", "cli.status_chat",

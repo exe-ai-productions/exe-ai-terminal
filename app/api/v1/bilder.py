@@ -13,17 +13,17 @@ itself — nothing from the client reaches the filesystem.
 
 from __future__ import annotations
 
-import asyncio
 import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.abhaengigkeiten import hole_config, hole_sprache
 from app.config import Config
 from app.i18n import t
+from app.speicherorte import ort
 
 router = APIRouter(tags=["bilder"])
 
@@ -40,11 +40,37 @@ BILD_NAME_MUSTER = re.compile(r"^[a-f0-9]{32}\.(png|jpg|webp)$")
 
 
 def bilder_verzeichnis(config: Config):
-    return config.datenverzeichnis / "bilder"
+    return ort(config, "bilder")
 
 
 class BildAntwort(BaseModel):
     bild: str
+
+
+class BilderListe(BaseModel):
+    # The saved pictures, newest first — names only; the caller builds each
+    # address with the existing /images/{name} route.
+    bilder: list[str]
+
+
+@router.get("/bilder", response_model=BilderListe, summary="Gespeicherte Bilder auflisten")
+def bilder_auflisten(config: Config = Depends(hole_config)) -> BilderListe:
+    """Every saved picture in the picture folder, newest first. A missing
+    folder is not an error — it is the state before the first picture, and
+    the answer is simply an empty list."""
+    ordner = bilder_verzeichnis(config)
+    if not ordner.is_dir():
+        return BilderListe(bilder=[])
+    # Skip anything too small to be a real picture: a stray file dropped into
+    # the folder by hand would otherwise show as a broken tile. The smallest
+    # valid PNG is around 67 bytes; 100 clears junk without touching a real
+    # image, which is never that small.
+    treffer = [
+        p for p in ordner.iterdir()
+        if p.is_file() and BILD_NAME_MUSTER.match(p.name) and p.stat().st_size >= 100
+    ]
+    treffer.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return BilderListe(bilder=[p.name for p in treffer])
 
 
 @router.post(
@@ -76,159 +102,6 @@ async def bild_hochladen(
     verzeichnis.mkdir(parents=True, exist_ok=True)
     (verzeichnis / name).write_bytes(daten)
     return BildAntwort(bild=name)
-
-
-
-class BildEndpunktAntwort(BaseModel):
-    id: str
-    dialect: str
-    erreichbar: bool
-
-
-class BildKonfiguration(BaseModel):
-    content: str
-    kaputt: str | None
-
-
-@router.get(
-    "/images/endpoints",
-    response_model=list[BildEndpunktAntwort],
-    summary="Konfigurierte Bild-Generatoren samt Erreichbarkeit",
-)
-async def bild_endpunkte(config: Config = Depends(hole_config)) -> list[BildEndpunktAntwort]:
-    """Checked fresh on every call — image mode asks rarely, and the answer
-    should be honest, not a minute old."""
-    from app.bildgeneratoren import generatoren
-
-    antworten = []
-    for generator in generatoren(config):
-        antworten.append(
-            BildEndpunktAntwort(
-                id=generator.id,
-                dialect=generator.dialect,
-                erreichbar=await generator.erreichbar(),
-            )
-        )
-    return antworten
-
-
-class BildErzeugen(BaseModel):
-    chat_id: str
-    prompt: str
-    endpoint_id: str | None = None
-    # Assigned by the client so it can stop this very generation —
-    # after all, the response only arrives once everything is over.
-    generation_id: str | None = None
-
-
-class BildErzeugtAntwort(BaseModel):
-    """With `abgebrochen` the remaining fields are empty — there is no image
-    and nothing was saved; the chat remains untouched."""
-
-    frage_id: str | None = None
-    antwort_id: str | None = None
-    bild: str | None = None
-    dialekt: str | None = None
-    abgebrochen: bool = False
-
-
-# Running generations, for the stop button: generation_id -> stop event.
-# In memory is enough — a generation doesn't survive the process anyway.
-_laufende: dict[str, "asyncio.Event"] = {}
-
-
-class BildStoppen(BaseModel):
-    generation_id: str
-
-
-@router.post(
-    "/images/stop",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-    response_model=None,
-    summary="Eine laufende Bild-Erzeugung stoppen",
-)
-def bild_stoppen(daten: BildStoppen, sprache: str = Depends(hole_sprache)) -> Response:
-    ereignis = _laufende.get(daten.generation_id)
-    if ereignis is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, t("fehler.bilderzeugung_fehlt", sprache)
-        )
-    ereignis.set()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post(
-    "/images/generate",
-    response_model=BildErzeugtAntwort,
-    summary="Bild erzeugen (Bildmodus) — roher Prompt an den Generator",
-)
-async def bild_erzeugen(
-    daten: BildErzeugen,
-    request: Request,
-    config: Config = Depends(hole_config),
-    sprache: str = Depends(hole_sprache),
-) -> BildErzeugtAntwort:
-    """Runs synchronously — a generation takes a while, the caller waits along.
-
-    Prompt and image end up in the chat as a message pair: the question
-    carries the raw prompt, the answer carries the image — the history shows
-    both like any other exchange, without a separate display path.
-    """
-    from app.api.abhaengigkeiten import STANDARD_BENUTZER, hole_repositories
-    from app.bildgeneratoren import BildAbbruch, BildFehler, generatoren
-
-    # The switch in the config really counts (interface close-out C):
-    # off means off, even if someone talks to the API directly.
-    if not config.features.image_generation:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, t("fehler.funktion_aus", sprache))
-
-    repositories = request.app.state.repositories
-    benutzer = getattr(request.app.state, "standard_benutzer", STANDARD_BENUTZER)
-    chat = repositories.chats.holen(daten.chat_id, user_id=benutzer)
-    if chat is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, t("fehler.chat_nicht_gefunden", sprache))
-
-    kandidaten = generatoren(config)
-    if daten.endpoint_id:
-        kandidaten = [g for g in kandidaten if g.id == daten.endpoint_id]
-    generator = None
-    for kandidat in kandidaten:
-        if await kandidat.erreichbar():
-            generator = kandidat
-            break
-    if generator is None:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, t("fehler.bildserver_fehlt", sprache)
-        )
-
-    stopp = asyncio.Event()
-    schluessel = daten.generation_id or uuid.uuid4().hex
-    _laufende[schluessel] = stopp
-    try:
-        ergebnis = await generator.erzeugen(daten.prompt, stopp=stopp)
-    except BildAbbruch:
-        return BildErzeugtAntwort(abgebrochen=True)
-    except BildFehler as fehler:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(fehler)) from fehler
-    finally:
-        _laufende.pop(schluessel, None)
-
-    name = uuid.uuid4().hex + ergebnis.endung
-    verzeichnis = bilder_verzeichnis(config)
-    verzeichnis.mkdir(parents=True, exist_ok=True)
-    (verzeichnis / name).write_bytes(ergebnis.daten)
-
-    frage = repositories.messages.speichern(
-        chat_id=chat.id, role="user", content=daten.prompt
-    )
-    antwort = repositories.messages.speichern(
-        chat_id=chat.id, role="assistant", content="", bild=name
-    )
-    repositories.chats.zeitstempel_auffrischen(chat.id)
-    return BildErzeugtAntwort(
-        frage_id=frage.id, antwort_id=antwort.id, bild=name, dialect=generator.dialect
-    )
 
 
 @router.get("/images/{name}", summary="Ein hochgeladenes Bild ausliefern")

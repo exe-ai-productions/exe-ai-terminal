@@ -4,6 +4,8 @@
   import { fly } from 'svelte/transition'
   import { backOut } from 'svelte/easing'
   import Menueleiste from './teile/Menueleiste.svelte'
+  import Materiefeld from './teile/Materiefeld.svelte'
+  import Himmelfeld from './teile/Himmelfeld.svelte'
   import Seitenleiste from './teile/Seitenleiste.svelte'
   import Seitengriff from './teile/Seitengriff.svelte'
   import Arbeitsleiste from './teile/Arbeitsleiste.svelte'
@@ -21,6 +23,7 @@
   import Bildschau from './teile/Bildschau.svelte'
   import Meldungen from './teile/Meldungen.svelte'
   import Wortmarke from './teile/Wortmarke.svelte'
+  import Kontextnase from './teile/Kontextnase.svelte'
   import Ordnerpillen from './teile/Ordnerpillen.svelte'
   import Auftraege from './teile/Auftraege.svelte'
   import Agentenmarke from './teile/Agentenmarke.svelte'
@@ -43,10 +46,11 @@
     werkzeugfrageBeantworten, benutzerfrageBeantworten, werkzeugImmerErlaubt, frageBeantworten, seitenleisteSchalten,
     chatFertigMerken, chatFertigGesehen, menueFensterOeffnen,
   } from './lib/zustand.svelte.js'
-  import { begruessung, begruessungLaden, grussSchluessel } from './lib/begruessung.svelte.js'
+  import { begruessung, begruessungLaden } from './lib/begruessung.svelte.js'
   import { verbinden as terminalVerbinden } from './lib/terminalfenster.svelte.js'
   import { klangwahlLaden, klingen } from './lib/klaenge.svelte.js'
   import { dateienAus } from './lib/markdown.js'
+  import { seedlage } from './lib/bildseed.svelte.js'
   import { standLaden as eewStandLaden } from './lib/eew.svelte.js'
   import { dockLaden, notizenLaden } from './lib/notizen.svelte.js'
   import { tabOeffnen } from './lib/vorschautabs.svelte.js'
@@ -163,6 +167,35 @@
     })
   }
 
+  /* Keeps the view's floor glued to the list's end for a little while —
+     one snap per frame. Used while a message grows in place (the picture
+     frame's 75%→100% growth): with the bottom standing still, the growth
+     reads upward instead of sliding out below. Bails out the moment the
+     reader scrolls away, exactly like runter(). */
+  function runterGleiten(dauer = 750) {
+    if (!verlauf) return
+    folgtMit = true
+    const ende = performance.now() + dauer
+    const halten = () => {
+      if (!folgtMit || !verlauf) return
+      /* Already at the floor: setting scrollTop would move nothing and fire
+         no scroll event — but the eigenScroll latch would stay armed and
+         swallow the reader's NEXT real scroll. Snap only when it snaps. */
+      if (verlauf.scrollHeight - verlauf.scrollTop - verlauf.clientHeight <= 0) return
+      eigenScroll = true
+      verlauf.scrollTop = verlauf.scrollHeight
+    }
+    const schritt = () => {
+      halten()
+      if (performance.now() < ende) requestAnimationFrame(schritt)
+    }
+    requestAnimationFrame(schritt)
+    /* Animation frames stand still while the window is hidden; a few plain
+       timers hold the floor there too, so a picture finishing in a covered
+       window still ends at the floor instead of just above it. */
+    for (const zeit of [150, 400, dauer, dauer + 400]) setTimeout(halten, zeit)
+  }
+
   const letzteAntwort = $derived(
     [...zustand.nachrichten].reverse().find((n) => n.role === 'assistant'),
   )
@@ -258,56 +291,6 @@
     await antwortHolen(inhalt, bild, dokument?.id ?? null, denken, skill)
   }
 
-  /* Image mode (image grill part 2): the raw prompt goes to the
-     generator, question and image land as a message pair in the history —
-     the server has already stored them, here we only catch up. */
-  let bildGenerationId = null
-
-  async function bildErzeugen(prompt) {
-    if (!zustand.aktiverChat) {
-      const titel = prompt.length > 40 ? prompt.slice(0, 40) + '…' : prompt
-      const chat = await api.chatAnlegen({ title: titel, endpoint_id: zustand.modellId })
-      zustand.aktiverChat = chat.id
-      zustand.nachrichten = []
-      await chatsLaden()
-    }
-    const chatId = zustand.aktiverChat
-    zustand.nachrichten.push({ id: 'eigen-' + Date.now(), role: 'user', content: prompt })
-    /* The waiting line sits in the answer bubble, where the thinking
-       indicator usually is — not under the input field. IMPORTANT: fetch
-       the object back out of the list after the push — only the list copy
-       is reactive. Whoever keeps the raw object writes into the void (the
-       image-only-appears-after-switching-chats bug). */
-    zustand.nachrichten.push({ id: null, role: 'assistant', content: '', bildLaeuft: true, stats: {}, werkzeuge: [] })
-    const platzhalter = zustand.nachrichten[zustand.nachrichten.length - 1]
-    runter(true)
-    bildGenerationId = crypto.randomUUID().replaceAll('-', '')
-    try {
-      const ergebnis = await api.bildGenerieren({
-        chat_id: chatId, prompt, generation_id: bildGenerationId,
-      })
-      /* Whoever switches chats during generation is looking at a foreign
-         list — then touch nothing. The pair lives on the server; the chat
-         shows it on the next open. */
-      if (zustand.aktiverChat !== chatId) return
-      const stelle = zustand.nachrichten.indexOf(platzhalter)
-      if (ergebnis.abgebrochen) {
-        if (stelle !== -1) zustand.nachrichten.splice(stelle, 1)
-        return
-      }
-      platzhalter.id = ergebnis.antwort_id
-      platzhalter.bild = ergebnis.bild
-      platzhalter.bildLaeuft = false
-      runter(true)
-    } catch (fehler) {
-      const stelle = zustand.nachrichten.indexOf(platzhalter)
-      if (stelle !== -1) zustand.nachrichten.splice(stelle, 1)
-      melde(String(fehler.message || fehler), 'fehler')
-    } finally {
-      bildGenerationId = null
-    }
-  }
-
   /* A picture made on this machine, from the click to the frame.
 
      The window is already gone by the time this runs — it shrank away, and
@@ -318,40 +301,123 @@
      The pair in the history is written by the server, so when the picture
      lands there is nothing to assemble — only to catch up. */
   let bildLokalLaeuft = $state(false)
+  /* Pictures asked for while one is drawing wait here and run one after the
+     other — pressing "draw" three times queues three, it does not throw two
+     away. Not $state: only the count in the store drives the badge. */
+  let bildQueue = []
 
+  /* The count shown is every picture still to come — the one drawing now
+     plus the ones queued behind it. The badge appears whenever it is at
+     least one and vanishes when the last picture lands. */
+  function bildZahlSetzen() {
+    zustand.bildWarteschlange = bildQueue.length + (bildLokalLaeuft ? 1 : 0)
+  }
+
+  /* Enqueue and, if nothing is drawing yet, start working the queue off. */
   async function bildLokalZeichnen(wunsch) {
+    bildQueue.push(wunsch)
+    bildZahlSetzen()
     if (bildLokalLaeuft) return
+    bildLokalLaeuft = true
+    try {
+      while (bildQueue.length) {
+        const naechste = bildQueue.shift()
+        bildZahlSetzen()
+        await bildEinesZeichnen(naechste)
+      }
+    } finally {
+      bildLokalLaeuft = false
+      zustand.bildLaeuftChat = null
+      zustand.bildMasse = null
+      bildZahlSetzen()
+    }
+  }
+
+  async function bildEinesZeichnen(wunsch) {
     const chatId = wunsch.chat_id
     zustand.nachrichten.push({ id: 'eigen-' + Date.now(), role: 'user', content: wunsch.prompt })
     /* IMPORTANT: fetch the object back OUT of the list after the push —
        only the list's copy is reactive. Whoever keeps the raw object writes
        into the void, which is the bug where the picture only appeared after
        switching chats. */
+    const masse = { breite: wunsch.breite ?? 512, hoehe: wunsch.hoehe ?? 512 }
     zustand.nachrichten.push({
       id: null, role: 'assistant', content: '', bildLaeuft: true, stats: {}, werkzeuge: [],
+      bildMasse: masse,
     })
     const platzhalter = zustand.nachrichten[zustand.nachrichten.length - 1]
     runter(true)
-    bildLokalLaeuft = true
+    // Remember which chat is drawing, so switching away and back can put the
+    // working message (and its filling frame) back — it is not on the server.
+    zustand.bildLaeuftChat = chatId
+    zustand.bildMasse = masse
     try {
-      await api.bildZeichnen(wunsch)
+      const antwort = await api.bildZeichnen(wunsch)
+      // The seed the picture was ACTUALLY drawn with — also when the server
+      // picked it. The picture window shows it and the seed plan continues
+      // from it.
+      if (Number.isInteger(antwort?.seed)) seedlage.letzter = antwort.seed
       /* Whoever switched chats meanwhile is looking at a foreign list —
          then touch nothing. The pair lives on the server and shows itself
          the next time the chat is opened. */
       if (zustand.aktiverChat !== chatId) return
-      zustand.nachrichten = await api.nachrichten(chatId)
-      runter(true)
-      await chatsLaden()
+      /* The finished picture first lands in the SAME working message: the
+         frame stays the same element, so it can grow smoothly from the 75%
+         working size to the full display size with the picture inside.
+         Only after that little growth does the list reconcile with the
+         server — same content, so nothing visibly changes.
+
+         Resolve the working message from the CURRENT list first: leaving
+         and re-entering the chat replaces the list and re-creates the
+         placeholder, and a write into the discarded object would leave the
+         visible one drawing forever. */
+      const ziel = zustand.nachrichten.includes(platzhalter)
+        ? platzhalter
+        : zustand.nachrichten.find((n) => n.bildLaeuft)
+      if (ziel) {
+        ziel.bildMasse = ziel.bildMasse ?? masse
+        ziel.bild = antwort.bild
+        ziel.stats = { ...ziel.stats, seed: antwort.seed }
+        ziel.bildLaeuft = false
+      }
+      /* Glued to the floor for the growth's length: the frame's bottom
+         stands, its top rises — the growth reads upward. */
+      runterGleiten()
+      /* From here on the picture is drawn and on screen. A reconcile that
+         fails must not take it away again — the server has the pair, and
+         the list heals on the next chat open. */
+      try {
+        await new Promise((frei) => setTimeout(frei, 700))
+        if (zustand.aktiverChat !== chatId) return
+        zustand.nachrichten = await api.nachrichten(chatId)
+        /* The server's copy of the message does not know the ordered size.
+           Hand it over, so the sized stage stays after the reconcile and the
+           picture keeps its exact geometry — a natural-size re-render would
+           reflow on image load and yank the view away from the picture. */
+        const frisch = [...zustand.nachrichten].reverse()
+          .find((n) => n.role === 'assistant' && n.bild === antwort.bild)
+        if (frisch) frisch.bildMasse = masse
+        /* A short glide, not one snap: the reconciled message renders its
+           stats foot a frame later, and a single snap lands just above the
+           true floor. */
+        runterGleiten(300)
+        await chatsLaden()
+      } catch {
+        /* the picture stands; the fresh list arrives with the next open */
+      }
     } catch (fehler) {
       if (zustand.aktiverChat === chatId) {
-        const stelle = zustand.nachrichten.indexOf(platzhalter)
+        /* The visible placeholder may be a re-created twin of the captured
+           one (chat left and re-entered) — remove whichever still claims to
+           be drawing, or a dust frame stands in the chat forever. */
+        const stelle = zustand.nachrichten.findIndex(
+          (n) => n === platzhalter || (n.bildLaeuft && n.id === null),
+        )
         if (stelle !== -1) zustand.nachrichten.splice(stelle, 1)
       }
       /* A stopped picture is not an error. It is what was just asked for,
          and the working message disappearing IS the answer. */
       if (fehler.status !== 499) melde(String(fehler.message || fehler), 'fehler')
-    } finally {
-      bildLokalLaeuft = false
     }
   }
 
@@ -359,13 +425,11 @@
      interrupts the generator — the waiting request above resolves itself
      as a result. */
   function bildStoppen() {
-    /* One button, whichever picture is running: the one from the picture
-       server, or the one from this machine. */
-    if (bildLokalLaeuft) {
-      api.bildZeichnenStoppen().catch(() => {})
-      return
-    }
-    if (bildGenerationId) api.bildStoppen(bildGenerationId).catch(() => {})
+    // Cancel everything, not only the one drawing: the queued ones were
+    // asked for by the same hand and stopping means stopping.
+    bildQueue = []
+    bildZahlSetzen()
+    if (bildLokalLaeuft) api.bildZeichnenStoppen().catch(() => {})
   }
 
   /* Regenerate the answer (3.4): delete the old one and recompute on the
@@ -720,6 +784,9 @@
 <svelte:window onkeydown={tastatur} />
 
 <div class="fenster">
+  <!-- The Dark-Matter field, behind everything; paints only under that skin. -->
+  <Materiefeld />
+  <Himmelfeld />
   <Menueleiste
     bind:this={menue}
     einstellungenOeffnen={() => {
@@ -766,6 +833,11 @@
            not in the window: the center of the notification sits on the
            center of the chat column. -->
       <Meldungen />
+      <!-- The context nose, for the same reason and in the same place: it
+           hangs on the seam above the chat and has to sit over the middle
+           of THAT column. Anchored in the window it would drift left by
+           half the sidebar and never line up with the input below it. -->
+      <Kontextnase />
       {#if zustand.bereich === 'auftraege'}
       <!-- The jobs view (6.5) displaces the chat including the input: a
            job isn't typed down here, it comes from the agent. -->
@@ -812,8 +884,8 @@
         <div class="marke" class:weg={!nochLeer}>
           <Wortmarke hoehe={55} zentriert />
         </div>
-        <Eingabeleiste bind:this={eingabe} {senden} {abbrechen} {bildErzeugen} {bildStoppen} bildZeichnen={bildLokalZeichnen} {bildLokalLaeuft} {tempo} schlank={nochLeer}
-          gruss={nochLeer && begruessung.an && begruessung.name ? t(grussSchluessel(true), { name: begruessung.name }) : null} />
+        <Eingabeleiste bind:this={eingabe} {senden} {abbrechen} {bildStoppen} bildZeichnen={bildLokalZeichnen} {bildLokalLaeuft} {tempo} schlank={nochLeer}
+          gruss={nochLeer && begruessung.an ? t('eingabe.los') : null} />
       </div>
 
       <div class="unterraum" class:zu={!nochLeer}></div>
@@ -884,7 +956,16 @@
     height: 52px;
     flex: none;
     padding: 0 18px;
+    /* Header band. Transparent by default, so light and dark keep showing the
+       ground through it exactly as before. Under Dark Matter it takes a solid
+       dark cap (--kopf-bg) and a soft shadow (--kopf-schatten) so the whole
+       header lifts off the nebula with a hard lower edge instead of melting
+       into the shimmer. position/z-index let the shadow fall on the content. */
+    background: var(--kopf-bg, transparent);
     border-bottom: 1px solid var(--linie);
+    box-shadow: var(--kopf-schatten, none);
+    position: relative;
+    z-index: 1;
   }
   /* The model-picker corner: presses itself against the right edge,
      opposite the wordmark. min-width: 0 so long model names truncate
@@ -966,8 +1047,12 @@
     font-size: var(--chat-schrift, 14px);
     /* More air at the bottom than at the top: the last bubble has to be
        able to stand above the fade-out, otherwise its end would hang in
-       the gradient permanently. */
-    padding: 26px 28px 84px;
+       the gradient permanently.
+
+       The top has grown by the reach of the context nose, which hangs off
+       the header into this field. Without it the first message would start
+       underneath the nose and be read through it. */
+    padding: 46px 28px 84px;
     display: flex;
     flex-direction: column;
     gap: 22px;
@@ -1019,7 +1104,7 @@
 
   @media (max-width: 720px) {
     .spur {
-      padding: 26px 18px;
+      padding: 46px 18px 26px;
     }
   }
 

@@ -21,14 +21,14 @@
 </script>
 
 <div class="marke" class:zentriert class:nurzeichen={!mitText} role="img"
-     aria-label="Exe AI Terminal" style="font-size:{hoehe / 2}px">
+     aria-label="Exe AI" style="font-size:{hoehe / 2}px">
   <svg viewBox="0 0 35 28" fill="none" stroke="currentColor"
        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <rect x="1.35" y="1.35" width="32.3" height="25.3" rx="7.5" stroke-width="2.7" />
     <path d="M9.5 10 L15.5 14.5 L9.5 19" stroke-width="2.5" />
     <path d="M20 19 H 27" stroke-width="2.5" />
   </svg>
-  {#if mitText}<span>Exe AI Terminal</span>{/if}
+  {#if mitText}<span>Exe AI</span>{/if}
 </div>
 
 <style>
@@ -50,14 +50,22 @@
     flex: none;
     display: block;
   }
-  /* Where the mark sits centered, the optical center counts, not the
-     box's: the type juts out past its layout box on the right. Measured
-     at 37.3 px type, the drawing sat 4.42 px too far right — hence
-     0.118em. Relative, so it holds at every size.
+  /* Where the mark sits centered, the optical centre counts, not the box's.
+     The centre that matters runs from the left edge of the drawing to where
+     the ink of the last letter actually ends — the advance width carries a
+     little air past it that belongs to no glyph and would push the whole
+     block left of the input field below.
+
+     Measured at 27.5 px type, ink ending on the I of "AI": the box centre
+     sat 0.621 px right of the optical one, hence 0.023em. Relative, so it
+     holds at every size. The value belongs to the lettering: it was 0.118em
+     while the mark still read "Exe AI Terminal" and ended on an l, and any
+     change to the wording has to be measured again rather than guessed.
+
      Left-aligned this doesn't apply: there the ink should start at the
      edge, and it does so without compensation. */
   .zentriert {
-    transform: translateX(-0.118em);
+    transform: translateX(-0.023em);
   }
   /* Without the lettering there is nothing to compensate and nothing to
      flow around: the drawing fills the box the watermark gives it. The

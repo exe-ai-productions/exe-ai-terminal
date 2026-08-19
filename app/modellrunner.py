@@ -26,6 +26,7 @@ Three rules hold the whole thing together:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import secrets
@@ -37,11 +38,14 @@ import threading
 from app import modellzuordnung
 from app import prozessstopp
 from app.feineinstellungen import Feineinstellungen, flags as feinflags
+from app.ggufmtp import traegt_eingebettetes_mtp
 from app.modellprofil import startflags
 from app.prozessspeicher import rss_gb
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 # Where a package manager puts it. Searched after PATH, because somebody who
 # put it somewhere of their own means it.
@@ -59,6 +63,23 @@ PROTOKOLL_ZEILEN = 400
 # says what it decided in exactly one line at load time: "…: flash_attn    =
 # enabled" or "…: flash_attn    = disabled". This is that line, read back.
 _FLASH_ATTN_MUSTER = re.compile(r"flash_attn\s*=\s*(\w+)")
+
+# The drafter (multi-token prediction / speculative decoding) prints exactly
+# one line as it initialises, and it comes BEFORE the "model loaded" line:
+#   "common_speculative_init_result: loading draft model '…'"
+# Read it back the same way flash attention is read back. A drafter can be
+# *configured* at start and still never engage; this line is the proof it did.
+# If the server reaches "model loaded" without it, the pairing did not take.
+#
+# The same line covers a model drafting against its OWN embedded weights
+# (no separate --model-draft): the engine's every speculative backend
+# (draft-simple, draft-mtp, draft-eagle3, …) funnels through this one log
+# call, confirmed by the engine's own build carrying exactly one instance
+# of this string regardless of which backend fires. No second pattern
+# needed for the embedded case — still worth the one live run to see the
+# real line before trusting it in practice.
+_MTP_MUSTER = re.compile(r"common_speculative_init_result")
+_BEREIT_MUSTER = re.compile(r"llama_server:\s*model loaded")
 
 # Where the started server's process id is noted. The server outlives the
 # service on purpose (its own process group, so a service crash does not
@@ -145,13 +166,56 @@ def ist_mtp(name: str) -> bool:
     return "mtp" in name.lower()
 
 
+# The companions live in their own sub-folders of the model folder, so the
+# model folder itself shows only startable models — and the drafter folder
+# shows only drafters, the vision folder only projectors. The file names stay
+# the same, so the manifest and the name heuristics keep binding.
+MTP_ORDNER = "mtp"
+VISION_ORDNER = "vision"
+
+
+def _begleiter_ordner(ordner: Path, rolle: str) -> Path:
+    """The sub-folder a companion of this role lives in."""
+    return ordner / (MTP_ORDNER if rolle == "mtp" else VISION_ORDNER)
+
+
+def begleiter_einsortieren(ordner: Path) -> None:
+    """Move loose companion files out of the model folder into their own
+    sub-folders once, at startup, so each folder shows only its own kind.
+
+    A plain rename inside the same folder — the name is kept, so the manifest
+    bond and the name heuristics still hold. A name already taken in the
+    target is left where it lies (a log line says so), never overwritten; the
+    model folder is scanned flat, so files already sorted are untouched.
+    """
+    if not ordner.is_dir():
+        return
+    for p in sorted(ordner.glob("*.gguf")):
+        if not p.is_file():
+            continue
+        if ist_mtp(p.name) and not ist_mmproj(p.name):
+            unter = MTP_ORDNER
+        elif ist_mmproj(p.name):
+            unter = VISION_ORDNER
+        else:
+            continue
+        ziel_ordner = ordner / unter
+        ziel_ordner.mkdir(exist_ok=True)
+        ziel = ziel_ordner / p.name
+        if ziel.exists():
+            log.warning("begleiter bleibt liegen, ziel belegt: %s", ziel)
+            continue
+        p.rename(ziel)
+
+
 def modelle_auflisten(ordner: Path) -> list[Modelldatei]:
     """The startable GGUF files in the model folder, largest first.
 
     Companion files are not models: vision projectors (mmproj) belong NEXT
     to a model, and multi-token-prediction modules (mtp) ride along as
     draft modules — offered as models, both would sit in the picker as
-    entries that never answer.
+    entries that never answer. They live in sub-folders now (a flat glob
+    passes them by); the name filter stays as a safety net.
     """
     if not ordner.is_dir():
         return []
@@ -164,25 +228,31 @@ def modelle_auflisten(ordner: Path) -> list[Modelldatei]:
 
 
 def mtp_auflisten(ordner: Path) -> list[Modelldatei]:
-    """The draft modules lying in the folder, with their sizes.
+    """The draft modules lying in the ``mtp/`` sub-folder, with their sizes.
 
     Sizes ride along because the draft is a passenger in the memory plan —
     a quarter gigabyte is honest weight, just not much of it.
     """
-    if not ordner.is_dir():
+    unter = ordner / MTP_ORDNER
+    if not unter.is_dir():
         return []
     return [
         Modelldatei(name=p.name, groesse_gb=round(p.stat().st_size / 1e9, 1))
-        for p in sorted(ordner.glob("*.gguf"))
+        for p in sorted(unter.glob("*.gguf"))
         if p.is_file() and ist_mtp(p.name) and not ist_mmproj(p.name)
     ]
 
 
 def mmproj_auflisten(ordner: Path) -> list[str]:
-    """The vision companions lying in the folder — names only."""
-    if not ordner.is_dir():
+    """The vision companions lying in the ``vision/`` sub-folder — names only.
+
+    The name check stays even though the folder already sorts by kind: a file
+    hand-dropped into vision/ that is not a projector is not offered as one.
+    """
+    unter = ordner / VISION_ORDNER
+    if not unter.is_dir():
         return []
-    return sorted(p.name for p in ordner.glob("*.gguf") if p.is_file() and ist_mmproj(p.name))
+    return sorted(p.name for p in unter.glob("*.gguf") if p.is_file() and ist_mmproj(p.name))
 
 
 def passende_mmproj(ordner: Path, modell: str) -> Path | None:
@@ -210,7 +280,7 @@ def passende_mmproj(ordner: Path, modell: str) -> Path | None:
         if laenge < 4 or not rest.startswith("mmproj"):
             continue
         if beste is None or laenge > beste[0]:
-            beste = (laenge, ordner / name)
+            beste = (laenge, ordner / VISION_ORDNER / name)
     return beste[1] if beste else None
 
 
@@ -274,6 +344,13 @@ class Modellrunner:
         # The log is a ring buffer — a busy server pushes the one load-time
         # line out of it, so the answer must be kept, not re-searched.
         self._flash_attn: bool | None = None
+        # The drafter's real state, caught the same way. Whether one was asked
+        # for, whether its init line passed, whether the server reported ready:
+        # the three together are the honest answer, because "configured" is
+        # not "running".
+        self._drafter_gewuenscht: bool = False
+        self._mtp_gesehen: bool = False
+        self._bereit_gesehen: bool = False
         self._schloss = threading.Lock()
 
     # --- What can be seen without starting anything ------------------------
@@ -321,7 +398,33 @@ class Modellrunner:
         None while the log has not reached it yet (server still loading, or
         not running). A bool, so the engine's wording lives in this one
         method and nowhere else."""
+        if not self.laeuft():
+            return None
         return self._flash_attn
+
+    def mtp_zustand(self) -> str | None:
+        """The drafter's honest state, read off the server's own words — not
+        the flag sent at start, which only proves it was *configured*.
+
+        ``None``   → server down, no drafter asked for, or still loading:
+                       nothing to show. The liveness guard matters: the
+                       log flags survive a stopped process, the state must
+                       not.
+        ``"aktiv"``  → the speculative-init line passed, so the draft truly
+                       engaged (blue).
+        ``"fehler"`` → the server reached "model loaded" without that line, so
+                       a drafter was configured but never took — a broken
+                       pairing (red).
+        """
+        if not self.laeuft():
+            return None
+        if not self._drafter_gewuenscht:
+            return None
+        if self._mtp_gesehen:
+            return "aktiv"
+        if self._bereit_gesehen:
+            return "fehler"
+        return None
 
     def _zeile_aufnehmen(self, zeile: str) -> None:
         zeile = zeile.rstrip("\n")
@@ -331,6 +434,10 @@ class Modellrunner:
             wert = treffer.group(1).lower()
             if wert in ("enabled", "disabled"):
                 self._flash_attn = wert == "enabled"
+        if _MTP_MUSTER.search(zeile):
+            self._mtp_gesehen = True
+        if _BEREIT_MUSTER.search(zeile):
+            self._bereit_gesehen = True
 
     def befehl(
         self,
@@ -366,12 +473,18 @@ class Modellrunner:
         # as it did before the section existed.
         zeile += feinflags(fein)
         if drafter:
-            zeile += ["--model-draft", str(self._ordner / drafter)]
+            zeile += ["--model-draft", str(_begleiter_ordner(self._ordner, "mtp") / drafter)]
             # A prediction module needs its own mode; fed into the plain
             # draft path it fails to build a context. A small sibling
             # model is the plain path and needs no flag.
             if ist_mtp(drafter):
                 zeile += ["--spec-type", "draft-mtp"]
+        elif traegt_eingebettetes_mtp(self._ordner / modell):
+            # No separate draft file chosen, and the model's own header
+            # says it carries its prediction layers already — the engine
+            # drafts against itself, no --model-draft needed. Never both
+            # paths at once: a chosen drafter always wins the branch above.
+            zeile += ["--spec-type", "draft-mtp"]
         # A model whose eyes lie next to it gets them attached — that is the
         # whole difference between a vision model and the same model mute.
         # The declared projector wins over the name heuristic: the manifest is
@@ -394,8 +507,11 @@ class Modellrunner:
         name = modellzuordnung.fuer(self._ordner, modell).get(rolle)
         if not name:
             return None
-        pfad = (self._ordner / name).resolve()
-        if pfad.parent != self._ordner.resolve() or not pfad.is_file():
+        # The companion lives in its own sub-folder; the boundary check is that
+        # sub-folder, so a hand-edited note can still never point outside it.
+        basis = _begleiter_ordner(self._ordner, rolle).resolve()
+        pfad = (basis / name).resolve()
+        if pfad.parent != basis or not pfad.is_file():
             return None
         return pfad
 
@@ -436,8 +552,9 @@ class Modellrunner:
             # The draft model obeys the same rule as the main one: a name
             # from the folder or nothing.
             if drafter:
-                dziel = (self._ordner / drafter).resolve()
-                if dziel.parent != self._ordner.resolve() or not dziel.is_file():
+                basis = (self._ordner / MTP_ORDNER).resolve()
+                dziel = (basis / drafter).resolve()
+                if dziel.parent != basis or not dziel.is_file():
                     raise RunnerFehler("kein_modell")
 
             # A taken port would let the new server die quietly while the
@@ -449,6 +566,13 @@ class Modellrunner:
 
             self._protokoll.clear()
             self._flash_attn = None
+            # The bolt watches for the SAME proof either way: a chosen
+            # drafter file, or the main model's own header carrying its
+            # prediction layers. Both ask the engine to draft; only the
+            # engine's own log line says whether it actually did.
+            self._drafter_gewuenscht = bool(drafter) or traegt_eingebettetes_mtp(ziel)
+            self._mtp_gesehen = False
+            self._bereit_gesehen = False
             # A fresh key per start; the service keeps it in its own
             # environment, where the provider picks it up to sign requests.
             schluessel = secrets.token_urlsafe(24)

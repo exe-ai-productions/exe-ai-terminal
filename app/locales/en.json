@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Exe AI Terminal",
+    "name": "Exe AI",
     "bereit": "Ready",
     "startet": "Service starting …",
     "schliessen": "Close",
@@ -61,6 +61,7 @@
   "eingabe": {
     "tps_einheit": "TPS",
     "platzhalter": "Write a message …",
+    "los": "Where shall we begin?",
     "nachricht": "Message",
     "senden": "Send",
     "abbrechen": "Stop response",
@@ -71,15 +72,16 @@
     "anhang_hinweis": "or drop / paste one",
     "anhang_entfernen": "Remove image",
     "bild_titel": "Image",
-    "bildmodus": "Image mode",
-    "bild_platzhalter": "Describe the image …",
     "dokument_anhaengen": "Attach document",
     "dokument_hinweis": "PDF, TXT, MD — read as text",
     "dokument_entfernen": "Remove document",
     "denken": "Thinking",
     "denken_an": "Thinking: on",
     "denken_aus": "Thinking: off",
-    "denken_gesperrt": "This model cannot switch thinking"
+    "mtp_aus": "Speed module off",
+    "denken_gesperrt": "This model cannot switch thinking",
+    "werkzeug_an": "Model can call tools",
+    "werkzeug_aus": "This model cannot call tools"
   },
   "maske": {
     "titel": "Mask",
@@ -119,7 +121,8 @@
     "vorgaben": "Defaults for the picture window",
     "generator_holen": "Get the generator",
     "generator_satz": "The small free program that does the drawing. It is fetched once, lands beside your models and stays there.",
-    "generator_laedt": "Fetching the generator…"
+    "generator_laedt": "Fetching the generator…",
+    "masse_folgen_modell": "Size and steps follow the chosen model automatically."
   },
   "einbettung": {
     "titel": "Search inside long documents",
@@ -138,6 +141,7 @@
     "lora_ordner": "Open LoRA folder",
     "lora_keine": "No LoRA files in the folder yet",
     "lora_unbekannt": "There is no LoRA by that name",
+    "begleiter_unbekannt": "There is no companion file by that name",
     "lora_eine_staerke": "sd.cpp applies one strength per LoRA — the separate model and clip strengths are a ComfyUI concept.",
     "startbild": "Start from a picture",
     "startbild_waehlen": "Choose a picture",
@@ -172,7 +176,41 @@
     "zeit_abgelaufen": "The picture took too long and was stopped",
     "gescheitert": "The picture could not be drawn",
     "abgebrochen": "Drawing stopped",
-    "kein_platz": "Not enough memory beside the loaded language model — about {gb} GB short"
+    "kein_platz": "Not enough memory beside the loaded language model — about {gb} GB short",
+    "erweitert": "Advanced",
+    "vae": "VAE (colour and detail)",
+    "vae_keins": "The model's own",
+    "clip_skip": "Clip skip",
+    "adetailer": "Sharpen faces (ADetailer)",
+    "adetailer_keins": "Off",
+    "ad_prompt": "Face prompt",
+    "ad_prompt_platzhalter": "empty inherits the main prompt",
+    "prompt_platzhalter": "What should be in the picture? — in your own language",
+    "gruppe_masse": "Measures & run",
+    "gruppe_feinschliff": "Fine-tuning & advanced",
+    "gruppe_startbild": "Start from a picture",
+    "hires": "Highres fix (crisper detail)",
+    "hires_faktor": "Scale",
+    "hires_hinweis": "Draws once, then again larger for finer detail — roughly doubles the time.",
+    "turbo_aus": "Image-Turbo is off",
+    "turbo_ladefehler": "Image-Turbo could not load the model in time",
+    "turbo": {
+      "name": "Image-Turbo",
+      "icon_hinweis": "Image-Turbo on/off — keeps the picture model loaded so the next images come without load time",
+      "kein_programm": "Image-Turbo is not set up on this PC",
+      "zustand_aus": "Image-Turbo is off",
+      "zustand_bereit": "Image-Turbo is ready",
+      "zustand_zeichnet": "Image-Turbo is loading or drawing",
+      "zustand_fehler": "Image-Turbo hit an error"
+    },
+    "fortschritt_prozent": "{zahl} %",
+    "seed_fest": "Fixed",
+    "seed_plus": "+1",
+    "seed_minus": "−1",
+    "seed_zuletzt": "last: {zahl}",
+    "seed_uebernehmen": "Take this seed and hold it",
+    "clip_auto": "Auto",
+    "warteschlange": "{zahl} pictures in the works"
   },
   "waechter": {
     "titel": "Extended Workflow",
@@ -218,7 +256,10 @@
     "bild_sichern": "Save",
     "dokument_seiten": "{zahl} pages",
     "dokument_gekuerzt": "Document truncated at 24,000 characters",
-    "neu_senden": "Send again"
+    "neu_senden": "Send again",
+    "seed_label": "Seed {zahl}",
+    "seed_kopieren": "Copy seed",
+    "seed_kopiert": "Seed copied"
   },
   "werkzeug": {
     "immer_erlauben": "Always allow in this chat",
@@ -336,6 +377,8 @@
     "server_unter_aus": "Off — nothing started yet",
     "kein_modell_satz": "No model yet — the catalog has one picked for this machine.",
     "mtp_aktiv": "Speed module active",
+    "mtp_fehler": "Speed module configured but not loaded",
+    "mtp_laedt": "Speed module loading …",
     "mtp_label": "MTP",
     "im_speicher": "{gb} GB in memory",
     "kontext_kurz": "Context {n}",
@@ -374,7 +417,8 @@
     "feld_mlock_hilfe": "stops the system swapping the model out",
     "schichten_alle": "All",
     "feld_eew": "Extended Workflow model",
-    "feld_eew_hilfe": "the small model that writes the suggestions"
+    "feld_eew_hilfe": "the small model that writes the suggestions",
+    "eew_keiner": "none"
   },
   "parameter": {
     "titel": "Parameters",
@@ -406,8 +450,10 @@
     "erscheinungsbild": "Appearance",
     "auto": "Auto",
     "auto_hinweis": "“Auto” follows the device setting",
-    "hell": "Light",
-    "dunkel": "Dark",
+    "hell": "Pearl",
+    "dunkel": "Exe",
+    "darkmatter": "Dark Matter",
+    "heaven": "Heaven",
     "kontur": "Messages as outline",
     "kontur_hinweis": "A hairline instead of a filled area",
     "oberflaeche": "Interface size",
@@ -455,8 +501,6 @@
     "bild_zu_gross": "The image is too large (10 MB max)",
     "bild_fehlt": "Image not found",
     "kein_vision": "The selected model cannot see images",
-    "bildserver_fehlt": "Image server not reachable — switch it on and it appears here automatically",
-    "bilderzeugung_fehlt": "No generation with this id is running",
     "dokument_typ": "Only PDF, TXT and MD files are accepted",
     "dokument_zu_gross": "The document is too large (max. 20 MB)",
     "dokument_unlesbar": "No readable text found in this document",
@@ -662,15 +706,15 @@
     "eingebaut_unter": "Built into the program"
   },
   "bilder": {
-    "gesichert": "Image servers saved — applies immediately",
-    "nicht_geladen": "Image server configuration could not be loaded",
-    "nicht_gesichert": "Image server configuration could not be saved",
-    "keine": "No image server configured"
+    "titel": "Images",
+    "bildordner": "Image folder",
+    "leer": "No pictures generated yet.",
+    "laedt": "Loading …"
   },
   "beta": {
     "marke": "Beta",
     "nur_vollversion": "Only available in the full version",
-    "nur_vollversion_text": "Agents, instructions and tools are part of the full Exe AI Terminal. During the public beta they stay visible but locked."
+    "nur_vollversion_text": "Agents, instructions and tools are part of the full Exe AI. During the public beta they stay visible but locked."
   },
   "dateien": {
     "gesichert": "Saved. Takes effect on next start.",
@@ -775,6 +819,7 @@
     "art_chat": "Chat",
     "art_einbettung": "Embedding",
     "art_bild": "Image",
+    "art_zubehoer": "Add-ons",
     "suchen": "Search all of Hugging Face …",
     "passt": "Fits your {gb} GB",
     "n_kontext": "{n}k context",
@@ -796,8 +841,6 @@
     "kann_auge": "Sees images",
     "kann_gluehbirne": "Thinks before answering",
     "kann_blitz": "Speed module (MTP)",
-    "satz_gemma31": "The flagship of the tool-calling family. Dense, steady through long agent runs, sees images.",
-    "lang_gemma31": "The flagship of the tool-calling family. Trained to call tools natively, dense across every answer, and steady through long agent runs. Ships with vision and its own speed module — both fetched automatically and matched exactly to this model.",
     "satz_gemma12": "Same family, half the weight. The pick for 16 GB machines — tools, vision and the speed module included.",
     "lang_gemma12": "The same tool-calling family, at half the weight — the everyday pick for a 16 GB machine. Dense, sees images, and ships with its own speed module, fetched and matched automatically.",
     "satz_bonsai": "One bit per weight — a 27B brain in a 3.8 GB file. Unbeatable per gigabyte, thinks before it answers.",
@@ -807,7 +850,46 @@
     "satz_exeguard": "Our own guardian model — tiny, trained on the terminal's own tools.",
     "lang_exeguard": "Exe Guard Dynamic: our self-trained guardian model. It spots a failed step and suggests the one instruction that fixes it. (Final wording just before release.)",
     "satz_exeturbo": "Our small core model for weak machines — MoE, trained on the terminal.",
-    "lang_exeturbo": "Exe Turbo S: our self-trained core model for machines with 6–8 GB of memory. It computes with only 1.5 of its 8.3 billion parameters per token and knows the terminal's tools and rules."
+    "lang_exeturbo": "Exe Turbo S: our self-trained core model for machines with 6–8 GB of memory. It computes with only 1.5 of its 8.3 billion parameters per token and knows the terminal's tools and rules.",
+    "satz_cyberrealisticxl": "Photoreal SDXL — skin, light and lens that hold up close. The go-to for realistic portraits and scenes.",
+    "satz_juggernautxl": "A broad, dependable SDXL all-rounder: photoreal by default, but at home in most styles you ask of it.",
+    "satz_realisticvision": "The small photoreal standard — SD 1.5, light on memory, and still strikingly real. A go-to base for realistic scenes.",
+    "satz_anythingv5": "The classic anime SD 1.5 — clean lines, bright colour, and light enough for almost any machine.",
+    "satz_toonyou": "Cartoon and stylised characters on SD 1.5 — soft shading, expressive faces, a small download.",
+    "satz_animaginexl": "Anime at SDXL size — sharper detail and higher resolution than the SD 1.5 anime models, for a stronger machine.",
+    "klasse_sdxl": "SDXL",
+    "klasse_sd15": "SD 1.5",
+    "einzeldatei": "single file",
+    "sorte_vae": "VAE",
+    "sorte_lora": "LoRA",
+    "sorte_adetailer": "ADetailer",
+    "sorte_mmproj": "Vision (mmproj)",
+    "sorte_mtp": "Speed (MTP)",
+    "satz_vae_sd15": "The classic SD 1.5 VAE — the part that turns the model's internal numbers into real pixels. Cleaner colours and detail on models shipped without one.",
+    "satz_vae_sdxl": "The fixed SDXL VAE that no longer overflows in fp16 — clean colours without the infamous black tiles.",
+    "satz_lora_lcm_sd15": "The LCM accelerator for SD 1.5 — usable pictures in a handful of steps instead of twenty.",
+    "satz_lora_lcm_sdxl": "The same LCM accelerator for SDXL — few steps, much faster.",
+    "satz_adetailer_face": "Finds faces in the finished picture and repaints each one on its own — the big lever for clean portraits.",
+    "satz_mmproj_gemma": "Vision for Gemma 4 31B — the projector that lets the language model see images. Lands in the model folder.",
+    "satz_mtp_gemma": "The speed module for Gemma 4 31B — a small rider that guesses the next words and speeds up answers.",
+    "ordner_zeigen": "Folder",
+    "satz_zub_lora": "A speed LoRA — usable pictures in a handful of steps instead of twenty.",
+    "satz_zub_vae": "A VAE — turns the model's internal numbers into real pixels, for cleaner colours and detail.",
+    "satz_zub_adetailer": "An ADetailer detector — finds faces, hands or people in the finished picture and sharpens each one.",
+    "satz_zub_mtp": "A speed module (MTP) — rides alongside the language model and speeds up its answers. Lands in the model folder.",
+    "satz_zub_mmproj": "Vision — the projector that lets a language model see images. Lands in the model folder.",
+    "satz_qwen36": "The speed flagship — MoE with its tempo module built in, and eyes via the vision add-on.",
+    "lang_qwen36": "A mixture-of-experts model: 35B on disk, 3B active per token, the tempo module baked into the file, a quarter-million tokens of context. The vision projector rides along with the download.",
+    "satz_qwencoder": "The agent coder — built for tool calls, long runs and big repositories.",
+    "lang_qwencoder": "Trained for agentic coding: tool calls, patient multi-step runs, honest diffs. MoE with 3B active per token, so it answers fast on a 32-GB machine.",
+    "satz_execore": "Our core model — trained on the terminal's own behaviour, tools and rules.",
+    "lang_execore": "A fine-tuned 27B that knows this terminal: every built-in tool, the folder rules, the limits — and it reads tool schemas it has never seen. Trained on behaviour, not facts.",
+    "satz_emb_qwen3": "The modern compact embedder — strong retrieval, 32k context.",
+    "satz_emb_nomic": "The proven all-rounder for local search — small, fast, reliable.",
+    "satz_emb_gemma": "Google's small embedder — light, multilingual, quick.",
+    "satz_emb_bgem3": "The multilingual heavyweight — a hundred languages, 8k context.",
+    "satz_emb_mxbai": "Strong English retrieval in a small file.",
+    "satz_emb_minilm": "The tiny classic — instant, and good enough for quick lookups."
   },
   "terminal": {
     "titel": "Terminal",
@@ -899,5 +981,18 @@
     "dock_weg": "Remove",
     "dock_weg_frage": "Take {name} out of the dock?",
     "anzahl": "{n} notes"
+  },
+  "speicherorte": {
+    "unbekannt": "There is no such storage location.",
+    "leer": "Please give a folder path.",
+    "kein_ordner": "A file already sits there, not a folder.",
+    "nicht_anlegbar": "The folder could not be created there.",
+    "nicht_schreibbar": "The program is not allowed to write into this folder.",
+    "ueberschneidung": "Another storage location already uses this folder.",
+    "oeffnen": "Open",
+    "aendern": "Change location",
+    "frage": "New folder:",
+    "geaendert": "Location changed.",
+    "neustart": "New location set — for models it takes hold after a restart."
   }
 }

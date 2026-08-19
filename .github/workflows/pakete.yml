@@ -46,8 +46,8 @@ jobs:
           # the day somebody with an Intel machine asks for it.
           - os: windows-latest
             name: windows
-          # No Linux package. The platform is not supported, and a build on
-          # the download page is a promise of support that nobody keeps.
+          - os: ubuntu-latest
+            name: linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

@@ -32,7 +32,13 @@ import httpx
 from app import modellzuordnung
 
 BASIS = "https://huggingface.co"
+# What a chat or embedding model may be — the one form the runner starts.
 ENDUNG = ".gguf"
+# What an image model may be. The local drawer (sd.cpp) reads single-file
+# safetensors and gguf, and the big image checkpoints on Hugging Face are
+# almost all safetensors — so the image folder accepts those forms too. Which
+# set applies is decided by the caller (per kind), not hardcoded here.
+BILD_ENDUNGEN = (".safetensors", ".gguf", ".ckpt", ".pt", ".pth")
 UNFERTIG = ".teil"
 
 # Big enough not to wake the loop for every packet, small enough that the bar
@@ -61,10 +67,31 @@ class DownloadFehler(Exception):
         self.grund = grund
 
 
-def _pruefen(datei: str) -> str:
+def _pruefen(datei: str, endungen: tuple[str, ...] = (ENDUNG,)) -> str:
+    """The LOCAL name: strictly flat, no path at all — it names a file that
+    lands directly in a folder we chose, so a slash or a dot-prefix could only
+    be an attempt to write somewhere else."""
     if "/" in datei or "\\" in datei or ".." in datei or datei.startswith("."):
         raise DownloadFehler("name")
-    if not datei.lower().endswith(ENDUNG):
+    if not datei.lower().endswith(endungen):
+        raise DownloadFehler("endung")
+    return datei
+
+
+def _pruefen_fern(datei: str, endungen: tuple[str, ...] = (ENDUNG,)) -> str:
+    """The REMOTE name on the hub: may sit in a sub-folder — a drafter lives at
+    ``MTP/mtp-….gguf``, a projector sometimes one level down — so a forward
+    slash between segments is allowed. Never a traversal, a backslash, a
+    leading slash or dot, or an empty segment: the address is built from this,
+    and the local name is derived from its last segment (flat, re-checked)."""
+    # The per-segment check below already rejects a leading slash (an empty
+    # first segment) and a leading dot (a hidden segment), so those need no
+    # separate guard here; only a traversal and a backslash do.
+    if "\\" in datei or ".." in datei:
+        raise DownloadFehler("name")
+    if any(not teil or teil.startswith(".") for teil in datei.split("/")):
+        raise DownloadFehler("name")
+    if not datei.lower().endswith(endungen):
         raise DownloadFehler("endung")
     return datei
 
@@ -98,6 +125,8 @@ class Modelldownload:
         gehoert_zu: str | None = None,
         rolle: str | None = None,
         ordner: Path | None = None,
+        endungen: tuple[str, ...] = (ENDUNG,),
+        manifest_ordner: Path | None = None,
     ) -> Fortschritt:
         """``ziel`` is the local name, when it must differ from the remote one.
 
@@ -122,16 +151,21 @@ class Modelldownload:
                 raise DownloadFehler("laeuft_schon")
 
             zielordner = Path(ordner).expanduser() if ordner else self._ordner
-            _pruefen(datei)
-            ziel = _pruefen(ziel) if ziel else datei
+            _pruefen_fern(datei, endungen)
+            # The local name: the given one, or the remote's last segment — the
+            # sub-folder never rides along into our folder.
+            ziel = _pruefen(ziel, endungen) if ziel else _pruefen(datei.rsplit("/", 1)[-1], endungen)
             if (zielordner / ziel).is_file():
                 raise DownloadFehler("schon_da")
 
+            # The manifest belongs to the MODEL folder, not the companion's
+            # sub-folder: the runner reads the bond from where the model lies.
+            manifest = Path(manifest_ordner).expanduser() if manifest_ordner else zielordner
             self._abbruch.clear()
             self._stand = Fortschritt(datei=ziel, geladen=0, gesamt=0)
             threading.Thread(
                 target=self._holen,
-                args=(repo, datei, ziel, gehoert_zu, rolle, zielordner),
+                args=(repo, datei, ziel, gehoert_zu, rolle, zielordner, manifest),
                 daemon=True,
             ).start()
             return self._stand
@@ -144,8 +178,10 @@ class Modelldownload:
         gehoert_zu: str | None = None,
         rolle: str | None = None,
         ordner: Path | None = None,
+        manifest_ordner: Path | None = None,
     ) -> None:
         zielordner = ordner if ordner is not None else self._ordner
+        manifest_ordner = manifest_ordner if manifest_ordner is not None else zielordner
         zielordner.mkdir(parents=True, exist_ok=True)
         ziel = zielordner / ziel_name
         halb = zielordner / (ziel_name + UNFERTIG)
@@ -184,7 +220,7 @@ class Modelldownload:
             # The bond is recorded only after the file is truly in place, so a
             # cancelled or failed fetch leaves no dangling manifest entry.
             if gehoert_zu and rolle:
-                modellzuordnung.eintragen(zielordner, gehoert_zu, rolle, ziel_name)
+                modellzuordnung.eintragen(manifest_ordner, gehoert_zu, rolle, ziel_name)
 
             if self._stand:
                 self._stand.geladen = ziel.stat().st_size

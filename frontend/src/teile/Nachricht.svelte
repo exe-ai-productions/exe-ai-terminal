@@ -10,6 +10,7 @@
   import { bildZeigen } from '../lib/bildschau.svelte.js'
   import Werkzeugzeichen from './Werkzeugzeichen.svelte'
   import Wartezeile from './Wartezeile.svelte'
+  import Bildfuellung from './Bildfuellung.svelte'
 
   let {
     nachricht, istLetzte = false, laeuft = false, neuErzeugen,
@@ -21,6 +22,28 @@
   let offeneWerkzeuge = $state(new Set())
 
   const istVonMir = $derived(nachricht.role === 'user')
+
+  /* The generated picture's display size, known BEFORE the picture exists:
+     the ordered dimensions scaled into the 540 cap. While the painter works
+     the frame stands at 75% of that; the moment the picture is there the
+     same frame grows to the full size. Without known dimensions (messages
+     from the server's history) the picture renders at its natural size as
+     before and nothing animates. */
+  const BILD_DECKEL = 540
+  const bildFlaeche = $derived.by(() => {
+    const b = nachricht.bildMasse?.breite, h = nachricht.bildMasse?.hoehe
+    if (!b || !h) {
+      if (!nachricht.bildLaeuft) return null
+      // Working frame without known dimensions: 75% of the square cap.
+      return { breite: Math.round(BILD_DECKEL * 0.75), seite: '1 / 1' }
+    }
+    const faktor = Math.min(1, BILD_DECKEL / b, BILD_DECKEL / h)
+    const voll = Math.round(b * faktor)
+    return {
+      breite: nachricht.bildLaeuft ? Math.round(voll * 0.75) : voll,
+      seite: `${b} / ${h}`,
+    }
+  })
 
   /* A picked skill stands in the text as it was typed, so it is stored and
      survives a reload. Here it is only drawn apart: the name as a pill, the
@@ -120,6 +143,12 @@
     navigator.clipboard
       .writeText(nachricht.content || '')
       .then(() => melde(t('nachricht.kopiert'), 'erfolg'))
+  }
+
+  function seedKopieren(seed) {
+    navigator.clipboard
+      .writeText(String(seed))
+      .then(() => melde(t('nachricht.seed_kopiert'), 'erfolg'))
   }
 
   /* Buttons inside a rendered answer only come into being at render time,
@@ -229,31 +258,76 @@
   </div>
 {:else}
   <div class="von-ki">
-    {#if nachricht.bild}
-      <!-- A generated image (image mode): card with zoom and save. -->
-      <div class="ki-bild">
-      <div class="bildrahmen">
-        <button class="bildknopf" onclick={() => bildZeigen(api.bildAdresse(nachricht.bild))}
-                aria-label={t('nachricht.bild_vergroessern')}>
-          <img class="bildanhang" src={api.bildAdresse(nachricht.bild)} alt="" loading="lazy" />
-        <span class="bildecke rechts" aria-hidden="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 4 H4 V10" />
-            <path d="M14 20 H20 V14" />
-          </svg>
-        </span>
-      </button>
-      <a class="bildecke links" href={api.bildAdresse(nachricht.bild)} download
-         aria-label={t('nachricht.bild_sichern')}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 4 V15" />
-          <path d="M7 11 L12 16 L17 11" />
-          <path d="M4 20 H20" />
-        </svg>
-      </a>
-      </div>
+    {#if nachricht.bild || nachricht.bildLaeuft}
+      <!-- A generated image: the light-edge frame, the picture rounded into
+           it, and a foot strip that carries what used to sit ON the picture —
+           save on the left, the seed (with a quick copy) in the middle, and
+           enlarge on the right. The seed comes from the message's own stats.
+           The SAME frame already stands while the painter works: the liquid
+           fill inside at 75% size, growing to the full size with the picture
+           the moment it is finished — one element, so the growth is smooth. -->
+      {#if nachricht.bildLaeuft}
+        <div class="bild-kopf">{t('nachricht.bild_laeuft')}</div>
+      {/if}
+      <div class="erzeugt">
+        {#if bildFlaeche}
+          <div class="erzeugt-flaeche" class:mitfuss={Boolean(nachricht.bild)}
+               style={`width:${bildFlaeche.breite}px;aspect-ratio:${bildFlaeche.seite}`}>
+            {#if nachricht.bild}
+              <button class="erzeugt-bild gefuellt" onclick={() => bildZeigen(api.bildAdresse(nachricht.bild))}
+                      aria-label={t('nachricht.bild_vergroessern')}>
+                <!-- The painter may snap ordered dimensions to its grid; the
+                     stage follows the REAL picture once it is here, so cover
+                     never crops a sliver off a rounded edge. -->
+                <img class="gemalt" src={api.bildAdresse(nachricht.bild)} alt="" loading="lazy"
+                     onload={(e) => {
+                       const b = e.currentTarget.naturalWidth, h = e.currentTarget.naturalHeight
+                       if (b && h && nachricht.bildMasse
+                           && (nachricht.bildMasse.breite !== b || nachricht.bildMasse.hoehe !== h)) {
+                         nachricht.bildMasse = { breite: b, hoehe: h }
+                       }
+                     }} />
+              </button>
+            {:else}
+              <Bildfuellung fuellen />
+            {/if}
+          </div>
+        {:else}
+          <button class="erzeugt-bild" onclick={() => bildZeigen(api.bildAdresse(nachricht.bild))}
+                  aria-label={t('nachricht.bild_vergroessern')}>
+            <img class="bildanhang" src={api.bildAdresse(nachricht.bild)} alt="" loading="lazy" />
+          </button>
+        {/if}
+        {#if nachricht.bild}
+        <div class="erzeugt-fuss">
+          <a class="fusstat" href={api.bildAdresse(nachricht.bild)} download
+             aria-label={t('nachricht.bild_sichern')} title={t('nachricht.bild_sichern')}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 4 V15" /><path d="M7 11 L12 16 L17 11" /><path d="M4 20 H20" />
+            </svg>
+          </a>
+          <span class="fussmitte">
+            {#if nachricht.stats?.seed != null}
+              <button class="seedkopie" onclick={() => seedKopieren(nachricht.stats.seed)}
+                      title={t('nachricht.seed_kopieren')}>
+                <span class="seedwert">{t('nachricht.seed_label', { zahl: nachricht.stats.seed })}</span>
+                <svg class="kopfzeichen" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15 V5 a2 2 0 0 1 2-2 h10" />
+                </svg>
+              </button>
+            {/if}
+          </span>
+          <button class="fusstat" onclick={() => bildZeigen(api.bildAdresse(nachricht.bild))}
+                  aria-label={t('nachricht.bild_vergroessern')} title={t('nachricht.bild_vergroessern')}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 4 H4 V10" /><path d="M14 20 H20 V14" />
+            </svg>
+          </button>
+        </div>
+        {/if}
       </div>
     {/if}
     {#if nachricht.reasoning}
@@ -328,25 +402,20 @@
           />
         </div>
       {/if}
-    {:else if nachricht.bildLaeuft}
-      <!-- Image generation running: the status stands as a header EXACTLY
-           at the spot of the reasoning text, the mark below it — all
-           three waiting states thus share the same
-           structure. -->
-      <div class="bild-kopf">{t('nachricht.bild_laeuft')}</div>
-      <Wartezeile art="bild" beschriftung={t('nachricht.bild_laeuft')} />
-    {:else if laeuft}
+    {:else if laeuft && !nachricht.bildLaeuft}
       <!-- While nothing is there yet: show that work is happening. The
            empty-answer notice would be wrong here — it just isn't
            finished yet. Without text: that an answer
-           is coming explains itself. -->
+           is coming explains itself. A working picture already shows its
+           own frame above; a second status mark would contradict it. -->
       <Wartezeile
         art={nachricht.vision ? 'vision' : 'antwort'}
         beschriftung={t('status.erzeugt_antwort')}
       />
-    {:else if !nachricht.bild}
+    {:else if !nachricht.bild && !nachricht.bildLaeuft}
       <!-- An image answer has empty text — that is its normal state, not
-           a "wrote nothing". -->
+           a "wrote nothing". The frame of a running picture stands above
+           already; it needs no second word down here. -->
       <div class="abgebrochen">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round">
@@ -385,9 +454,11 @@
     align-self: flex-end;
     max-width: 76%;
     /* The one surface the user may recolour; the ink flips with the
-       ground's luminance so no choice can make it unreadable. */
-    background: var(--blase-eigen, var(--blase));
-    color: var(--blase-eigen-text, inherit);
+       ground's luminance so no choice can make it unreadable. The chain:
+       the user's own pick wins, else a theme's own default (Dark Matter ships
+       a lavender here), else the plain house bubble. */
+    background: var(--blase-eigen, var(--blase-eigen-standard, var(--blase)));
+    color: var(--blase-eigen-text, var(--blase-eigen-text-standard, inherit));
     border-radius: 16px;
     padding: 10px 15px;
     line-height: 1.55;
@@ -486,8 +557,10 @@
   }
   .bildanhang {
     display: block;
-    max-width: 360px;
-    max-height: 360px;
+    /* Larger preview (L): min() keeps it within the bubble on a narrow
+       window, so it grows on a wide screen but never overflows. */
+    max-width: min(540px, 100%);
+    max-height: 540px;
     border-radius: 0;
   }
 
@@ -526,30 +599,120 @@
     background: var(--blase);
     border-radius: 12px;
   }
-  .ki-bild {
-    border: 1px solid var(--linie);
-    /* 12 — it is a surface, and the palette gives surfaces 12. */
-    border-radius: 12px;
-    background: var(--bg-erhoben);
-    padding: 5px;
+  /* The generated picture's frame: a one-pixel light edge (brighter at the
+     top, as if lit from above), the picture rounded into it, and a foot strip
+     below for save / seed / enlarge. fit-content so the frame hugs the
+     picture at whatever size it came out, up to the image's 540 cap. */
+  .erzeugt {
     width: fit-content;
+    max-width: 100%;
     margin-bottom: 6px;
+    padding: 1px;
+    border-radius: 11px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 42%, rgba(0, 0, 0, 0.4));
+    box-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.6);
   }
-  .ki-bild-zeile {
+  .erzeugt-bild {
+    display: block;
+    border: none;
+    background: none;
+    padding: 0;
+    line-height: 0;
+    cursor: zoom-in;
+    /* Rounded top corners only — the bottom meets the foot strip. overflow
+       clips the picture into the radius, trimming just the corner. */
+    border-radius: 10px 10px 0 0;
+    overflow: hidden;
+  }
+  /* The sized stage inside the frame, same element in both states: liquid
+     fill while the painter works, the picture when it is done. Its width is
+     set inline (75% growing to 100%), the height follows the ordered aspect
+     ratio — so the one transition on width IS the whole growth. */
+  .erzeugt-flaeche {
+    position: relative;
+    max-width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-erhoben);
+    transition: width 0.55s ease, border-radius 0.3s ease;
+  }
+  /* With the foot strip below, the bottom corners belong to the strip. */
+  .erzeugt-flaeche.mitfuss { border-radius: 10px 10px 0 0; }
+  .erzeugt-bild.gefuellt {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .gemalt {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .erzeugt-flaeche { transition: none; }
+  }
+  .erzeugt-fuss {
     display: flex;
-    justify-content: flex-end;
-    padding: 5px 7px 2px;
-    font-size: 12px;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    background: var(--bg-erhoben);
+    border-radius: 0 0 10px 10px;
   }
-  .ki-bild-zeile a {
+  .fusstat {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 26px;
+    border: none;
+    background: none;
     color: var(--text-still);
+    border-radius: 7px;
+    cursor: pointer;
     text-decoration: none;
-    padding: 2px 6px;
-    border-radius: 6px;
+    transition: background 0.12s, color 0.12s;
   }
-  .ki-bild-zeile a:hover {
+  .fusstat:hover {
     background: var(--linie);
     color: var(--text);
+  }
+  /* The seed sits centred and spreads only as wide as it needs; the two
+     icons hold the ends. */
+  .fussmitte {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .seedkopie {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    border: none;
+    background: none;
+    color: var(--text-still);
+    font: 400 11.5px var(--schrift-fest, ui-monospace, monospace);
+    padding: 3px 9px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .seedkopie:hover {
+    background: var(--linie);
+    color: var(--text);
+  }
+  .seedwert {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .seedkopie .kopfzeichen {
+    flex: none;
+    opacity: 0.8;
   }
   .von-ki {
     max-width: 92%;
@@ -681,7 +844,7 @@
   :global(:root[data-blasen='kontur']) .von-mir {
     background: transparent;
     color: inherit;
-    box-shadow: inset 0 0 0 1px var(--blase-eigen, var(--linie-stark));
+    box-shadow: inset 0 0 0 1px var(--blase-eigen, var(--blase-eigen-standard, var(--linie-stark)));
   }
   /* Keeps the footer at height so the text doesn't jump when finishing. */
   .platzhalter {

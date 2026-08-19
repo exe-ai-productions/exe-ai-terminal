@@ -18,7 +18,7 @@
   import Leuchtpunkt from './Leuchtpunkt.svelte'
   import { t } from '../lib/texte.svelte.js'
   import { LOGOS } from '../lib/logos.js'
-  import { brauchtMaschine } from '../lib/modellempfehlungen.js'
+  import { brauchtMaschine, FAEHIGKEIT_FARBE, SORTE_FARBE, SORTE_LABEL as SORTE } from '../lib/modellempfehlungen.js'
 
   let {
     karte,
@@ -33,19 +33,29 @@
     onStart,
   } = $props()
 
-  const kontextK = $derived(Math.round(karte.kontext / 1024))
-  const bauzahl = $derived(karte.fassungen.length)
+  /* An image card has no context window and no row of builds — it is one
+     file of a class. Guarded so the chat facts (context, build count) never
+     read NaN on it. */
+  const kontextK = $derived(karte.kontext ? Math.round(karte.kontext / 1024) : 0)
+  const bauzahl = $derived(karte.fassungen?.length ?? 1)
   const marke = $derived(karte.marke ? LOGOS[karte.marke] : null)
+  const KLASSE = { sdxl: 'katalog.klasse_sdxl', sd15: 'katalog.klasse_sd15' }
+  /* An accessory shows its kind instead of a class — that is the one thing
+     that tells a VAE from a LoRA from a face detector at a glance. Its labels
+     come from the shared SORTE_LABEL map (imported as SORTE). */
 
   /* Full keys in a map, not built inside t(): a composed t('x_'+f) would
      read as a broken key to the interface-text check. */
   const KANN = {
-    winkel: 'katalog.kann_winkel',
+    werkzeug: 'katalog.kann_winkel',
     auge: 'katalog.kann_auge',
     gluehbirne: 'katalog.kann_gluehbirne',
     blitz: 'katalog.kann_blitz',
     eew: 'katalog.kann_eew',
   }
+
+  /* The accessory's tag colour, used for its corner pill and logo. */
+  const farbe = $derived(SORTE_FARBE[karte.sorte] ?? 'var(--text-leise)')
 
   function halt(e, fn) {
     e.stopPropagation()
@@ -56,11 +66,42 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="karte"
+  class:zub={karte.zubehoer}
   role="button"
   tabindex="0"
   onclick={onOeffnen}
   onkeydown={(e) => { if (e.key === 'Enter') onOeffnen?.() }}
 >
+  {#if karte.zubehoer}
+    <!-- The compact accessory card: a coloured tag in the corner, the name on
+         one line, maker and size on the next, then one full-width button.
+         No VRAM plaque (a companion has no memory cost of its own). -->
+    <span class="zpille" style={`color:${farbe};border-color:${farbe}55;background:${farbe}18`}>
+      {t(SORTE[karte.sorte] ?? 'katalog.sorte_vae')}
+    </span>
+    <div class="zlogo" style={`border-color:${farbe}66;color:${farbe}`}>{karte.logo}</div>
+    <div class="zname">
+      {karte.name}
+      {#if karte.klasse}
+        <!-- Class-bound accessories (LoRA, VAE) name their class in full
+             text colour — an SD-1.5 file on an XL model was a real mishap,
+             so the answer stands beside the name, not in fine print. -->
+        <span class="zklasse">{t(KLASSE[karte.klasse] ?? 'katalog.klasse_sd15')}</span>
+      {/if}
+    </div>
+    <div class="zinfo">
+      <span class="zvon">{karte.von}</span>
+      <span class="zgb">{t('modell.gb', { zahl: fassung.groesse })}</span>
+    </div>
+    {#if status === 'laedt'}
+      <div class="laufbalken"><span class="balken"><i style="width:{fortschritt?.anteil ?? 0}%"></i></span></div>
+      <button class="knopf still voll" onclick={(e) => halt(e, onCancel)}>{t('katalog.abbrechen')}</button>
+    {:else if status === 'bereit'}
+      <span class="zda"><Leuchtpunkt farbe="still" groesse={7} /> {t('katalog.im_ordner')}</span>
+    {:else}
+      <button class="knopf wichtig voll" onclick={(e) => halt(e, onDownload)}>{t('katalog.herunterladen')}</button>
+    {/if}
+  {:else}
   {#if !passt}
     <span class="plakette">{t('katalog.braucht_maschine', { gb: brauchtMaschine(fassung) })}</span>
   {/if}
@@ -83,17 +124,32 @@
   <div class="satz">{t(karte.satz)}</div>
 
   <div class="zeichenreihe">
-    {#each karte.faehigkeiten as f (f)}
-      <span class="zeichen" title={t(KANN[f])}>{#if f === 'eew'}<EEWzeichen groesse={22} />{:else}<Hauszeichen zeichen={f} groesse="mittel" />{/if}</span>
-    {/each}
+    {#if karte.zubehoer}
+      <!-- An accessory shows its kind: VAE, LoRA, face detector, projector,
+           drafter. That, not a class, is what sets it apart. -->
+      <span class="klassepille">{t(SORTE[karte.sorte] ?? 'katalog.sorte_vae')}</span>
+    {:else if karte.bild}
+      <!-- An image model shows the one sign that decides how it draws: its
+           class, which sets the resolution it opens at. -->
+      <span class="klassepille">{t(KLASSE[karte.klasse] ?? 'katalog.klasse_sd15')}</span>
+    {:else}
+      {#each karte.faehigkeiten as f (f)}
+        <span class="zeichen" title={t(KANN[f])} style={FAEHIGKEIT_FARBE[f] ? `color:${FAEHIGKEIT_FARBE[f]}` : undefined}>{#if f === 'eew'}<EEWzeichen groesse={22} />{:else}<Hauszeichen zeichen={f} groesse="mittel" />{/if}</span>
+      {/each}
+    {/if}
   </div>
 
   <div class="fakten">
     <span>{t('modell.gb', { zahl: fassung.groesse })}</span>
-    <span>·</span>
-    <span>{t('katalog.n_kontext', { n: kontextK })}</span>
-    <span>·</span>
-    <span>{bauzahl === 1 ? t('katalog.bau_eins') : t('katalog.bau_mehr', { n: bauzahl })}</span>
+    {#if karte.bild}
+      <span>·</span>
+      <span>{t('katalog.einzeldatei')}</span>
+    {:else}
+      <span>·</span>
+      <span>{t('katalog.n_kontext', { n: kontextK })}</span>
+      <span>·</span>
+      <span>{bauzahl === 1 ? t('katalog.bau_eins') : t('katalog.bau_mehr', { n: bauzahl })}</span>
+    {/if}
   </div>
 
   {#if status === 'bereit'}
@@ -114,6 +170,7 @@
       <button class="knopf wichtig" onclick={(e) => halt(e, onDownload)}>{t('katalog.herunterladen')}</button>
     </div>
   {/if}
+  {/if}
 </div>
 
 <style>
@@ -133,6 +190,85 @@
   .karte:hover {
     border-color: var(--linie-stark);
   }
+
+  /* The compact accessory card: tighter, single line per row, a coloured tag
+     in the corner and the size as a bright monospace value. */
+  .karte.zub {
+    gap: 8px;
+    padding: 12px 13px;
+  }
+  .zpille {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1px solid;
+    border-radius: 99px;
+    padding: 2px 9px;
+  }
+  .zlogo {
+    width: 30px;
+    height: 30px;
+    border: 1px dashed;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .zname {
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* The class pill of a class-bound accessory — full text colour, so the
+     SD 1.5 / SDXL question is answered before anything is downloaded. */
+  .zklasse {
+    display: inline-block;
+    margin-left: 6px;
+    border: 1px solid var(--text-still);
+    border-radius: 99px;
+    padding: 1px 8px;
+    font: 600 10.5px var(--schrift);
+    color: var(--text);
+    vertical-align: 1px;
+  }
+  .zinfo {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .zvon {
+    font-size: 11px;
+    color: var(--text-still);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The size stands out as a technical value: brighter, bolder, monospace. */
+  .zgb {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-leise);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: -0.01em;
+    flex: none;
+  }
+  .zda {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--text-still);
+  }
+  .knopf.voll {
+    width: 100%;
+  }
   /* Colourless on purpose: a fit is a fact, so it carries brightness and a
      border, not a state colour. */
   .plakette {
@@ -150,12 +286,12 @@
     position: absolute;
     bottom: 20px;
     left: 20px;
-    background: #241d0e;
-    border: 1px solid #b8912e;
+    background: #241d46;
+    border: 1px solid #7d6cba;
     border-radius: 99px;
     padding: 2px 9px;
     font: 600 10px var(--schrift);
-    color: #e7ce7a;
+    color: #cbbcee;
     white-space: nowrap;
   }
   .oben {
@@ -216,6 +352,15 @@
   }
   .zeichen {
     display: inline-flex;
+  }
+  /* The image model's class, worn as a quiet pill — a fact about the model,
+     so it carries a border, not a state colour. */
+  .klassepille {
+    border: 1px solid var(--linie-stark);
+    border-radius: 99px;
+    padding: 2px 10px;
+    font: 600 11px var(--schrift);
+    color: var(--text-leise);
   }
   .fakten {
     display: flex;

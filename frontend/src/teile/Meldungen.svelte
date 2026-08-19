@@ -106,6 +106,9 @@
     flex: 1;
     min-width: 0;
     overflow-wrap: anywhere;
+    /* Errors may carry the painter's raw log below the sentence — the
+       line breaks of that log are meaning, so they stay. */
+    white-space: pre-line;
   }
   .zu {
     flex: none;

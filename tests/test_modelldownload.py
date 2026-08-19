@@ -92,17 +92,60 @@ def test_waehrend_es_laeuft_heisst_die_datei_anders(tmp_path, strom):
 # --- Where it has to refuse -----------------------------------------------
 
 
-@pytest.mark.parametrize("datei", ["../weg.gguf", "unter/tief.gguf", ".versteckt.gguf"])
+@pytest.mark.parametrize(
+    "datei", ["../weg.gguf", "unter/../weg.gguf", ".versteckt.gguf", "/weg.gguf", "unter/.geheim.gguf"]
+)
 def test_ein_name_ist_nie_ein_pfad(tmp_path, datei):
+    """A traversal, a leading slash or dot, or a hidden segment is refused —
+    on the remote name too, even though a plain sub-folder is now allowed."""
     with pytest.raises(DownloadFehler) as fehler:
         Modelldownload(tmp_path).starten("repo", datei)
     assert fehler.value.grund == "name"
 
 
+def test_ein_remote_unterordner_ist_erlaubt(tmp_path, strom):
+    """A drafter lives at MTP/…gguf on the hub — the remote name may sit in a
+    sub-folder. The local file keeps only the flat last segment; the folder
+    never rides along."""
+    strom(b"m" * 4096)
+    download = Modelldownload(tmp_path)
+    download.starten("repo", "MTP/mtp-modell.gguf")
+    assert warten_bis(lambda: download.stand().fertig)
+    assert (tmp_path / "mtp-modell.gguf").is_file()
+    assert not (tmp_path / "MTP").exists()
+
+
+def test_der_lokale_name_bleibt_flach(tmp_path):
+    """`ziel` names a file in our folder — it must never be a path."""
+    with pytest.raises(DownloadFehler) as fehler:
+        Modelldownload(tmp_path).starten("repo", "MTP/x.gguf", ziel="unter/x.gguf")
+    assert fehler.value.grund == "name"
+
+
 @pytest.mark.parametrize("datei", ["modell.safetensors", "modell.bin", "modell"])
 def test_nur_gguf_wird_geholt(tmp_path, datei):
+    """Default (chat/embedding): GGUF only, the one form the runner starts."""
     with pytest.raises(DownloadFehler) as fehler:
         Modelldownload(tmp_path).starten("repo", datei)
+    assert fehler.value.grund == "endung"
+
+
+def test_bild_darf_safetensors_holen(tmp_path, strom):
+    """An image model is safetensors — the image folder accepts it, and the
+    endings the caller allows decide, not a hardcoded .gguf."""
+    from app.modelldownload import BILD_ENDUNGEN
+    strom(b"abc")
+    download = Modelldownload(tmp_path)
+    download.starten("repo/bild", "CyberRealisticXL.safetensors", endungen=BILD_ENDUNGEN)
+    assert warten_bis(lambda: download.stand().fertig)
+    assert (tmp_path / "CyberRealisticXL.safetensors").is_file()
+
+
+def test_bild_lehnt_eine_zip_trotzdem_ab(tmp_path):
+    """The set is the image forms, not everything — a .zip is still refused."""
+    from app.modelldownload import BILD_ENDUNGEN
+    with pytest.raises(DownloadFehler) as fehler:
+        Modelldownload(tmp_path).starten("repo", "modell.zip", endungen=BILD_ENDUNGEN)
     assert fehler.value.grund == "endung"
 
 
@@ -178,14 +221,19 @@ def test_ein_begleiter_wird_im_manifest_vermerkt(tmp_path, strom):
     # later reads it instead of guessing from name prefixes.
     strom(b"abc")
     download = Modelldownload(tmp_path)
+    # The projector lands in the vision sub-folder; the bond is written to the
+    # model folder (the root), where the runner reads it.
     download.starten(
         "wer/was",
         "mmproj-BF16.gguf",
         ziel="modell-mmproj-BF16.gguf",
         gehoert_zu="modell.gguf",
         rolle="mmproj",
+        ordner=tmp_path / "vision",
+        manifest_ordner=tmp_path,
     )
     assert warten_bis(lambda: download.stand().fertig)
+    assert (tmp_path / "vision" / "modell-mmproj-BF16.gguf").is_file()
     assert (
         modellzuordnung.fuer(tmp_path, "modell.gguf")["mmproj"]
         == "modell-mmproj-BF16.gguf"

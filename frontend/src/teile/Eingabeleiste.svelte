@@ -6,6 +6,7 @@
   import Ordnerpillen from './Ordnerpillen.svelte'
   import Skillliste from './Skillliste.svelte'
   import Bildfenster from './Bildfenster.svelte'
+  import Hauszeichen from './Hauszeichen.svelte'
   import Tempoanzeige from './Tempoanzeige.svelte'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
   import { gefiltert, skillAmAnfang, skills, skillsLaden } from '../lib/skills.svelte.js'
@@ -17,7 +18,7 @@
     zustand, werkzeugfrageBeantworten, benutzerfrageBeantworten, melde, aktuellerChat,
   } from '../lib/zustand.svelte.js'
 
-  let { senden, abbrechen, bildErzeugen, bildStoppen, bildZeichnen, bildLokalLaeuft = false, tempo, schlank = false, gruss = null } = $props()
+  let { senden, abbrechen, bildStoppen, bildZeichnen, bildLokalLaeuft = false, tempo, schlank = false, gruss = null } = $props()
 
   /* The three things the bar can be doing, in the house's colours: waiting
      for the first token is a wait, a running answer is a run, and anything
@@ -36,24 +37,59 @@
      enabling, the image server is honestly checked — the red line says
      when none is there (reachability is the operator's/arbiter's
      business). */
-  let bildmodus = $state(false)
   /* The parameter window for the picture made on this machine. */
   let bildfensterOffen = $state(false)
-  /* Picture servers configured by the user. Empty on a normal installation,
-     and then the image mode entry does not appear at all — one picture
-     entry in the menu, not two that sound alike. Fetched when the menu
-     opens rather than at startup: nobody needs it until then. */
-  let eigeneBildserver = $state([])
+
+  /* Image-Turbo: the optional persistent picture server. It is switched INSIDE
+     the picture window now (its animated gauge lives in that window's header);
+     here we only READ its state to tint the plus-menu's picture icon. */
+  let turboZustand = $state('aus')
+  const turboAn = $derived(turboZustand === 'bereit' || turboZustand === 'zeichnet')
+
+  async function turboStandHolen() {
+    try {
+      turboZustand = (await api.turboStand()).zustand ?? 'aus'
+    } catch {
+      turboZustand = 'aus'
+    }
+  }
+
+  /* Whether the local generator is ready to draw at all (program + model) —
+     the same "bereit" the Bildserver tile in the local tab shows. */
+  let bildStand = $state('')
+  async function bildStandHolen() {
+    try {
+      bildStand = (await api.bildmodelle()).stand ?? ''
+    } catch {
+      bildStand = ''
+    }
+  }
+
+  /* The picture icon is a status light: blue (+ pulse) while Turbo runs, else
+     GREEN as soon as the generator is ready to draw, else red on a turbo fault,
+     else grey. */
+  const bildIconFarbe = $derived(
+    turboAn
+      ? 'var(--blau)'
+      : bildStand === 'bereit' || bildStand === 'zeichnet'
+        ? 'var(--gruen)'
+        : turboZustand === 'fehler'
+          ? 'var(--rot)'
+          : 'var(--linie-stark)',
+  )
+
+  /* While the menu is open, keep the plaque colour fresh — the server may
+     still be loading its model (blue → green) after a start. */
   $effect(() => {
     if (!menueOffen) return
-    api.bildEndpunkte().then((e) => (eigeneBildserver = e)).catch(() => (eigeneBildserver = []))
+    turboStandHolen()
+    bildStandHolen()
+    const uhr = setInterval(() => {
+      turboStandHolen()
+      bildStandHolen()
+    }, 2000)
+    return () => clearInterval(uhr)
   })
-  /* Their names, as one line. Built here rather than in the markup: an
-     expression that wraps across lines reads to the house-rule test as
-     hard-coded words, and it is easier to read here anyway. */
-  const bildserverNamen = $derived(eigeneBildserver.map((e) => e.id).join(' · '))
-  let bildserverDa = $state(true)
-  let erzeugtGerade = $state(false)
 
   /* The slash list. It is open only while a slash stands at the very front
      and no space has followed the name yet — from the first space on, the
@@ -61,7 +97,7 @@
   let skillDran = $state(0)
   const skillFilter = $derived(/^\/([a-z0-9-]*)$/.exec(text)?.[1] ?? null)
   const skillTreffer = $derived(skillFilter === null ? [] : gefiltert(skillFilter))
-  const skillOffen = $derived(!bildmodus && skillTreffer.length > 0)
+  const skillOffen = $derived(skillTreffer.length > 0)
 
   $effect(() => {
     void skillFilter
@@ -78,26 +114,6 @@
     hoeheAnpassen()
   }
 
-  async function bildmodusSchalten() {
-    menueOffen = false
-    bildmodus = !bildmodus
-    if (bildmodus) {
-      anhangEntfernen()
-      dokumentEntfernen()
-      try {
-        const endpunkte = await api.bildEndpunkte()
-        bildserverDa = endpunkte.some((e) => e.erreichbar)
-      } catch {
-        bildserverDa = false
-      }
-      /* An unreachable server is a notice, not a label. It used to be a red
-         line glued under the prompt, where it stayed for as long as the mode
-         did — the house has one place for something that went wrong, and
-         this is it. */
-      if (!bildserverDa) melde(t('fehler.bildserver_fehlt'), 'fehler')
-    }
-    setTimeout(() => feld?.focus(), 60)
-  }
 
   const laeuftGerade = $derived(Boolean(zustand.laeuft))
 
@@ -116,6 +132,12 @@
   const denkFaehig = $derived(
     Boolean(zustand.modelle.find((m) => m.id === zustand.modellId)?.capabilities?.thinking),
   )
+
+  /* The tool lamp beside it: can the chosen model call tools? Resolved
+     capability from the discovery, no per-model special cases. */
+  const werkzeugFaehig = $derived(
+    Boolean(zustand.modelle.find((m) => m.id === zustand.modellId)?.capabilities?.tool_calls),
+  )
   let denken = $state(true)
   $effect(() => {
     if (!zustand.modellId) return
@@ -127,12 +149,32 @@
     localStorage.setItem('denken:' + zustand.modellId, denken ? 'an' : 'aus')
   }
 
+  /* The MTP lamp next to the thinking switch: a read-only indicator that the
+     speed module is truly running on the local server. Grey off, blue on —
+     read off the runner's honest flag (the same one the drawer used to show).
+     Polled gently; the state only changes when a server starts or stops. */
+  let mtpAktiv = $state(false)
+  $effect(() => {
+    let lebt = true
+    const holen = async () => {
+      try {
+        const s = await api.runnerAuskunft()
+        if (lebt) mtpAktiv = s?.mtp_aktiv === 'aktiv'
+      } catch {
+        if (lebt) mtpAktiv = false
+      }
+    }
+    holen()
+    const uhr = setInterval(holen, 6000)
+    return () => { lebt = false; clearInterval(uhr) }
+  })
+
   const leer = $derived(!text.trim() && !anhang && !dokumentAnhang)
   /* The action button shows the stop sign only while a run has nothing to
      send beside it — with something in the field, sending (into the queue)
      is what the hand is after. Image generation is not queued and keeps
      its own stop. */
-  const stoppt = $derived(erzeugtGerade || bildLokalLaeuft || (laeuftGerade && leer))
+  const stoppt = $derived(bildLokalLaeuft || (laeuftGerade && leer))
   const BILD_TYPEN = ['image/png', 'image/jpeg', 'image/webp']
 
   /* Document attachment (4.1): image OR document, never
@@ -285,23 +327,6 @@
 
   async function absenden() {
     const inhalt = text.trim()
-    if (bildmodus) {
-      /* `bildLokalLaeuft` as well as the local flag: a picture started from
-         the picture window sets only the app-wide one, and the generator
-         takes one job at a time. Without this the second order goes out,
-         the service refuses it, and the refusal lands on top of the answer
-         that was still being written. The stop button beside this already
-         treats the two as one fact. */
-      if (!inhalt || erzeugtGerade || bildLokalLaeuft || !bildserverDa) return
-      erzeugtGerade = true
-      text = ''
-      try {
-        await bildErzeugen(inhalt)
-      } finally {
-        erzeugtGerade = false
-      }
-      return
-    }
     if (!inhalt && !anhang && !dokumentAnhang) return
     /* A run with no chat behind it: the chat was left with ⌘N or the "+"
        button while an answer was still going. Queueing here would file the
@@ -471,45 +496,35 @@
          that one talks to a picture server, this one runs a program on this
          machine with nothing leaving it — and it has six numbers, which is
          why it opens a window instead of switching the input field. -->
-    <button
-      role="menuitem"
-      onclick={() => {
-        menueOffen = false
-        bildfensterOffen = true
-      }}
-    >
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <circle cx="8.5" cy="9.5" r="1.6" />
-        <path d="M4 17l4.5-5 3.5 4 3-2.5L20 17" />
-      </svg>
-      <span>
-        {t('bild.titel')}
-        <span class="menuehinweis">{t('bild.hier_hinweis')}</span>
-      </span>
-    </button>
-    <!-- Image mode belongs to a picture server somebody configured
-         themselves. Without one it is not a feature that is switched off,
-         it is a feature that does not apply — and standing beside "make a
-         picture" it read like its twin. -->
-    {#if zustand.features.image_generation && eigeneBildserver.length}
-    <button role="menuitem" onclick={bildmodusSchalten}>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 4 C14 6 9 10 7.5 14.5 C6.8 16.6 8 18 10 17.5 C14.5 16 18 11 20 4 Z" />
-        <path d="M9 17.5 C8 19.5 7 20.5 4 21 C5.5 18.5 5.5 17.5 6.5 15.5" />
-      </svg>
-      <span>
-        {t('eingabe.bildmodus')}
-        <!-- The name of the server it talks to. "Raw prompt to the
-             generator" said what it does technically and nothing about
-             which of the two entries this is. -->
-        <span class="menuehinweis">{bildserverNamen}</span>
-      </span>
-      {#if bildmodus}<span class="haken">✓</span>{/if}
-    </button>
-    {/if}
+    <!-- The picture icon + text opens the window. The icon is a status light:
+         green as soon as the local picture server can draw, blue and pulsing
+         while Image-Turbo runs — Turbo is switched inside the window now, not
+         here, so there is no gauge on the tile any more. -->
+    <div class="bildeintrag">
+      <button
+        class="bildoeffnen"
+        role="menuitem"
+        onclick={() => {
+          menueOffen = false
+          bildfensterOffen = true
+        }}
+      >
+        <svg
+          width="17" height="17" viewBox="0 0 24 24" fill="none"
+          class="bildicon" class:pulst={turboAn}
+          style={`color:${bildIconFarbe}`}
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        >
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="8.5" cy="9.5" r="1.6" />
+          <path d="M4 17l4.5-5 3.5 4 3-2.5L20 17" />
+        </svg>
+        <span>
+          {t('bild.titel')}
+          <span class="menuehinweis">{t('bild.hier_hinweis')}</span>
+        </span>
+      </button>
+    </div>
   </div>
   </div>
   <input
@@ -569,7 +584,7 @@
     </div>
   {/if}
 
-  <div class="eingabe" class:im-bildmodus={bildmodus}>
+  <div class="eingabe">
     <!-- In the centered start state, the footer is folded shut; this
          button keeps the field operable anyway without making it
          two-lined. -->
@@ -600,15 +615,11 @@
       bind:this={feld}
       bind:value={text}
       rows="1"
-      placeholder={bildmodus ? t('eingabe.bild_platzhalter') : (gruss || t('eingabe.platzhalter'))}
+      placeholder={gruss || t('eingabe.platzhalter')}
       onkeydown={taste}
       onpaste={einfuegen}
       aria-label={t('eingabe.nachricht')}
     ></textarea>
-
-    <!-- While a generation runs, the waiting line stands in the answer
-         bubble — not here. `erzeugtGerade` only
-         blocks double-sending. -->
 
     <div class="fuss">
       <!-- The plus: ONE button the menu grows out of. It
@@ -626,10 +637,12 @@
              stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
       </button>
 
-      <!-- The thinking switch (a light bulb that builds up
-           its rays when turned on). Off = a quiet ghost of the shape, on
-           = the drawing builds up in blue and dismantles backwards when
-           turned off. Non-switchable models: grayed out with a hint. -->
+      <!-- The thinking switch. THE house bulb from Hauszeichen.svelte,
+           scaled to the 64 grid — the house has exactly one bulb drawing
+           (the old circle-with-rays here was a second, uglier one). Off = a
+           quiet ghost of the shape, on = the bulb draws itself in gold and
+           dismantles backwards when turned off. Non-switchable models:
+           grayed out with a hint. -->
       <button
         class="denkknopf"
         class:an={denkFaehig && denken}
@@ -646,19 +659,57 @@
         <svg viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round"
              aria-hidden="true">
           <g class="geist" stroke="currentColor">
-            <circle cx="32" cy="26" r="13" stroke-width="5" />
-            <path d="M26 46 H38 M27 53 H37" stroke-width="4.5" />
+            <path d="M32 8 a16.8 16.8 0 0 1 9.07 30.93 c-1.6 1.07 -2.67 2.67 -2.67 4.53 v1.87 h-12.8 v-1.87 c0 -1.87 -1.07 -3.47 -2.67 -4.53 A16.8 16.8 0 0 1 32 8 Z" stroke-width="5" />
+            <path d="M26.7 54.7 H37.3" stroke-width="4.5" />
           </g>
           <g class="aktiv" stroke="currentColor">
-            <circle class="strich" cx="32" cy="26" r="13" stroke-width="5" style="--laenge:82" />
-            <path class="strich s2" d="M26 46 H38" stroke-width="4.5" style="--laenge:12" />
-            <path class="strich s3" d="M27 53 H37" stroke-width="4.5" style="--laenge:10" />
-            <path class="strich s4" d="M32 3 V9" stroke-width="4.5" style="--laenge:6" />
-            <path class="strich s4" d="M15 9 L20 14" stroke-width="4.5" style="--laenge:7" />
-            <path class="strich s4" d="M49 9 L44 14" stroke-width="4.5" style="--laenge:7" />
+            <path class="strich" d="M32 8 a16.8 16.8 0 0 1 9.07 30.93 c-1.6 1.07 -2.67 2.67 -2.67 4.53 v1.87 h-12.8 v-1.87 c0 -1.87 -1.07 -3.47 -2.67 -4.53 A16.8 16.8 0 0 1 32 8 Z" stroke-width="5" style="--laenge:120" />
+            <path class="strich s2" d="M26.7 54.7 H37.3" stroke-width="4.5" style="--laenge:11" />
           </g>
         </svg>
       </button>
+
+      <!-- The tool lamp: read-only, first in the lamp row, right beside
+           the thinking switch. Olive when the chosen model can call
+           tools, resting grey when not — read off the resolved capability,
+           no special cases per model. -->
+      <span
+        class="werkzeuglampe"
+        class:an={werkzeugFaehig}
+        role="img"
+        aria-label={t(werkzeugFaehig ? 'eingabe.werkzeug_an' : 'eingabe.werkzeug_aus')}
+        title={t(werkzeugFaehig ? 'eingabe.werkzeug_an' : 'eingabe.werkzeug_aus')}
+      >
+        <Hauszeichen zeichen="werkzeug" groesse="klein" />
+      </span>
+
+      <!-- The MTP lamp: same ring as the two buttons, but read-only — it does
+           not toggle anything, it reports whether the local speed module is
+           truly running. Grey off, blue on. -->
+      <span
+        class="mtplampe"
+        class:an={mtpAktiv}
+        role="img"
+        aria-label={t(mtpAktiv ? 'modell.mtp_aktiv' : 'eingabe.mtp_aus')}
+        title={t(mtpAktiv ? 'modell.mtp_aktiv' : 'eingabe.mtp_aus')}
+      >
+        <Hauszeichen zeichen="blitz" groesse="klein" />
+      </span>
+
+      <!-- The vision lamp: read-only like the MTP lamp beside it. Violet
+           when the chosen model can see images, resting grey when not — so
+           the hand knows BEFORE dropping a file whether the eye is open.
+           One capability, one colour, everywhere: this violet is the same
+           the mmproj cards wear in the catalogue. -->
+      <span
+        class="augenlampe"
+        class:an={visionFaehig}
+        role="img"
+        aria-label={t(visionFaehig ? 'eingabe.anhang_hinweis' : 'fehler.kein_vision')}
+        title={t(visionFaehig ? 'eingabe.anhang_hinweis' : 'fehler.kein_vision')}
+      >
+        <Hauszeichen zeichen="auge" groesse="klein" />
+      </span>
       </div>
 
       <div class="rechts">
@@ -688,8 +739,8 @@
         <button
           class="aktion"
           class:stoppt={stoppt}
-          class:leer={!laeuftGerade && !erzeugtGerade && leer}
-          onclick={() => (erzeugtGerade || bildLokalLaeuft ? bildStoppen() : stoppt ? abbrechen() : absenden())}
+          class:leer={!laeuftGerade && leer}
+          onclick={() => (bildLokalLaeuft ? bildStoppen() : stoppt ? abbrechen() : absenden())}
           title={stoppt ? t('eingabe.abbrechen_tipp') : t('eingabe.senden')}
           aria-label={stoppt ? t('eingabe.abbrechen') : t('eingabe.senden')}
         >
@@ -745,7 +796,7 @@
     bottom: 8px;
     min-width: 220px;
     background: var(--bg-erhoben);
-    border: 1px solid var(--linie-stark);
+    border: 1px solid var(--kontrast);
     border-radius: 12px;
     padding: 5px;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
@@ -807,6 +858,32 @@
     background: none;
   }
 
+  /* The picture entry is two targets in one row: the icon + text that opens
+     the window (icon keeps the Image-Turbo status colour), then a separate
+     bolt on the right that switches the turbo on and off. */
+  .bildeintrag {
+    display: flex;
+    align-items: stretch;
+  }
+  .klappmenue .bildeintrag button {
+    width: auto;
+  }
+  .klappmenue .bildeintrag .bildoeffnen {
+    flex: 1;
+  }
+  /* The picture icon pulses while Image-Turbo runs — the same "something is
+     live" cue the header's picture-queue badge uses. */
+  .bildeintrag .bildicon.pulst {
+    animation: bildpuls 1.5s ease-in-out infinite;
+  }
+  @keyframes bildpuls {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bildeintrag .bildicon.pulst { animation: none; }
+  }
+
   /* The plus: padding 0 is the difference between centered and crooked —
      browsers give buttons paddings of their own. */
   .plus {
@@ -818,6 +895,9 @@
     border: 1px solid var(--linie-stark);
     border-radius: 99px;
     background: none;
+    /* The row's brightness rule: bright glyph = pressable, lamp grey =
+       indicator only. The plus is a button, so its mark is bright; the
+       ring stays in the quiet line tone like every circle in the row. */
     color: var(--text-leise);
     display: inline-flex;
     align-items: center;
@@ -836,16 +916,6 @@
     color: var(--text);
   }
 
-  /* Image mode: the bar wears blue (approved mockup). */
-  .eingabe.im-bildmodus {
-    border-color: var(--blau);
-    box-shadow: 0 0 0 1px var(--blau) inset;
-  }
-  .haken {
-    margin-left: auto;
-    color: var(--blau);
-    font-weight: 700;
-  }
   /* The attachment chip docks ABOVE the field — one
      spot for both modes, flush with the field's left edge. Its own
      background, because it now sits on the page, no longer in the box. */
@@ -1024,6 +1094,61 @@
     gap: 8px;
     flex: none;
   }
+  /* The MTP lamp: the same ring as the plus and the thinking switch, but it is
+     an indicator, not a button — grey while off, blue and softly glowing when
+     the local speed module is running. */
+  .mtplampe {
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    border-radius: 99px;
+    border: 1px solid var(--linie-stark);
+    color: var(--linie-stark);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    transition: color 0.25s, border-color 0.25s, box-shadow 0.25s;
+  }
+  .mtplampe.an {
+    color: var(--blau);
+    border-color: var(--blau);
+  }
+  .mtplampe :global(svg) { width: 15px; height: 15px; }
+  .augenlampe {
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    border-radius: 99px;
+    border: 1px solid var(--linie-stark);
+    color: var(--linie-stark);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .augenlampe.an {
+    color: var(--violett);
+    border-color: var(--violett);
+  }
+  .augenlampe :global(svg) { width: 15px; height: 15px; }
+  .werkzeuglampe {
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    border-radius: 99px;
+    border: 1px solid var(--linie-stark);
+    color: var(--linie-stark);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .werkzeuglampe.an {
+    color: var(--oliv);
+    border-color: var(--oliv);
+  }
+  .werkzeuglampe :global(svg) { width: 15px; height: 15px; }
   .denkknopf {
     width: 28px;
     height: 28px;
@@ -1041,17 +1166,22 @@
     transition: border-color 0.2s, background 0.15s;
   }
   .denkknopf:hover { background: var(--linie); }
-  .denkknopf.an { border-color: var(--blau); }
-  .denkknopf.gesperrt { opacity: 0.4; cursor: default; }
+  .denkknopf.an { border-color: var(--gelb); }
+  /* Locked = same resting grey as everything else, only dead to the hand —
+     the extra 0.4 opacity made the bulb darker than its two neighbours. */
+  .denkknopf.gesperrt { cursor: default; }
   .denkknopf.gesperrt:hover { background: none; }
   .denkknopf svg { width: 15px; height: 15px; overflow: visible; }
-  .denkknopf .geist { color: var(--text-still); opacity: 0.4; }
+  /* The bulb is a button: off = the bright button grey (pressable), locked =
+     exactly the lamp grey — two greys in the row, never a third. */
+  .denkknopf .geist { color: var(--text-leise); opacity: 1; }
+  .denkknopf.gesperrt .geist { color: var(--linie-stark); }
   /* The blue layer is COMPLETELY invisible in the off state — hidden
      strokes with round caps otherwise paint dots at the stroke starts.
      Immediately visible on switching on; on
      switching off, only hide after the teardown. */
   .denkknopf .aktiv {
-    color: var(--blau);
+    color: var(--gelb);
     opacity: 0;
     transition: opacity 0s linear 0.65s;
   }
@@ -1065,9 +1195,7 @@
     transition: stroke-dashoffset 0.55s cubic-bezier(0.2, 0.9, 0.3, 1);
   }
   .denkknopf.an .aktiv .strich { stroke-dashoffset: 0; }
-  .denkknopf.an .aktiv .s2 { transition-delay: 0.12s; }
-  .denkknopf.an .aktiv .s3 { transition-delay: 0.2s; }
-  .denkknopf.an .aktiv .s4 { transition-delay: 0.3s; }
+  .denkknopf.an .aktiv .s2 { transition-delay: 0.18s; }
   @media (prefers-reduced-motion: reduce) {
     .denkknopf .aktiv .strich { transition: none !important; }
   }

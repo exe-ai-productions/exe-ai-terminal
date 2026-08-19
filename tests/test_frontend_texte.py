@@ -21,7 +21,9 @@ WURZEL = Path(__file__).resolve().parent.parent
 QUELLEN = WURZEL / "frontend" / "src"
 
 # The brand name is the same in every language and must not be translated.
-ERLAUBT = {"Exe AI Terminal"}
+# The long form stays listed: it is still the name of the program folder and
+# of the user's data directory, even though the surface now reads the short one.
+ERLAUBT = {"Exe AI", "Exe AI Terminal"}
 
 
 def _dateien():

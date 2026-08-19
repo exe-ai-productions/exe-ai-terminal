@@ -7,6 +7,7 @@
      everything it asks lives in the settings afterwards. */
   import { t, texte, spracheWaehlen } from '../lib/texte.svelte.js'
   import Wortmarke from './Wortmarke.svelte'
+  import Klappwahl from './Klappwahl.svelte'
   import {
     begruessung, anredeSpeichern, erststartNoetig, erststartErledigt,
   } from '../lib/begruessung.svelte.js'
@@ -17,6 +18,8 @@
     ['auto', 'einstellungen.auto'],
     ['hell', 'einstellungen.hell'],
     ['dunkel', 'einstellungen.dunkel'],
+    ['darkmatter', 'einstellungen.darkmatter'],
+    ['heaven', 'einstellungen.heaven'],
   ]
 
   let phase = $state('aus') // aus | klein | auf | zu
@@ -74,11 +77,11 @@
       <div class="kachel">
         <span class="strich"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" /></svg></span>
         <div class="w"><div class="t">{t('erststart.erscheinung')}</div></div>
-        <div class="segment">
-          {#each MODI as [wert, beschriftung] (wert)}
-            <button aria-pressed={modus === wert} onclick={() => (modus = wert)}>{t(beschriftung)}</button>
-          {/each}
-        </div>
+        <Klappwahl
+          optionen={MODI.map(([wert, schluessel]) => [wert, t(schluessel)])}
+          bind:wert={modus}
+          beschriftung={t('erststart.erscheinung')}
+        />
       </div>
       <div class="fuss">
         <span class="lokal"><span class="punkt"><i></i><em></em></span> {t('erststart.alle_daten')}</span>

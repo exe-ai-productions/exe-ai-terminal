@@ -33,6 +33,7 @@
     ['cli', 'cli.titel'],
     ['vorschau', 'vorschau.titel'],
     ['notiz', 'notiz.titel'],
+    ['bilder', 'bilder.titel'],
     ['waechter', 'waechter.titel'],
   ]
 
@@ -91,7 +92,9 @@
     gap: 4px;
     padding: 8px 0;
     border-left: 1px solid var(--linie);
-    background: var(--bg-leiste);
+    /* Shares the sidebar's tone, not the header bar's — the two side rails
+       read as one pair, a step lighter than the header. */
+    background: var(--bg-seite);
   }
   /* One group, one size — every sign is the same square, whatever it
      shows. The square grew with the strip: the gold mark is 28 across, and a

@@ -13,6 +13,7 @@
   import Modulzeichen from './Modulzeichen.svelte'
   import Notizwerkzeuge from './Notizwerkzeuge.svelte'
   import ModulNotiz from './ModulNotiz.svelte'
+  import ModulBilder from './ModulBilder.svelte'
   import ModulTerminal from './ModulTerminal.svelte'
   import ModulVorschau from './ModulVorschau.svelte'
   import ModulWaechter from './ModulWaechter.svelte'
@@ -104,6 +105,7 @@
     ['cli', 'cli.titel'],
     ['vorschau', 'vorschau.titel'],
     ['notiz', 'notiz.titel'],
+    ['bilder', 'bilder.titel'],
     ['waechter', 'waechter.titel'],
   ]
 
@@ -229,6 +231,8 @@
         <ModulVorschau />
       {:else if leiste.modul === 'waechter'}
         <ModulWaechter senden={befundSenden} />
+      {:else if leiste.modul === 'bilder'}
+        <ModulBilder />
       {:else}
         <ModulNotiz />
       {/if}

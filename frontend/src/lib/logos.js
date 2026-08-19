@@ -27,12 +27,14 @@ export const LOGOS = {
     vb: '0 0 64 64',
     html: `<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="27" cy="27" r="15" stroke-width="5" /><path d="M12 27 H42" stroke-width="4.5" /><ellipse cx="27" cy="27" rx="6.5" ry="15" stroke-width="4.5" /><path d="M37.6 37.6 L53 53" stroke-width="5" /></g>`,
   },
-  /* Our own mark — the terminal prompt >_ in a gold-gradient frame (our own
-     vector, transparent ground). The gradient runs in user space so the
-     underscore, a flat line, still takes the fill. */
+  /* Our own mark — the terminal prompt >_ in the Dark-Matter colour
+     language: a light lilac gradient ground, a deep lilac outer frame, and
+     the chevron with its underscore a step lighter than the frame. The
+     gradients run in user space so the underscore, a flat line, still
+     takes the fill. */
   exe: {
     vb: '0 0 72 72',
-    html: `<defs><linearGradient id="exegoldmark" gradientUnits="userSpaceOnUse" x1="12" y1="10" x2="60" y2="62"><stop offset="0" stop-color="#8F6C10"/><stop offset="0.45" stop-color="#E7CE7A"/><stop offset="0.6" stop-color="#C9A227"/><stop offset="1" stop-color="#7A5C0C"/></linearGradient></defs><rect x="6" y="6" width="60" height="60" rx="17" fill="#4a3a1a" /><g fill="none" stroke="url(#exegoldmark)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 26 L33 36 L21 46" /><path d="M40 46 H 52" /></g><rect x="6.5" y="6.5" width="59" height="59" rx="16.5" fill="none" stroke="url(#exegoldmark)" stroke-width="4" />`,
+    html: `<defs><linearGradient id="exelilagrund" gradientUnits="userSpaceOnUse" x1="12" y1="8" x2="60" y2="64"><stop offset="0" stop-color="#ddd3f8"/><stop offset="1" stop-color="#b3a3e6"/></linearGradient><linearGradient id="exelilarand" gradientUnits="userSpaceOnUse" x1="12" y1="10" x2="60" y2="62"><stop offset="0" stop-color="#352d63"/><stop offset="0.5" stop-color="#4a3f85"/><stop offset="1" stop-color="#2c2454"/></linearGradient><linearGradient id="exelilazug" gradientUnits="userSpaceOnUse" x1="12" y1="10" x2="60" y2="62"><stop offset="0" stop-color="#4a3f85"/><stop offset="0.5" stop-color="#6a5ab2"/><stop offset="1" stop-color="#453a7e"/></linearGradient></defs><rect x="6" y="6" width="60" height="60" rx="17" fill="url(#exelilagrund)" /><g fill="none" stroke="url(#exelilazug)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 26 L33 36 L21 46" /><path d="M40 46 H 52" /></g><rect x="6.5" y="6.5" width="59" height="59" rx="16.5" fill="none" stroke="url(#exelilarand)" stroke-width="4" />`,
   },
   recraft: {
     vb: '0 0 80 80',

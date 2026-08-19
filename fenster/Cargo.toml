@@ -18,6 +18,10 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
+# For a graceful SIGTERM to the service on exit — the plugin's own kill() is
+# a hard SIGKILL, which would skip the service's shutdown and orphan its
+# model, embedding and image servers.
+libc = "0.2"
 
 [profile.release]
 strip = true

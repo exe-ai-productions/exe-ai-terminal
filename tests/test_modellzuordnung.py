@@ -17,8 +17,10 @@ from app import modellzuordnung
 
 
 def test_ein_eintrag_kommt_gleich_zurueck(tmp_path: Path):
-    (tmp_path / "modell-mmproj-BF16.gguf").write_bytes(b"x")
-    (tmp_path / "modell-mtp-Q8.gguf").write_bytes(b"x")
+    (tmp_path / "vision").mkdir()
+    (tmp_path / "vision" / "modell-mmproj-BF16.gguf").write_bytes(b"x")
+    (tmp_path / "mtp").mkdir()
+    (tmp_path / "mtp" / "modell-mtp-Q8.gguf").write_bytes(b"x")
 
     modellzuordnung.eintragen(tmp_path, "modell.gguf", "mmproj", "modell-mmproj-BF16.gguf")
     modellzuordnung.eintragen(tmp_path, "modell.gguf", "mtp", "modell-mtp-Q8.gguf")
@@ -30,8 +32,9 @@ def test_ein_eintrag_kommt_gleich_zurueck(tmp_path: Path):
 
 
 def test_ein_zweiter_eintrag_ersetzt_die_rolle(tmp_path: Path):
-    (tmp_path / "alt-mmproj.gguf").write_bytes(b"x")
-    (tmp_path / "neu-mmproj.gguf").write_bytes(b"x")
+    (tmp_path / "vision").mkdir()
+    (tmp_path / "vision" / "alt-mmproj.gguf").write_bytes(b"x")
+    (tmp_path / "vision" / "neu-mmproj.gguf").write_bytes(b"x")
 
     modellzuordnung.eintragen(tmp_path, "modell.gguf", "mmproj", "alt-mmproj.gguf")
     modellzuordnung.eintragen(tmp_path, "modell.gguf", "mmproj", "neu-mmproj.gguf")
@@ -73,7 +76,8 @@ def test_eine_unbekannte_rolle_wird_ignoriert(tmp_path: Path):
 
 
 def test_ein_geloeschter_begleiter_faellt_raus(tmp_path: Path):
-    begleiter = tmp_path / "modell-mmproj-BF16.gguf"
+    (tmp_path / "vision").mkdir()
+    begleiter = tmp_path / "vision" / "modell-mmproj-BF16.gguf"
     begleiter.write_bytes(b"x")
     modellzuordnung.eintragen(tmp_path, "modell.gguf", "mmproj", "modell-mmproj-BF16.gguf")
     assert modellzuordnung.fuer(tmp_path, "modell.gguf")["mmproj"] == "modell-mmproj-BF16.gguf"

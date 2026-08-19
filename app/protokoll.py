@@ -73,16 +73,20 @@ def _spitzenspeicher_windows() -> float:
 
     zaehler = _Speicherzaehler()
     zaehler.cb = ctypes.sizeof(zaehler)
-    ctypes.WinDLL("kernel32").K32GetProcessMemoryInfo(
-        ctypes.WinDLL("kernel32").GetCurrentProcess(),
-        ctypes.byref(zaehler),
-        zaehler.cb,
+    kernel = ctypes.WinDLL("kernel32")
+    kernel.K32GetProcessMemoryInfo(
+        kernel.GetCurrentProcess(), ctypes.byref(zaehler), zaehler.cb
     )
     return round(zaehler.PeakWorkingSetSize / (1024 * 1024), 1)
 
 
 def speicher_mb() -> float:
-    """Peak resident memory of this process so far, in MB."""
+    """Peak resident memory of this process so far, in MB.
+
+    The module that carries this on Unix does not exist on Windows, so it is
+    imported where it is used rather than at the top — an import at the top
+    would take the whole program down on a system that has none.
+    """
     if sys.platform == "win32":
         return _spitzenspeicher_windows()
 

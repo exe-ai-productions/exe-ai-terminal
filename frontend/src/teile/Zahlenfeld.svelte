@@ -12,7 +12,13 @@
     schritt = 1,
     id = '',
     gesperrt = false,
+    /* A word shown INSTEAD of the zero — for fields where 0 does not mean
+       zero but "the program decides" (clip-skip). Empty: plain numbers. */
+    nullwort = '',
   } = $props()
+
+  let fokus = $state(false)
+  const wortDa = $derived(Boolean(nullwort) && !fokus && Number(wert) === 0)
 
   function setzen(neu) {
     wert = Math.min(max, Math.max(min, neu))
@@ -27,15 +33,21 @@
 </script>
 
 <div class="zahl" class:gesperrt>
+  {#if wortDa}
+    <span class="nullwort">{nullwort}</span>
+  {/if}
   <input
     {id}
     type="number"
+    class:versteckt={wortDa}
     bind:value={wert}
     {min}
     {max}
     step={schritt}
     disabled={gesperrt}
     onchange={eingerastet}
+    onfocus={() => (fokus = true)}
+    onblur={() => (fokus = false)}
   />
   <span class="treppe">
     <button
@@ -67,6 +79,7 @@
 
 <style>
   .zahl {
+    position: relative;
     display: flex;
     align-items: center;
     width: 100%;
@@ -91,6 +104,18 @@
   input::-webkit-outer-spin-button {
     appearance: none;
     margin: 0;
+  }
+  /* While the word stands in, the zero steps aside; a click on the field
+     brings the number back for typing. */
+  input.versteckt {
+    color: transparent;
+  }
+  .nullwort {
+    position: absolute;
+    right: 34px;
+    font: 400 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-still);
+    pointer-events: none;
   }
   .gesperrt input {
     color: var(--text-still);

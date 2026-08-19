@@ -25,7 +25,8 @@ from app.api.v1.health import _health_ermitteln
 from app.modelldownload import Modelldownload
 from app import eewserver, einbettungsserver
 from app.bildrunner import Bildrunner
-from app.modellrunner import Modellrunner
+from app.bildturbo import Bildturbo
+from app.modellrunner import Modellrunner, begleiter_einsortieren
 from app.sddownload import Sddownload
 from app.serverdownload import Serverdownload
 from app.config import PROJEKT_WURZEL, Config, get_config
@@ -36,6 +37,7 @@ from app.events import Ereignisse, bus
 from app.generationen import Generierungsverwaltung
 from app.hintergrundmeldung import anmelden as hintergrundmeldung_anmelden
 from app.protokoll import ProtokollMiddleware, logging_einrichten, speicher_mb
+from app.speicherorte import ort
 from app.tools import WerkzeugRegistry, server_lesen
 from app.tools.hintergrund import laeufe
 from app.tools.mcp_auth import AuthSpeicher, OAuthVermittler
@@ -145,7 +147,11 @@ async def lebenszyklus(app: FastAPI):
 
     # The model runner. Built here and not per request: it holds a running
     # process, and a second instance would not know about the first.
-    modellordner = config.pfad(config.app.modelle_verzeichnis)
+    modellordner = ort(config, "modelle")
+    # Companions used to lie loose among the models; move them into their own
+    # sub-folders once at startup, so the model folder shows only models and
+    # each companion folder only its own kind. A plain rename, names kept.
+    begleiter_einsortieren(modellordner)
     app.state.modellrunner = Modellrunner(modellordner, config.app.runner_programm)
     # The picture runner is built HERE and not on first use. Its whole job is
     # to hold one lock so two pictures cannot be drawn at once — and a lazy
@@ -153,6 +159,13 @@ async def lebenszyklus(app: FastAPI):
     # moment by two requests, which would leave two runners holding two
     # locks and let exactly the thing happen that the lock exists to stop.
     app.state.bildrunner = Bildrunner(config.datenverzeichnis)
+    # Image-Turbo: the optional persistent picture server. Built here, never
+    # started here — off by default, switched on by hand from the plus menu.
+    # sd-cli stays the default; this only holds the model in memory so every
+    # picture after the first skips the load.
+    app.state.bildturbo = Bildturbo(config.datenverzeichnis)
+    # A leftover server from a previous run holds the port; end it now.
+    app.state.bildturbo._raeum_waise()
     # The embedding server: its own folder, its own port, its own note and
     # key. Not started here — it is a speed-up somebody switches on, and the
     # one-shot path works without it.
@@ -184,7 +197,7 @@ async def lebenszyklus(app: FastAPI):
     app.state.modellordner_je_art = {
         "chat": modellordner,
         "einbettung": config.pfad(config.app.einbettungsmodelle_verzeichnis),
-        "bild": config.pfad(config.app.bildmodelle_verzeichnis),
+        "bild": ort(config, "bildmodelle"),
     }
     # The model server itself, fetchable in one click on machines that do
     # not have it — into the user's data folder, next to their models.
@@ -224,6 +237,21 @@ async def lebenszyklus(app: FastAPI):
     try:
         yield
     finally:
+        # No server outlives the program. The model, embedding, guardian and
+        # image-turbo servers each run in their OWN session (so a crash of the
+        # service does not take them with it), which means they also do NOT die
+        # on a clean shutdown unless ended by hand. Left running, the next
+        # launch mints a fresh session key and the old server rejects it with
+        # "Invalid API-Key" — the bug that made the program look broken after a
+        # restart. So every server the service holds goes down here first.
+        for name in ("modellrunner", "einbettungsrunner", "eewrunner", "bildturbo"):
+            server = getattr(app.state, name, None)
+            if server is None:
+                continue
+            try:
+                server.stoppen()
+            except Exception:
+                log.warning("%s ließ sich beim Beenden nicht stoppen", name, exc_info=True)
         # No process outlives its chat unseen: whatever a background run
         # still has running goes down with the service.
         getoetet = laeufe.alle_toeten()

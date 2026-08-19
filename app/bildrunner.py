@@ -19,6 +19,7 @@ the memory.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -38,20 +39,34 @@ ORDNER = "stable-diffusion.cpp"
 
 # Long enough for a big picture on a slow machine, short enough that a run
 # gone wrong does not hold the lock for the rest of the evening.
-ZEITGRENZE = 300
+# 300 killed honest runs: an SDXL highres pass renders a second time at
+# 2048² and legitimately needs several minutes on Metal. The limit exists
+# for HUNG processes, not slow ones — the stop button covers impatience.
+ZEITGRENZE = 900
 
 # How long a cancelled generator gets to end before it is killed. Short: the
 # caller is holding a request open on this answer, and a program told to stop
 # drawing has nothing left to finish.
 ABBRUCH_FRIST = 5
 
+# The painter's progress bar on stderr: "|####      | 12/28 - 3.10it/s".
+# The loader prints bars in the same shape with tensor counts, which is why
+# the reader only trusts bars whose total equals the requested step count.
+_SCHRITT_MUSTER = re.compile(r"\|\s*(\d+)/(\d+)\s*-")
+
 
 class BildFehler(Exception):
-    """Carries the key of the sentence to show, not the sentence itself."""
+    """Carries the key of the sentence to show, not the sentence itself.
 
-    def __init__(self, grund: str) -> None:
+    `protokoll` optionally carries the painter's REAL last words (raw
+    stderr) — shown verbatim to the user, never paraphrased: a rewritten
+    error catalogue would only hide the one line that explains the crash
+    (house rule)."""
+
+    def __init__(self, grund: str, protokoll: str | None = None) -> None:
         super().__init__(grund)
         self.grund = grund
+        self.protokoll = protokoll
 
 
 @dataclass(frozen=True)
@@ -95,6 +110,43 @@ class Auftrag:
     # again. Only means anything beside a starting image — a mask without
     # one has nothing to mask.
     maske: Path | None = None
+    # How many of CLIP's last layers to ignore. -1 means "unspecified", which
+    # the generator turns into the right value per model class. A few models
+    # (notably some SD-1.5 anime checkpoints) were trained expecting one layer
+    # skipped and look wrong without it.
+    clip_skip: int = -1
+    # A standalone VAE — the part that turns the model's internal number-image
+    # into real pixels. A model's built-in VAE is often the weak link; the
+    # right external one is where washed-out colour and mushy detail come back.
+    vae: Path | None = None
+    # ADetailer: a small detector that finds faces and redraws each one at
+    # full resolution, so a face that came out as a smear in a wide shot is
+    # painted again sharp. The model file is the detector (a YOLO net); an
+    # empty file means the pass is off.
+    ad_modell: Path | None = None
+    ad_prompt: str = ""
+    # Flash attention in the diffusion model — faster where the machine can do
+    # it, no effect on the picture. ON by default: measured on the shipped build
+    # (master-820), the second, high-resolution pass of the highres fix drops
+    # from ~30 s per step to ~3.5 s — nine times faster, the difference between
+    # a usable highres fix and one that runs past the time limit and gets
+    # killed. The persistent server (Image-Turbo) already runs with it. The risk
+    # it was held back for — an older sd-cli a user swapped in that predates the
+    # flag and refuses the unknown argument — is against the binary we ship, so
+    # the default follows our build, not a hypothetical replacement.
+    diffusion_fa: bool = True
+    # Highres fix: draw at the base size, then upscale and paint over the
+    # result at the larger size, so fine detail the first pass could not fit
+    # arrives on the second. `hires_scale` is how much larger (2.0 = double);
+    # `hires_steps` 0 reuses the main step count. Off by default — it roughly
+    # doubles the time, and most drafts do not need it.
+    hires: bool = False
+    hires_scale: float = 2.0
+    hires_steps: int = 0
+    # Process the VAE in tiles to save memory on a big picture. Off by
+    # default; the plumbing is here for a low-memory machine that would
+    # otherwise run out on the final decode.
+    vae_tiling: bool = False
 
 
 def programm_finden(datenordner: Path) -> Path | None:
@@ -144,6 +196,50 @@ def lora_pfad(bildordner: Path, name: str) -> Path:
     return Path(bildordner).expanduser() / "lora" / name
 
 
+# The two companion kinds, each in its own subfolder below the image models —
+# the same shape as `lora/`, so nothing collides with a model in the picker.
+VAE_ORDNER = "vae"
+YOLO_ORDNER = "adetailer"
+
+
+def _im_unterordner(bildordner: Path, unter: str) -> list[str]:
+    ordner = Path(bildordner).expanduser() / unter
+    if not ordner.is_dir():
+        return []
+    return sorted(
+        p.name for p in ordner.iterdir()
+        if p.is_file() and p.suffix in {".gguf", ".safetensors", ".ckpt", ".pt", ".pth", ".onnx"}
+    )
+
+
+def vaes(bildordner: Path) -> list[str]:
+    """The standalone VAE files in their own folder below the image models."""
+    return _im_unterordner(bildordner, VAE_ORDNER)
+
+
+def yolos(bildordner: Path) -> list[str]:
+    """The ADetailer detector models in their own folder."""
+    return _im_unterordner(bildordner, YOLO_ORDNER)
+
+
+def _begleiter_pfad(bildordner: Path, name: str, unter: str, vorhanden: list[str]) -> Path:
+    """A companion NAME turned into a path — hostile name treated as hostile,
+    exactly like a model or a LoRA: bare file name, really in its folder."""
+    if not name or "/" in name or "\\" in name or name != Path(name).name:
+        raise BildFehler("bild.begleiter_unbekannt")
+    if name not in vorhanden:
+        raise BildFehler("bild.begleiter_unbekannt")
+    return Path(bildordner).expanduser() / unter / name
+
+
+def vae_pfad(bildordner: Path, name: str) -> Path:
+    return _begleiter_pfad(bildordner, name, VAE_ORDNER, vaes(bildordner))
+
+
+def yolo_pfad(bildordner: Path, name: str) -> Path:
+    return _begleiter_pfad(bildordner, name, YOLO_ORDNER, yolos(bildordner))
+
+
 def modell_pfad(bildordner: Path, name: str) -> Path:
     """A model NAME turned into a path — never the other way round.
 
@@ -170,6 +266,24 @@ class Bildrunner:
         # time limit — and the panel had no way of saying so.
         self._prozess: subprocess.Popen | None = None
         self._abgebrochen = False
+        # The live step counter of the running picture, or None while no
+        # picture runs — what the filling frame in the interface drinks from.
+        self._fortschritt: dict | None = None
+
+    def fortschritt(self) -> dict | None:
+        """The running picture's honest progress, or nothing while idle."""
+        return self._fortschritt if self.laeuft() else None
+
+    def reservieren(self) -> None:
+        """Take the one-picture-at-a-time lock without drawing — the turbo
+        path borrows it so a turbo picture and an sd-cli picture can never
+        run at once, and a second request cannot restart the server under a
+        running draw. Pairs with ``freigeben``."""
+        if not self._schloss.acquire(blocking=False):
+            raise BildFehler("bild.laeuft_schon")
+
+    def freigeben(self) -> None:
+        self._schloss.release()
 
     @property
     def programm(self) -> Path | None:
@@ -232,6 +346,30 @@ class Bildrunner:
             teile += ["--negative-prompt", auftrag.negativ]
         if auftrag.loras and auftrag.lora_ordner is not None:
             teile += ["--lora-model-dir", str(auftrag.lora_ordner)]
+            # NEVER the auto mode: on this Metal build the "immediately"
+            # path applies 0 of N tensors and then aborts inside sampling
+            # (ggml-backend.cpp:930, found live with LCM and Hyper-SD).
+            # at_runtime applies every tensor and renders — proven live
+            # with LCM-SD15, LCM-SDXL and Hyper-SD15.
+            teile += ["--lora-apply-mode", "at_runtime"]
+        # The quality companions. Each is left off entirely when unset, so the
+        # command line carries only what was actually chosen.
+        if auftrag.clip_skip > 0:
+            teile += ["--clip-skip", str(auftrag.clip_skip)]
+        if auftrag.vae is not None:
+            teile += ["--vae", str(auftrag.vae)]
+        if auftrag.diffusion_fa:
+            teile += ["--diffusion-fa"]
+        if auftrag.vae_tiling:
+            teile += ["--vae-tiling"]
+        if auftrag.hires:
+            teile += ["--hires", "--hires-scale", str(auftrag.hires_scale)]
+            if auftrag.hires_steps > 0:
+                teile += ["--hires-steps", str(auftrag.hires_steps)]
+        if auftrag.ad_modell is not None:
+            teile += ["--ad-model", str(auftrag.ad_modell)]
+            if auftrag.ad_prompt:
+                teile += ["--ad-prompt", auftrag.ad_prompt]
         # The strength only means anything beside a starting image. Sent
         # without one it would be a number the program quietly ignores, and
         # a control that does nothing is worse than no control.
@@ -261,6 +399,10 @@ class Bildrunner:
                 # Popen and not run(): a stop has to be able to reach the
                 # program, and run() hands back only the finished result.
                 # Its own process group, so ending it takes the whole thing.
+                # BOTH streams are read live, each by its own reader: the
+                # painter prints its log and the step counter on stdout,
+                # ggml its asserts on stderr — the counter feeds the filling
+                # frame, and both texts together feed the honest error.
                 self._prozess = subprocess.Popen(
                     befehl,
                     stdout=subprocess.PIPE,
@@ -270,13 +412,89 @@ class Bildrunner:
                 )
             except OSError as fehler:
                 raise BildFehler("bild.kein_programm") from fehler
+
+            # Honest percent: only bars whose total equals the requested
+            # step count are painting passes (the loader prints bars too,
+            # with tensor counts). A run has a known number of passes —
+            # base, plus highres, plus one detailer pass — and the overall
+            # share is passes done plus the current pass's fraction.
+            erwartete_paesse = 1 + (1 if auftrag.hires else 0) + (1 if auftrag.ad_modell else 0)
+            ausgabeteile: list[str] = []
+            fehlerteile: list[str] = []
+            self._fortschritt = {"anteil": 0.0, "schritt": 0, "gesamt": auftrag.schritte}
+            fertige_paesse = 0
+            letzter_schritt = 0
+
+            # The stream handles are caught in locals BEFORE the threads
+            # start: a reader that outlives the wait (a grandchild holding
+            # the pipe open) must never reach for self._prozess after the
+            # finally block has nulled it.
+            ausgang, fehlerkanal = self._prozess.stdout, self._prozess.stderr
+
+            def _zaehler_lesen() -> None:
+                nonlocal fertige_paesse, letzter_schritt
+                rest = ""
+                malt = False  # the first painting bar has been seen
+                while True:
+                    stueck = ausgang.read(256)
+                    if not stueck:
+                        break
+                    ausgabeteile.append(stueck)
+                    text = rest + stueck
+                    for treffer in _SCHRITT_MUSTER.finditer(text):
+                        if treffer.end() <= len(rest):
+                            continue  # already seen in the previous round
+                        schritt, gesamt = int(treffer.group(1)), int(treffer.group(2))
+                        # Before painting starts, only a bar with the requested
+                        # step count is a painting pass — everything else is
+                        # the loader. Once painting has begun, EVERY later bar
+                        # is real remaining work: the detector repaints each
+                        # found face, often with its own step count, and
+                        # filtering those out froze the number.
+                        if gesamt != auftrag.schritte and not malt:
+                            continue
+                        malt = True
+                        if schritt < letzter_schritt:
+                            # A new pass began. More faces than expected stay
+                            # inside the last pass's share instead of pushing
+                            # the figure past the end.
+                            fertige_paesse = min(fertige_paesse + 1, erwartete_paesse - 1)
+                        letzter_schritt = schritt
+                        anteil = (fertige_paesse + schritt / gesamt) / erwartete_paesse
+                        self._fortschritt = {
+                            "anteil": min(anteil, 0.99),
+                            "schritt": schritt,
+                            "gesamt": gesamt,
+                        }
+                    rest = text[-64:]
+
+            def _fehler_lesen() -> None:
+                while True:
+                    stueck = fehlerkanal.read(256)
+                    if not stueck:
+                        break
+                    fehlerteile.append(stueck)
+
+            leser = [
+                threading.Thread(target=_zaehler_lesen, daemon=True),
+                threading.Thread(target=_fehler_lesen, daemon=True),
+            ]
+            for l in leser:
+                l.start()
             try:
-                _, fehlertext = self._prozess.communicate(timeout=ZEITGRENZE)
+                self._prozess.wait(timeout=ZEITGRENZE)
             except subprocess.TimeoutExpired as fehler:
                 self.stoppen()
                 # Collect the child so no zombie is left behind.
-                self._prozess.communicate()
+                self._prozess.wait()
+                for l in leser:
+                    l.join(timeout=5)
                 raise BildFehler("bild.zeit_abgelaufen") from fehler
+            for l in leser:
+                l.join(timeout=5)
+            # Both voices together: the painter's log (stdout) carries the
+            # [ERROR] lines, ggml's aborts land on stderr.
+            fehlertext = "".join(ausgabeteile) + "\n" + "".join(fehlerteile)
             if self._abgebrochen:
                 # A stopped picture is not a failed one. The difference
                 # matters at the other end: one is reported, the other is
@@ -288,8 +506,24 @@ class Bildrunner:
                     "Bild gescheitert (%s): %s",
                     self._prozess.returncode, (fehlertext or "")[-500:],
                 )
-                raise BildFehler("bild.gescheitert")
+                # The user sees the painter's REAL lines, verbatim. The
+                # telling ones (asserts, [ERROR]) usually stand BEFORE the
+                # backtrace, so they are picked first; the raw tail only
+                # fills in when no such line exists. Selection, never
+                # rewording.
+                zeilen = (fehlertext or "").splitlines()
+                kern = [
+                    z for z in zeilen
+                    if "GGML_ASSERT" in z or "GGML_ABORT" in z
+                    or "[ERROR]" in z or "error:" in z.lower()
+                    # ggml aborts print "file.cpp:930: <reason>" without any
+                    # ERROR marker — that reason line IS the crash message.
+                    or (re.search(r"\.\w+:\d+: ", z) and not z.lstrip().startswith(("[INFO", "[WARN", "[DEBUG")))
+                ]
+                auszug = "\n".join(kern[-8:]) if kern else (fehlertext or "")[-1200:]
+                raise BildFehler("bild.gescheitert", protokoll=auszug[-1200:])
             return ziel
         finally:
             self._prozess = None
+            self._fortschritt = None
             self._schloss.release()
