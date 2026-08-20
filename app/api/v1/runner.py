@@ -81,6 +81,9 @@ class Auskunft(BaseModel):
     schichten: int | None = None
     port: int | None = None
     drafter: str | None = None
+    # The vision projector the running server was started with by hand — None
+    # when the server auto-paired one or runs mute.
+    vision: str | None = None
     # The engine levers the running server was started with, so the drawer
     # can show what is actually in force instead of its own defaults. None
     # while nothing runs — then the form falls back to the stored choice.
@@ -111,6 +114,10 @@ class Start(BaseModel):
     # Optional draft model for speculative decoding — a small file from the
     # same folder that guesses ahead while the big one only checks.
     drafter: str | None = None
+    # Optional vision projector chosen by hand — a file from the vision
+    # folder, for a companion whose name does not follow the convention the
+    # auto-pairing reads.
+    vision: str | None = None
     # The advanced section's levers, as sent. Kept loose on purpose: the
     # clamping and the fallback for an unknown name live in one place, next
     # to the flags they turn into.
@@ -167,6 +174,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         schichten=lauf.schichten if lauf else None,
         port=lauf.port if lauf else None,
         drafter=lauf.drafter if lauf else None,
+        vision=lauf.vision if lauf else None,
         fein=lauf.fein.als_daten() if lauf and lauf.fein else None,
         flash_aktiv=runner.flash_attn_zustand(),
         mtp_aktiv=runner.mtp_zustand(),
@@ -194,6 +202,7 @@ async def starten(
             port=daten.port,
             drafter=daten.drafter,
             fein=Feineinstellungen.aus_daten(daten.fein),
+            vision=daten.vision,
         )
     except RunnerFehler as fehler:
         raise _fehler(fehler.grund, sprache) from None

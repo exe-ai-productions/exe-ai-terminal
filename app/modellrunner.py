@@ -295,6 +295,9 @@ class Lauf:
     # The draft model for speculative decoding, when one was chosen — a
     # small model guesses ahead, the big one only checks.
     drafter: str | None = None
+    # The vision projector this server was started with, when one was chosen
+    # by hand — otherwise the auto-paired one leaves no name here.
+    vision: str | None = None
     # The engine levers this server was started with. Kept because they are
     # otherwise unreadable afterwards: they leave no trace in the answer, and
     # a form that cannot show them makes the user set them again from
@@ -447,6 +450,7 @@ class Modellrunner:
         port: int,
         drafter: str | None = None,
         fein: Feineinstellungen | None = None,
+        vision: str | None = None,
     ) -> list[str]:
         """The command as it will be run — the same list, shown and executed.
 
@@ -490,9 +494,19 @@ class Modellrunner:
         # The declared projector wins over the name heuristic: the manifest is
         # written when the pair is fetched together, while the heuristic reads
         # shared prefixes and can pick the wrong one when two models share one.
-        augen = self._manifest_pfad(modell, "mmproj")
-        if augen is None:
-            augen = passende_mmproj(self._ordner, modell)
+        # A projector chosen by the caller wins over both the manifest and
+        # the name heuristic: it is the escape for a companion whose file name
+        # does not follow the "<model>-mmproj" convention, so the two can be
+        # paired by hand. The name obeys the same folder boundary as every
+        # other file a start may reach.
+        if vision:
+            basis = _begleiter_ordner(self._ordner, "mmproj").resolve()
+            gewaehlt = (basis / vision).resolve()
+            augen = gewaehlt if gewaehlt.parent == basis and gewaehlt.is_file() else None
+        else:
+            augen = self._manifest_pfad(modell, "mmproj")
+            if augen is None:
+                augen = passende_mmproj(self._ordner, modell)
         if augen is not None:
             zeile += ["--mmproj", str(augen)]
         return zeile
@@ -526,7 +540,8 @@ class Modellrunner:
 
     def starten(self, modell: str, *, kontext: int = 8192, schichten: int = 99,
                 port: int | None = None, drafter: str | None = None,
-                fein: Feineinstellungen | None = None) -> Lauf:
+                fein: Feineinstellungen | None = None,
+                vision: str | None = None) -> Lauf:
         port = self._port if port is None else port
         with self._schloss:
             if self.laeuft():
@@ -557,6 +572,14 @@ class Modellrunner:
                 if dziel.parent != basis or not dziel.is_file():
                     raise RunnerFehler("kein_modell")
 
+            # The chosen projector, if any, obeys the same rule: a name from
+            # the vision folder or nothing.
+            if vision:
+                vbasis = (self._ordner / VISION_ORDNER).resolve()
+                vziel = (vbasis / vision).resolve()
+                if vziel.parent != vbasis or not vziel.is_file():
+                    raise RunnerFehler("kein_modell")
+
             # A taken port would let the new server die quietly while the
             # old one keeps answering — the settings in the form would then
             # look applied and never be.
@@ -579,7 +602,7 @@ class Modellrunner:
             os.environ[self._schluessel_variable] = schluessel
             self._schluessel = schluessel
             self._prozess = subprocess.Popen(
-                self.befehl(modell, kontext, schichten, port, drafter, fein),
+                self.befehl(modell, kontext, schichten, port, drafter, fein, vision),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -595,6 +618,7 @@ class Modellrunner:
                 schichten=schichten,
                 port=port,
                 drafter=drafter,
+                vision=vision,
                 fein=fein,
             )
             self._pid_merken(self._prozess.pid)

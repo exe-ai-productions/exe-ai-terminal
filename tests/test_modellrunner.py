@@ -216,6 +216,28 @@ def test_ohne_augen_kein_mmproj(ordner, falsches_programm):
     assert "--mmproj" not in runner.befehl("klein.gguf", 4096, 33, 8081)
 
 
+def test_gewaehlte_augen_schlagen_die_heuristik(ordner, falsches_programm):
+    # A projector whose name does not follow the convention — mmproj at the
+    # front instead of behind the model prefix — is never auto-paired. Chosen
+    # by hand, it is attached all the same.
+    (ordner / "vision").mkdir()
+    (ordner / "vision" / "mmproj-fremd-f16.gguf").write_bytes(b"x" * 5)
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    assert "--mmproj" not in runner.befehl("klein.gguf", 4096, 33, 8081)
+    befehl = runner.befehl("klein.gguf", 4096, 33, 8081, vision="mmproj-fremd-f16.gguf")
+    assert befehl[befehl.index("--mmproj") + 1].endswith("mmproj-fremd-f16.gguf")
+
+
+def test_gewaehlte_augen_ausserhalb_des_ordners_greifen_nicht(ordner, falsches_programm):
+    # The chosen name obeys the same folder boundary as every other file a
+    # start may reach: a traversal name attaches nothing.
+    (ordner / "vision").mkdir()
+    runner = Modellrunner(ordner, programm=str(falsches_programm))
+    assert "--mmproj" not in runner.befehl(
+        "klein.gguf", 4096, 33, 8081, vision="../../etc/passwd"
+    )
+
+
 def test_fremde_augen_bleiben_liegen(ordner, falsches_programm):
     # The shared prefix ends before the word mmproj — those are somebody
     # else's eyes, and attaching them would be worse than none.

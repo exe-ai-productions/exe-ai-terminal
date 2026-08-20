@@ -65,6 +65,7 @@
   let port = $state(8080)
   let modell = $state('')
   let drafter = $state('')
+  let vision = $state('')
 
   /* The parameter count in a model name — "12B", "31b", "1.7B". Two models
      of one family but different sizes must not draft one another with an
@@ -258,6 +259,14 @@
     ...drafterKandidaten.map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
   ])
 
+  /* Every projector in the vision folder, "without" first. Not narrowed by
+     name: the whole point of this row is the companion the name heuristic
+     cannot pair — so the choice is the user's, across the full list. */
+  const visionauswahl = $derived([
+    { wert: '', text: t('modell.vision_keiner') },
+    ...(auskunft?.mmproj ?? []).map((name) => ({ wert: name, text: name })),
+  ])
+
   const modellauswahl = $derived(
     (auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
   )
@@ -283,12 +292,20 @@
           const z = auskunft.zuordnung?.[modell]
           if (z?.mtp) drafter = z.mtp
         }
+        const visionGemerkt = localStorage.getItem('runner:vision:' + modell)
+        if (visionGemerkt !== null) {
+          vision = visionGemerkt
+        } else {
+          const z = auskunft.zuordnung?.[modell]
+          if (z?.mmproj) vision = z.mmproj
+        }
       }
       if (auskunft.laeuft) {
         kontext = auskunft.kontext
         schichten = auskunft.schichten
         port = auskunft.port
         drafter = auskunft.drafter || ''
+        vision = auskunft.vision || vision
         /* What the running server was actually started with beats what was
            once chosen — and it is taken only once, because this runs every
            two seconds and would otherwise fight the hand in the drawer. */
@@ -322,18 +339,22 @@
   function modellGewaehlt() {
     const gemerkt = localStorage.getItem('runner:drafter:' + modell)
     drafter = gemerkt !== null ? gemerkt : (auskunft?.zuordnung?.[modell]?.mtp ?? '')
+    const vGemerkt = localStorage.getItem('runner:vision:' + modell)
+    vision = vGemerkt !== null ? vGemerkt : (auskunft?.zuordnung?.[modell]?.mmproj ?? '')
   }
 
   async function starten() {
     arbeitet = true
     try {
       auskunft = await api.runnerStarten({
-        modell, kontext, schichten, port, drafter: drafter || null, fein: feindaten,
+        modell, kontext, schichten, port, drafter: drafter || null,
+        vision: vision || null, fein: feindaten,
       })
       /* Remember what actually started — the model, and the drafter choice
          for exactly this model (an empty string is a remembered "none"). */
       localStorage.setItem('runner:modell', modell)
       localStorage.setItem('runner:drafter:' + modell, drafter || '')
+      localStorage.setItem('runner:vision:' + modell, vision || '')
       protokollOffen = true
       await modelleLaden(true)
     } catch (fehler) {
@@ -452,6 +473,15 @@
               eintraege={drafterauswahl}
               gesperrt={laeuft}
               beschriftung={t('modell.feld_speedmodul')}
+            />
+
+            <label for="rs-vision">{t('modell.feld_vision')}<span>{t('modell.feld_vision_hilfe')}</span></label>
+            <Auswahlfeld
+              id="rs-vision"
+              bind:wert={vision}
+              eintraege={visionauswahl}
+              gesperrt={laeuft}
+              beschriftung={t('modell.feld_vision')}
             />
 
             <!-- The third row, and deliberately no tile of its own: which
