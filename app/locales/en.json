@@ -792,6 +792,10 @@
     "an_cloud": "Send to cloud models",
     "an_cloud_hinweis": "Travels to the provider with every request"
   },
+  "bildschutz": {
+    "titel": "Clear image metadata",
+    "hinweis": "Removes prompt, settings and EXIF from every picture"
+  },
   "skills": {
     "quelle": "Skills",
     "selbst": "Offer skills on their own",

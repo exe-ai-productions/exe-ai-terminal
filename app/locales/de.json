@@ -792,6 +792,10 @@
     "an_cloud": "An Cloud-Modelle schicken",
     "an_cloud_hinweis": "Reist bei jeder Anfrage zum Anbieter"
   },
+  "bildschutz": {
+    "titel": "Bild-Metadaten entfernen",
+    "hinweis": "Löscht Prompt, Einstellungen und EXIF aus jedem Bild"
+  },
   "skills": {
     "quelle": "Skills",
     "selbst": "Skills von selbst anbieten",

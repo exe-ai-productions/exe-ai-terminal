@@ -38,6 +38,8 @@ from app.waechterwahl import SCHLUESSEL as WAECHTER
 from app.waechterwahl import schalter_pruefen as waechter_pruefen
 from app.werkzeugwahl import SCHLUESSEL as WERKZEUGE_AUS
 from app.werkzeugwahl import aus_pruefen as werkzeuge_aus_pruefen
+from app.bildschutz import SCHLUESSEL as BILDSCHUTZ
+from app.bildschutz import schalter_pruefen as bildschutz_pruefen
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -57,6 +59,7 @@ PRUEFER = {
     EINBETTUNG: einbettung_pruefen,
     BILD_VORGABEN: bild_vorgaben_pruefen,
     FEINEINSTELLUNGEN: feineinstellungen_pruefen,
+    BILDSCHUTZ: bildschutz_pruefen,
 }
 
 

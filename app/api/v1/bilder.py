@@ -21,6 +21,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.abhaengigkeiten import hole_config, hole_sprache
+from app.bildmetadaten import metadaten_entfernen
+from app.bildschutz import putzen_an
 from app.config import Config
 from app.i18n import t
 from app.speicherorte import ort
@@ -100,6 +102,11 @@ async def bild_hochladen(
     name = uuid.uuid4().hex + ERLAUBTE_TYPEN[typ]
     verzeichnis = bilder_verzeichnis(config)
     verzeichnis.mkdir(parents=True, exist_ok=True)
+    # An uploaded photo can carry EXIF — camera, time, place — and it would
+    # travel to a cloud vision model untouched. Stripped here when the switch
+    # is on, on the one path every upload takes to disk.
+    if putzen_an(request.app.state.repositories):
+        daten = metadaten_entfernen(daten)
     (verzeichnis / name).write_bytes(daten)
     return BildAntwort(bild=name)
 

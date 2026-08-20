@@ -25,6 +25,8 @@ from pydantic import BaseModel, Field
 
 from app.api.abhaengigkeiten import hole_config, hole_repositories, hole_sprache
 from app import bildvorgabenwahl
+from app.bildmetadaten import metadaten_entfernen
+from app.bildschutz import putzen_an
 from app.bildturbo import Bildturbo, BildturboFehler
 from app.bildrunner import (
     Auftrag, BildFehler, Bildrunner, LoRA, loras, lora_pfad, modelle, modell_pfad,
@@ -567,6 +569,12 @@ async def bild_erzeugen(
         bildlauf.beenden(lauf, gescheitert=True)
         raise
     bildlauf.beenden(lauf)
+
+    # The generator writes the prompt, seed and every setting into the file.
+    # Stripped here, once the finished picture lies on disk, so both painters
+    # pass the same gate and nothing but the pixels is stored or handed on.
+    if putzen_an(request.app.state.repositories):
+        ziel.write_bytes(metadaten_entfernen(ziel.read_bytes()))
 
     # Prompt and picture land in the chat as a message pair — the question
     # carries the prompt, the answer carries the image. Exactly as the

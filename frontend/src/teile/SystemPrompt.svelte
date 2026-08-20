@@ -117,6 +117,32 @@
     }
   }
 
+  /* The switch that strips a picture of everything but its pixels — uploaded
+     and generated alike. Shipped on: a picture leaves no trail unless this is
+     turned off on purpose. Stored as a set of one, like the memory switches,
+     so "off" is a truthy value the settings route keeps rather than discards. */
+  let bildschutzSchalter = $state({ an: true })
+  async function bildschutzStandLaden() {
+    try {
+      const stand = await api.einstellungAufgeloest('bildmetadaten')
+      if (stand?.wert && typeof stand.wert === 'object') {
+        bildschutzSchalter = { ...bildschutzSchalter, ...stand.wert }
+      }
+    } catch {
+      /* Leaves the default standing — it is the careful one. */
+    }
+  }
+  async function bildschutzSchalten(an) {
+    const vorher = bildschutzSchalter
+    bildschutzSchalter = { an }
+    try {
+      await api.einstellungSetzen('global', 'bildmetadaten', bildschutzSchalter)
+    } catch {
+      bildschutzSchalter = vorher
+      melde(t('fehler.allgemein'), 'fehler')
+    }
+  }
+
   /* The guardian's switch. Shipped on: it only ever offers, so leaving it
      on can cost nothing but a few seconds after a step that already went
      wrong.
@@ -202,6 +228,7 @@
     }).catch(() => {})
     api.hfTokenStand().then((s) => { stand.hf = s.gesetzt; hfGesetzt = s.gesetzt }).catch(() => {})
     gedaechtnisStandLaden()
+    bildschutzStandLaden()
     waechterStandLaden()
     einbettungStandLaden()
   }
@@ -731,6 +758,13 @@ once the question is answered.
               <span class="hinweis">{t('gedaechtnis.an_cloud_hinweis')}</span>
             </div>
             <Schalter an={gedaechtnisSchalter.cloud} beschriftung={t('gedaechtnis.an_cloud')} onschalten={(an) => gedaechtnisSchalten('cloud', an)} />
+          </div>
+          <div class="schalterzeile">
+            <div class="beschriftung">
+              {t('bildschutz.titel')}
+              <span class="hinweis">{t('bildschutz.hinweis')}</span>
+            </div>
+            <Schalter an={bildschutzSchalter.an} beschriftung={t('bildschutz.titel')} onschalten={(an) => bildschutzSchalten(an)} />
           </div>
         {/if}
 
