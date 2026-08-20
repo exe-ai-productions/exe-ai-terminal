@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Exe AI Terminal — Manual</title>
+<title>Exe AI — Manual</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   /* Self-contained on purpose: the manual must never break because the app
@@ -101,7 +101,7 @@
 <body>
 <div class="seite">
 
-<h1>Exe AI Terminal</h1>
+<h1>Exe AI</h1>
 <p class="leise">Your own interface to language models — the ones running on this machine and the ones you rent. Chats, working folders, tools, skills and agents, all under your own roof.</p>
 
 <h2 id="chat">1 · Chatting</h2>
@@ -125,7 +125,7 @@
 <p>The current model stands at the <strong>foot of the sidebar</strong>. Click it for a quick list of everything reachable right now; the menu bar has the full picture under <strong>Local</strong> and <strong>Cloud</strong>.</p>
 <p>The split is not cosmetic. <strong>Local</strong> means the model runs on this machine and nothing you type leaves it. <strong>Cloud</strong> means a paid service, and your text travels there. The list only ever offers what is <em>actually reachable</em> — the terminal keeps checking, and model names come from the servers themselves, never from a list somebody maintained by hand.</p>
 <p>Sampling controls — temperature, top-p, response length — sit next to the picker, and only the dials your model's server really understands are shown. What you set there becomes that model's default; a single chat can override it without disturbing the rest.</p>
-<p>The bar at the foot of the sidebar shows how full the context window is. The small pill next to the send button beats with the live speed while an answer streams — tokens per second, as small bars rising and falling with the pace — and stands still, quiet and grey, once the reply ends. The pill keeps the speed; under the reply stands how long the first word took.</p>
+<p>A slim bar sits on the seam between the header and the chat and shows how full the context window is; it appears once a model is loaded and fills from green through amber to red as the conversation grows. The small pill next to the send button beats with the live speed while an answer streams — tokens per second, as small bars rising and falling with the pace — and stands still, quiet and grey, once the reply ends. The pill keeps the speed; under the reply stands how long the first word took.</p>
 
 <h3>Getting a model</h3>
 <p>Under <strong>Local → Catalog</strong> four tabs stand side by side — <strong>Chat</strong>, <strong>Embedding</strong>, <strong>Image</strong> and <strong>Accessories</strong> — and each shows only its own kind. Accessories are the small companion files: speed modules, vision add-ons, colour correctors, detailers and face finders, each landing in the folder of the server that will use it. What you fetch under one tab lands where the server that will run it looks for it: a chat model with the model server, an embedding with the embedding server, an image model with the image server. There are four steps under each, by how much memory your machine has, with a suggestion in each. One button fetches it; a bar shows how far it has come. Nothing to install, nothing to type. A card marked <strong>★ Recommended</strong> is the one this program would pick itself for your machine.</p>
@@ -285,7 +285,7 @@ You are a concise researcher. …</pre>
 
 <h2 id="einstellungen">12 · Appearance, language, installing</h2>
 <ul>
-  <li><strong>Settings → Appearance:</strong> light, dark or follow the device; messages filled or as an outline; and <strong>Code colours</strong> — the scheme code blocks are painted in, applied the moment you pick it.</li>
+  <li><strong>Settings → Appearance:</strong> the look, picked from a list — Pearl, Exe, Dark Matter, Heaven, or Auto to follow the device; messages filled or as an outline; and <strong>Code colours</strong> — the scheme code blocks are painted in, applied the moment you pick it.</li>
   <li><strong>Interface size:</strong> three steps — Default, Large, Larger. This one grows the program itself: menu bar, sidebar, windows, signs, lines and spacing all at once, in the same proportion to one another. It is a separate choice from the text size below, because wanting large reading type is not the same as wanting a large interface.</li>
   <li><strong>Text size:</strong> three steps — Default, Large, Larger. Chat text and column grow together, so lines keep their length while the letters gain. Reasoning rows and tool rows stay as they are.</li>
   <li><strong>Message colour:</strong> pick a colour for your own messages. The text inside flips between light and dark on its own, so every colour stays readable. <em>Default</em> brings the original back. Both choices are remembered per device.</li>
@@ -298,7 +298,7 @@ You are a concise researcher. …</pre>
 <p><strong>Everything arrives switched on.</strong> Anything the assistant can do by itself is on when you first open the program, and every one of those has a switch in its own menu. A feature nobody finds is a feature nobody has — so the program starts by trusting you with all of it, and gets out of the way when you say so.</p>
 <p><strong>One question, not ten.</strong> There is exactly one thing that stops and asks: a command reaching outside the folders you shared. Everything else runs, and everything else can be undone by looking at it. That is a deliberate trade, and it is the reason the one question is still worth reading when it appears.</p>
 
-<p class="still" style="margin-top:40px">Exe AI Terminal · The interface documents itself at <code>/docs</code> · This page: <code>/hilfe/</code></p>
+<p class="still" style="margin-top:40px">Exe AI · The interface documents itself at <code>/docs</code> · This page: <code>/hilfe/</code></p>
 </div>
 </body>
 </html>

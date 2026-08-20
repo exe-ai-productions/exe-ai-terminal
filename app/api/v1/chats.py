@@ -194,7 +194,10 @@ def nachrichten_auflisten(
         from app.api.v1.dokumente import meta_bauen
 
         dokument = repositories.documents.holen(nachricht.dokument)
-        return meta_bauen(dokument).model_dump() if dokument else None
+        if not dokument:
+            return None
+        anzahl = repositories.abschnitte.anzahl(dokument.id)
+        return meta_bauen(dokument, abschnitte=anzahl).model_dump()
 
     return [NachrichtAntwort.aus(nachricht, meta(nachricht)) for nachricht in nachrichten]
 

@@ -60,6 +60,7 @@ class DokumentMeta(BaseModel):
     seiten: int | None = None
     kb: int
     gekuerzt: bool
+    abschnitte: int = 0
 
 
 class DokumentHochgeladen(BaseModel):
@@ -166,12 +167,19 @@ async def dokument_hochladen(
         if not abschnitte and len(text) > TEXT_GRENZE:
             repositories.documents.text_kuerzen(dokument.id, text[:TEXT_GRENZE])
             dokument = repositories.documents.holen(dokument.id)
-    return DokumentHochgeladen(dokument=meta_bauen(dokument))
+    return DokumentHochgeladen(
+        dokument=meta_bauen(dokument, abschnitte=repositories.abschnitte.anzahl(dokument.id))
+    )
 
 
-def meta_bauen(dokument) -> DokumentMeta:
+def meta_bauen(dokument, abschnitte: int = 0) -> DokumentMeta:
     """The meta card for the window — always built from the database row,
-    never from client input. The message retrieval uses it too."""
+    never from client input. The message retrieval uses it too.
+
+    ``abschnitte`` says whether the section search stands behind this
+    document. The card needs it to tell an honest story: a document cut at
+    the section ceiling is not "truncated at 24,000 characters" — its
+    questions travel by the passages that match."""
     typen = {v: k for k, v in ERLAUBTE_ENDUNGEN.items()}
     endung = typen.get(dokument.mime_type or "", ".txt")
     return DokumentMeta(
@@ -181,4 +189,5 @@ def meta_bauen(dokument) -> DokumentMeta:
         seiten=dokument.pages,
         kb=max(1, round((dokument.size_bytes or 0) / 1024)),
         gekuerzt=dokument.truncated,
+        abschnitte=abschnitte,
     )

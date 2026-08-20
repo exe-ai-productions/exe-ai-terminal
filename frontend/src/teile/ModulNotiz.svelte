@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte'
   /* The notes module: blocks of notes, and the document dock beneath them.
 
      Notes stack from the top, all the same width, with a small fixed gap —
@@ -24,12 +25,16 @@
   let dateiwahl = $state(null)
   let ueberZiel = $state(false)
 
-  /* The editable body carries HTML, so it is filled once when a note opens
-     instead of being bound — binding would fight the caret on every
-     keystroke. */
+  /* The editable body carries HTML, so it is filled when a note opens or
+     the draft is swapped — never while typing. Reading the draft's content
+     inside this effect would make every keystroke a dependency: the effect
+     would rewrite the body, the caret would snap to the front, and the
+     text would come out mirrored. The draft object itself is the trigger —
+     opening and switching assign a fresh one, typing only mutates it. */
   $effect(() => {
     const offen = notizen.offen
-    if (offen && leib) leib.innerHTML = notizen.entwurf.inhalt || ''
+    const entwurf = notizen.entwurf
+    if (offen && leib) leib.innerHTML = untrack(() => entwurf.inhalt) || ''
   })
 
   function leibGeaendert() {

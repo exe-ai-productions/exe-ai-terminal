@@ -255,6 +255,8 @@
     "bild_vergroessern": "Bild vergrößern",
     "bild_sichern": "Sichern",
     "dokument_seiten": "{zahl} Seiten",
+    "dokument_liest": "Dokument wird gelesen …",
+    "dokument_abschnitte": "In {zahl} Abschnitte zerlegt",
     "dokument_gekuerzt": "Dokument nach 24.000 Zeichen gekürzt",
     "neu_senden": "Nochmal senden",
     "seed_label": "Seed {zahl}",

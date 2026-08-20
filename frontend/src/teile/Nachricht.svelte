@@ -202,7 +202,12 @@
         </span>
       </div>
       {#if nachricht.content}<div class="bildtext">{nachricht.content}</div>{/if}
-      {#if dokument.gekuerzt}
+      {#if dokument.abschnitte}
+        <!-- The section search stands behind this document: say so instead
+             of crying truncation — questions travel by matching passages,
+             and a cut at the section ceiling changes nothing about that. -->
+        <div class="dok-gekuerzt">{t('nachricht.dokument_abschnitte', { zahl: dokument.abschnitte })}</div>
+      {:else if dokument.gekuerzt}
         <div class="dok-gekuerzt">{t('nachricht.dokument_gekuerzt')}</div>
       {/if}
     {:else if nachricht.bild}
@@ -256,6 +261,12 @@
       </button>
     {/if}
   </div>
+  {#if dokument?.liest}
+    <!-- The upload is still extracting and embedding: the waiting line
+         stands where the answer's working mark will appear, so the wait
+         is visible instead of a frozen-looking chat. -->
+    <Wartezeile art="einbettung" text={t('nachricht.dokument_liest')} beschriftung={t('nachricht.dokument_liest')} />
+  {/if}
 {:else}
   <div class="von-ki">
     {#if nachricht.bild || nachricht.bildLaeuft}
@@ -597,6 +608,10 @@
     margin-top: 6px;
     padding: 7px 12px;
     background: var(--blase);
+    /* The box wears the house bubble, so it needs the house ink — the
+       surrounding user bubble's ink follows the user's chosen ground and
+       can be dark on a light bubble, which made this text vanish. */
+    color: var(--text);
     border-radius: 12px;
   }
   /* The generated picture's frame: a one-pixel light edge (brighter at the

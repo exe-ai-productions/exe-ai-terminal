@@ -255,6 +255,8 @@
     "bild_vergroessern": "Enlarge image",
     "bild_sichern": "Save",
     "dokument_seiten": "{zahl} pages",
+    "dokument_liest": "Reading the document …",
+    "dokument_abschnitte": "Indexed in {zahl} sections",
     "dokument_gekuerzt": "Document truncated at 24,000 characters",
     "neu_senden": "Send again",
     "seed_label": "Seed {zahl}",

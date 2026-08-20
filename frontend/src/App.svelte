@@ -272,22 +272,45 @@
           .catch(() => {})
       }
     }
-    /* The document AFTER the chat: the documents table hangs off the chat
-       (4.1). The server extracts the text right away and returns the meta
-       card. */
+    /* The bubble goes up BEFORE the document upload. Extracting a large
+       document — and, with the section search on, embedding it — happens
+       inside that one request and takes real time. The view decides
+       between greeting and conversation by the message list alone, so an
+       empty list during that work showed a frozen-looking empty chat while
+       the sidebar already carried the new conversation. The card starts
+       with the file's own facts and a reading note; the server's meta card
+       replaces it when the upload returns. */
+    zustand.nachrichten.push({
+      id: 'eigen-' + Date.now(),
+      role: 'user',
+      content: inhalt,
+      bild,
+      dokument: dokumentDatei
+        ? {
+            name: dokumentDatei.name,
+            typ: (dokumentDatei.name.split('.').pop() || '').toLowerCase(),
+            kb: Math.max(1, Math.round(dokumentDatei.size / 1024)),
+            liest: true,
+          }
+        : null,
+    })
+    /* Mutations must land on the proxy the list holds, not on the raw
+       object that went in — same pattern as the answer placeholder. */
+    const eintrag = zustand.nachrichten[zustand.nachrichten.length - 1]
+    runter(true)
     let dokument = null
     if (dokumentDatei) {
       try {
         dokument = (await api.dokumentHochladen(zustand.aktiverChat, dokumentDatei)).dokument
+        eintrag.dokument = dokument
       } catch (fehler) {
+        /* The upload failed: the bubble leaves again, so the chat shows
+           exactly what the server knows — nothing. */
+        zustand.nachrichten = zustand.nachrichten.filter((n) => n.id !== eintrag.id)
         melde(String(fehler.message || fehler), 'fehler')
         return
       }
     }
-    zustand.nachrichten.push({
-      id: 'eigen-' + Date.now(), role: 'user', content: inhalt, bild, dokument,
-    })
-    runter(true)
     await antwortHolen(inhalt, bild, dokument?.id ?? null, denken, skill)
   }
 

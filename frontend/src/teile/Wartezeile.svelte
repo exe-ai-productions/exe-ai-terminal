@@ -22,7 +22,15 @@
          outer geometry — frame always x4 y4 72×56 rx15, the eye spans
          the same width and lies on the same center line (y 32). Whoever
          builds a new mark here keeps to these edges. -->
-    {#if art === 'vision'}
+    {#if art === 'einbettung'}
+      <!-- A document is being read and embedded: the SAME web-and-points
+           sign as the embedding server in Hauszeichen.svelte, scaled to the
+           waiting mark's body. The web draws first, then the three points
+           settle onto its corners — the lines carry less weight than what
+           they connect, exactly as in the still sign. -->
+      <path class="strich zug2" d="M12 57 L40 7 L68 44.5 Z" stroke-width="4.5" style="--laenge:170" />
+      <path class="strich zug3" d="M12 57 h.01 M40 7 h.01 M68 44.5 h.01" stroke-width="13" style="--laenge:1" />
+    {:else if art === 'vision'}
       <!-- Image recognition: the message carried an image. The SAME eye as
            the capability sign in Hauszeichen.svelte, scaled to the waiting
            mark's width — the house has exactly one eye drawing. The pupil is

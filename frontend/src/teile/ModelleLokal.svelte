@@ -41,16 +41,23 @@
   const BILD = 'bild'
   let gezeigt = $state(SERVER)
 
-  /* What the two new tiles report, fetched when the window opens. The
-     panels behind them fetch for themselves; the tiles only need the one
-     line each that says where things stand. */
+  /* What the two new tiles report. The panels behind them fetch for
+     themselves and update live — a snapshot taken only at opening left
+     the tile saying "not running" while the panel next to it had long
+     started the server. So the tiles follow the same rhythm as the
+     reachability loop instead of trusting one old glance. */
   const BILDFARBE = { bereit: 'gruen', zeichnet: 'blau', kein_modell: 'still', kein_programm: 'rot' }
   let einbettungStand = $state(null)
   let bildStand = $state(null)
   $effect(() => {
     if (!offen) return
-    api.einbettungAuskunft().then((a) => (einbettungStand = a)).catch(() => {})
-    api.bildmodelle().then((a) => (bildStand = a)).catch(() => {})
+    const holen = () => {
+      api.einbettungAuskunft().then((a) => (einbettungStand = a)).catch(() => {})
+      api.bildmodelle().then((a) => (bildStand = a)).catch(() => {})
+    }
+    holen()
+    const takt = setInterval(holen, 15_000)
+    return () => clearInterval(takt)
   })
 
   const modelle = $derived(lokale())

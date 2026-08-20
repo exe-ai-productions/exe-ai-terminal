@@ -1,295 +1,236 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/site/mark-dark.svg">
-    <img src="docs/site/mark-light.svg" width="220" alt="The Exe AI mark, split into the four skin colours">
-  </picture>
+  <img src="docs/logo.svg" width="110" alt="Exe AI Terminal mark">
 </p>
 
-<h1 align="center">Exe AI</h1>
-
-<p align="center"><b>Your models. Your machine.</b></p>
+<h1 align="center">Exe AI Terminal</h1>
 
 <p align="center">
-  An AI agent harness that runs your entire workflow in a single window.<br>
-  Text, documents, even images — all built into a beautifully designed piece of<br>
-  software that keeps your data on your local storage.
-</p>
-
-<p align="center"><b>This is Exe AI.</b></p>
-
-<p align="center">
-  <a href="https://exe-hq.net"><b>Website</b></a>
-  &nbsp;·&nbsp;
-  <a href="https://exe-hq.net/docs/"><b>Documentation</b></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/exe-ai-productions/exe-ai-terminal/releases/latest"><b>Download for macOS</b></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/exe-ai-productions/exe-ai-terminal/releases/latest"><b>Download for Windows</b></a>
+  An AI agent harness you operate entirely from its window — and all data
+  stays on your PC.
 </p>
 
 <p align="center">
-  <a href="https://github.com/exe-ai-productions/exe-ai-terminal/releases/latest"><img src="https://img.shields.io/github/v/release/exe-ai-productions/exe-ai-terminal?style=flat-square&label=release&labelColor=1a1a18&color=7d6cba" alt="Latest release"></a>
-  &nbsp;<img src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Windows-b1a687?style=flat-square&labelColor=1a1a18" alt="Platforms: macOS and Windows">
-  &nbsp;<img src="https://img.shields.io/badge/data-stays%20on%20your%20PC-7e96c6?style=flat-square&labelColor=1a1a18" alt="Data stays on your PC">
-  &nbsp;<a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-8f8e86?style=flat-square&labelColor=1a1a18" alt="License: PolyForm Noncommercial 1.0.0"></a>
+  <a href="https://github.com/exe-ai-productions/exe-ai-terminal/releases/latest"><b>Download the latest release</b></a>
+  ·
+  <a href="#quick-start">Quick start</a>
+  ·
+  <a href="#privacy-stance">Privacy</a>
 </p>
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+---
+
+Download a model, start it, talk to it, hand your agents tools and
+schedules — nothing ever needs a terminal or a config file. Local models
+are the normal case, not the exception; cloud providers are one key away,
+and nothing leaves your machine unless you set that up yourself.
+
+![The empty chat greeting its user by name, with the wordmark and input centred](docs/chat.png)
+
+---
 
 <p align="center">
-  <img src="docs/site/chat.png" width="820" alt="The empty chat greeting its user by name, the picture wall open in the work rail">
-</p>
-
-<p align="center">
-  Download a model, start it, talk to it, hand your agents tools and schedules —<br>
-  nothing ever needs a terminal or a config file. Local models are the normal case,<br>
-  not the exception; cloud providers are one key away, and nothing leaves your<br>
-  machine unless you set that up yourself.
-</p>
-
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
-
-<p align="center">
-  <img src="docs/site/eew.svg" width="140" alt="The Extended Workflow monogram">
+  <img src="docs/eew.svg" width="132" alt="The Extended Workflow monogram">
 </p>
 
 <h2 align="center">Extended Workflow</h2>
 
 <p align="center">
-  <b>A tool call fails. A second model — yours, local, on its own port —<br>
+  <b>A tool call fails. A second model — yours, local, on its own port —
   reads what went wrong and writes the corrected instruction.<br>
   You read it, and it is one click away from being sent.</b>
 </p>
 
-<table>
-  <tr>
-    <td width="33%" valign="top">
-      <p><b>01 — Plain code spots the failure.</b></p>
-      <p>Not a model, not a heuristic dressed up as one — the exit code, the stderr, the timeout. No tokens spent on noticing.</p>
-    </td>
-    <td width="33%" valign="top">
-      <p><b>02 — A small model of your own writes the fix.</b></p>
-      <p>It runs on its own port and never asks the chat's model, never a cloud endpoint — a branch in the code with no fallback.</p>
-    </td>
-    <td width="33%" valign="top">
-      <p><b>03 — You decide.</b></p>
-      <p>The suggestion stands in the rail with the finding beside it. One click sends it, one click drops it. Nothing runs behind your back.</p>
-    </td>
-  </tr>
-</table>
+Every agent harness fails the same way: a command misses a flag, a path is
+wrong, a file is not where the model thought — and the run stalls, or worse,
+carries on as if nothing happened. The usual answer is to ask the big model
+to fix its own mistake, which costs a full round trip and, on a cloud
+endpoint, sends the failed command and your released folders out of the
+house.
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+Extended Workflow does it differently, and this is the part that is ours:
 
-## <img src="docs/site/z-funkelstern.svg" height="24" align="top" alt=""> What it does
+- **Plain code spots the failure.** Not a model, not a heuristic dressed up
+  as one — the exit code, the stderr, the timeout. No tokens spent on
+  noticing.
+- **A small model of your own writes the fix.** It runs on its own port,
+  loads only while the feature is on, and answers in a window sized to the
+  question. **It never asks the chat's model, and never a cloud endpoint** —
+  not as a preference, but as a branch in the code with no fallback.
+- **You decide.** The suggestion stands in the rail with the finding beside
+  it. One click sends it, one click drops it. Nothing runs behind your back.
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <p><b>Local models, end to end</b></p>
-      <p>A curated GGUF catalogue sized to your machine's memory, a Hugging Face search, a one-button download and a built-in <code>llama-server</code> runner. Fetch, start, chat — no shell, no scripts.</p>
-    </td>
-    <td width="50%" valign="top">
-      <p><b>Pictures, drawn on this machine</b></p>
-      <p>stable-diffusion.cpp draws them behind an honest memory gate — sizes, steps, samplers, stackable LoRAs, a starting image with a brush for the part to redraw, and a queue. Nothing leaves the PC.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <p><b>Long documents that fit</b></p>
-      <p>Past a threshold a document is cut into overlapping sections, each carries a vector from a local embedding model, and a question brings along only the passages that fit it — section numbers named.</p>
-    </td>
-    <td width="50%" valign="top">
-      <p><b>A memory that grows with you</b></p>
-      <p>The assistant saves what should still hold next week and retrieves it on demand. Local models get it by default, cloud models only if you switch that on.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <p><b>Agents, jobs and schedules</b></p>
-      <p>Reusable agent files — Markdown with front matter — one-off or scheduled runs, a step-by-step log and a final report. Missed runs are skipped, never stacked.</p>
-    </td>
-    <td width="50%" valign="top">
-      <p><b>Tools that ask first</b></p>
-      <p>Eight built-in tools and any MCP server. The shared folder is the permission: no shared folder, no file access — and reaching outside stops and asks.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <p><b>It knows who it works for</b></p>
-      <p>The first start asks your name, your language, light or dark. From then on the empty chat greets you by name — and one switch rules it all. Off means off, everywhere.</p>
-    </td>
-    <td width="50%" valign="top">
-      <p><b>Two languages, real maker marks</b></p>
-      <p>English and German at runtime, error messages included. Catalogue cards carry the original vendor vector of their model family — never redrawn, never guessed.</p>
-    </td>
-  </tr>
-</table>
+That is the whole promise of this program in one feature: the machine does
+the noticing and the drafting, and the person keeps the decision — with
+nothing leaving the PC on the way.
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+Shipped switched on. The switch sits in the module head and in the settings,
+and both draw the same fact from the same place.
 
-## <img src="docs/site/z-tropfen.svg" height="24" align="top" alt=""> One program, four worlds
+---
 
-Pick a skin and the whole surface follows — the frame, every line, every bubble, the code blocks.
+## What it does
 
-<table>
-  <tr>
-    <td width="50%" align="center"><img src="docs/site/skin-darkmatter.png" alt="Dark Matter — the violet nebula behind the chat"><br><b>Dark Matter</b></td>
-    <td width="50%" align="center"><img src="docs/site/skin-heaven.png" alt="Heaven — the pastel sky of overlapping bubbles"><br><b>Heaven</b></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center"><img src="docs/site/skin-exe.png" alt="Exe — the warm near-black the program ships in"><br><b>Exe</b></td>
-    <td width="50%" align="center"><img src="docs/site/skin-pearl.png" alt="Pearl — the warm cream mirror of the dark skin"><br><b>Pearl</b></td>
-  </tr>
-</table>
+- **Extended Workflow** (above): a failed tool call gets a corrected
+  instruction, written by a small local model on its own port, offered one
+  click away from being sent.
+- **Pictures, drawn on this machine.** stable-diffusion.cpp draws them one
+  at a time behind a memory gate that answers honestly before it starts —
+  size, steps, sampler and scheduler from the shipped binary's own lists, a
+  stackable LoRA list, a starting image with a brush for the part to redraw.
+  A machine without the generator fetches it in one click, the same way the
+  model server has always been fetchable. Nothing leaves the PC.
+- **Long documents stop overrunning the context.** Past a threshold a
+  document is cut into overlapping sections, each carries a vector from a
+  local embedding model, and a question brings along only the passages that
+  fit it — with the section numbers named, so the answer can be checked
+  against the source.
+- **It knows who it works for.** The first start grows a small welcome
+  window straight out of the wordmark: what to call you (your system
+  already suggests it), your language, light or dark. From then on the
+  empty chat greets you by name and time of day — and one switch rules
+  both the greeting and the single prompt line that lets your models
+  address you. Off means off, everywhere.
+- **Local models, end to end.** A curated catalogue of GGUF models sized
+  to your machine's memory, a Hugging Face search, a one-button download
+  and a built-in `llama-server` runner. Fetch, start, chat — no shell, no
+  scripts.
+- **Real maker marks.** Catalogue cards and every search hit carry the
+  original vendor vector of their model family — Qwen, DeepSeek, Mistral,
+  Meta, Microsoft, OpenAI, NVIDIA, IBM and more. Never redrawn, never
+  guessed: a mark only appears when the original exists.
+- **A fully integrated persistent memory.** The agent learns your working
+  style over time and improves alongside you — it saves memories on its
+  own and retrieves them on demand. The same applies to tools and skills.
+- **Cloud providers when you want them.** Anthropic, OpenAI or any
+  OpenAI-compatible endpoint. The API key goes into a local file with
+  tight permissions and is never displayed again — the interface only
+  ever learns *whether* a key is set.
+- **Chats with history**, stored in a local SQLite database. Rename, pin,
+  search, delete — it is your data, on your disk.
+- **Agents and jobs.** Reusable agent files (Markdown with front matter),
+  one-off or scheduled runs, with a step-by-step log and a final report.
+- **Tools via MCP.** The built-in exe-websearch and a shell tool ship
+  with the program; any MCP server can be added. Sources fold open and
+  closed in one quiet list, and tools that reach outside ask first.
+- **A shipped base prompt.** The program carries fixed operating
+  instructions for the model: report only what tool calls really
+  returned, treat everything a tool brings back as data rather than
+  orders — a web page cannot re-instruct the assistant — and do what was
+  asked, not more. Your own system prompt sits on top and shapes tone and
+  character; it never has to fight the machinery.
+- **Documents and images.** PDF/TXT/MD upload into the conversation and
+  image input for vision models. Pictures are drawn locally (above); a
+  ComfyUI instance or an OpenAI-compatible image endpoint can be used
+  instead when you have one.
+- **An interface that stays out of the way.** Windows take turns instead
+  of stacking, lists melt at their edges instead of cutting rows, and the
+  sidebar seam drags to the width you like — and remembers it.
+- **Two languages.** English and German, switchable at runtime —
+  including every error message the service produces.
 
-Plus code colour sets — Exe, Tokyo Night, One Light — three text sizes, outline messages, and your own bubble colour with ink that flips between light and dark on its own.
+![The curated catalogue: fitted cards with real maker marks, plus a search across Hugging Face](docs/katalog.png)
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+![The tools window: sources folded into one quiet list, one unfolded](docs/werkzeuge.png)
 
-## <img src="docs/site/z-paket.svg" height="24" align="top" alt=""> Three models of our own
+## Privacy stance
 
-Trained on the terminal itself — its tools, its folder rules, its limits. Not on facts, on behaviour.
+The service binds to `127.0.0.1`. Chats, settings, keys and models live in
+local files and a local database. The optional memory feature sends its
+content to cloud providers only if you switch that on, and the same
+honesty applies to your name: it sits in the local settings store, and the
+one switch that shares it with your models says so in plain words. Model
+downloads talk to `huggingface.co` directly; the model search runs through
+the service so your browser never contacts a third party.
 
-<table>
-  <tr>
-    <td width="33%" valign="top">
-      <p><b>Exe Core Dynamic</b><br><sub>THE CORE MODEL · QWEN 3.8 · 27B</sub></p>
-      <p>Knows every built-in tool and reads tool schemas it has never seen. The recommended choice for machines with room.</p>
-      <ul>
-        <li><b>262,144</b> context window</li>
-        <li>Extended Workflow · tools · vision</li>
-        <li>Five builds, 10.9–22.4 GB</li>
-      </ul>
-    </td>
-    <td width="33%" valign="top">
-      <p><b>Exe Turbo S</b><br><sub>THE SMALL ONE · LFM 2.5 · 8.3B MOE</sub></p>
-      <p>For machines with 6–8 GB of memory: computes with only 1.5 of its 8.3 billion parameters per token.</p>
-      <ul>
-        <li><b>128,000</b> context window</li>
-        <li>Extended Workflow · tools · thinking</li>
-        <li>Five builds, 3.8–9.0 GB</li>
-      </ul>
-    </td>
-    <td width="33%" valign="top">
-      <p><b>Exe Guard Dynamic</b><br><sub>THE GUARDIAN · QWEN 3.5 4B</sub></p>
-      <p>Tiny and fast: reads a failed tool step and names the one instruction that fixes it. Built for Extended Workflow.</p>
-      <ul>
-        <li><b>4,096</b> context — answer time is the point</li>
-        <li>Extended Workflow · tools · vision</li>
-        <li>Five builds, 1.2–3.1 GB</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+## Quick start
 
-<p align="center">
-  <img src="docs/site/exe-modelle.png" width="900" alt="The catalogue's Exe row — the three model cards with their capability marks, sizes and builds">
-</p>
+### Packaged (macOS)
 
-And every model you already know: the curated catalogue builds on the open model world, every entry started, shown an image and asked to call tools before it made the list — plus LM Studio, Ollama and MLX if you already run them, and Anthropic, OpenAI or any OpenAI-compatible endpoint one key away.
-
-<p align="center">
-  <img src="docs/site/katalog.png" width="820" alt="The catalogue — chat, embedding, image and add-on tabs, curated cards with real maker marks">
-</p>
-
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
-
-## <img src="docs/site/z-werkzeug.svg" height="24" align="top" alt=""> Tools that ask first
-
-**The shared folder is the permission.** No shared folder, no file access — not as a setting, as the architecture. Anything reaching outside your shared folders stops and asks first, right above the input field.
-
-| Tool | What it does |
-|---|---|
-| `run_command` | Shell commands inside your shared folders — foreground or background. Anything reaching outside asks first. |
-| `read_file` / `list_dir` | Look without touching: reading can stay on while writing stays off. |
-| `write_file` / `edit_file` | Writing creates, editing replaces one passage — and refuses with a reason if the old text isn't found exactly once. |
-| `memory_save` | Appends or replaces one entry. It cannot delete, and it cannot write whole files. |
-| `skill_load` / `skill_save` | Skills are little procedures the assistant loads on demand — or writes for you. |
-| `ask_user` | Hands the decision back: the run pauses, you answer, it continues. |
-| `web_search` | Ships with the program — no account, no key, runs locally. Or point it at your own SearXNG. |
-
-Everything beyond that speaks **MCP**: Notion, GitHub, Figma, Gmail, Recraft, Hugging Face — or your own server. Sensitive actions stop and ask, and a tool's output is treated as **data, never as new orders** — a web page cannot re-instruct the assistant.
-
-<p align="center">
-  <img src="docs/site/rueckfrage.png" width="740" alt="A command reaching outside the shared folders — the terminal stops and asks above the input field">
-</p>
-
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
-
-## <img src="docs/site/z-schloss.svg" height="24" align="top" alt=""> Built for privacy
-
-- The service binds to **127.0.0.1**. Chats, settings, keys and models live in local files and a local SQLite database.
-- API keys go into a local file with tight permissions and are never displayed again — the interface only ever learns *whether* a key is set.
-- The optional memory travels to cloud providers only if you switch that on. The same honesty applies to your name.
-- Model downloads talk to huggingface.co directly; the model search runs through the service, so your browser never contacts a third party.
-- The model server gets a fresh key at every start, and the service turns away cross-origin writes — web pages in your browser cannot knock on your local ports.
-- Extended Workflow's guardian never asks the chat's model and never a cloud endpoint — a branch in the code with no fallback.
-
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
-
-## <img src="docs/site/z-zahnrad.svg" height="24" align="top" alt=""> Quick start
-
-### Packaged — the normal way
-
-Grab the build for your system from the [latest release](https://github.com/exe-ai-productions/exe-ai-terminal/releases/latest). No account, no setup wizard.
-
-- **macOS (Apple Silicon)** — open the `.dmg`, drag the app into Applications. Signed and notarized with Apple.
-- **Windows (x64)** — one `.exe`; keep it wherever you like and run it.
+Grab the `.dmg` from the
+[latest release](https://github.com/exe-ai-productions/exe-ai-terminal/releases/latest),
+drag the app into `Applications`, open it. The service starts with the
+window and everything above applies out of the box.
 
 ### From source
 
 ```bash
-git clone https://github.com/exe-ai-productions/exe-ai-terminal
-cd exe-ai-terminal
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+cp config.example.yaml config.yaml   # optional: port, language, endpoints
 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
 ```
 
-Then open `http://127.0.0.1:8090/app/`. For local models, install [llama.cpp](https://github.com/ggml-org/llama.cpp) — or let the Local view fetch `llama-server` for you, exactly like the packaged app does. The test suite runs with `.venv/bin/pytest`.
+Then open `http://127.0.0.1:8090/app/`.
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+To run local models, install [llama.cpp](https://github.com/ggml-org/llama.cpp)
+(`brew install llama.cpp` on macOS, prebuilt releases exist for Windows and
+Linux). The interface finds `llama-server` on its own.
 
-## <img src="docs/site/z-globus.svg" height="24" align="top" alt=""> HTTP API
+### Self-contained build
 
-The window talks to a plain HTTP API on your machine — and so can your scripts.
+`deploy/exe-ai-terminal.spec` builds a single self-contained file with
+PyInstaller — no Python required on the target machine:
+
+```bash
+.venv/bin/pyinstaller deploy/exe-ai-terminal.spec
+```
+
+Double-clicking the result starts the service and opens the browser; a
+second start just brings the window back.
+
+### Docker
+
+```bash
+docker compose up
+```
+
+## Configuration
+
+`config.example.yaml` is version-controlled and serves as the template:
+copy it to `config.yaml` — your personal, unversioned copy — and adjust
+port, language, feature flags and candidate endpoints there. Secrets
+belong in `.env`, which never ends up in the repository. Everything else —
+providers, models, tools, agents — can be set up from the interface.
+
+Which endpoints are actually reachable is decided at runtime by a health
+check; the list in the file is only the set of candidates.
+
+## API
+
+The frontend talks to a plain HTTP API, which you can use directly.
 
 | Address | Purpose |
 |---|---|
-| `/health` | Service status — fixed address for monitoring |
+| `/health` | Service status (fixed address for monitoring) |
 | `/api/v1/meta` | Features, languages, version |
 | `/api/v1/models` | Reachable endpoints with their reported model names |
 | `/api/v1/chats` | Create, list, rename, delete chats |
 | `/api/v1/chat/completions` | Generate a response (Server-Sent Events) |
 | `/api/v1/tools` | Available tools (MCP) |
 | `/api/v1/agents`, `/api/v1/jobs` | Agents and their runs |
-| `/docs` | Interactive API documentation, served by the app itself |
+| `/docs` | Interactive API documentation |
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+## Project layout
 
-## <img src="docs/site/z-sanduhr.svg" height="24" align="top" alt=""> License
+```
+app/          FastAPI service: providers, discovery, tools, agents, db
+app/locales/  Translation catalogs (EN is the source, DE the translation)
+frontend/     Svelte 5 source of the interface (Vite)
+static/       Served files, including the built frontend
+mcp/          Bundled MCP servers (web search)
+deploy/       PyInstaller spec and systemd unit
+tests/        pytest suite — run with .venv/bin/pytest
+```
 
-[PolyForm Noncommercial 1.0.0](LICENSE.md) — in plain words: use it, change it and share it freely for anything personal, educational or otherwise noncommercial. Using it commercially — in a company, for paid work — needs a commercial license: write to **dev@exe-hq.net**.
+## Tests
 
-<p align="center"><img src="docs/site/trenner.svg" width="100%" alt=""></p>
+```bash
+.venv/bin/pytest
+```
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/site/mark-dark.svg">
-    <img src="docs/site/mark-light.svg" width="64" alt="">
-  </picture>
-</p>
+## License
 
-<p align="center">
-  <a href="https://exe-hq.net"><b>exe-hq.net</b></a>
-  &nbsp;·&nbsp;
-  <a href="https://exe-hq.net/docs/">Docs</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/exe-ai-productions/exe-ai-terminal/releases">Releases</a>
-  &nbsp;·&nbsp;
-  <a href="https://exe-hq.net/impressum.html">Legal Notice</a>
-  &nbsp;·&nbsp;
-  <a href="https://exe-hq.net/datenschutz.html">Privacy Policy</a>
-</p>
-
-<p align="center"><sub>© 2026 Exe AI Productions</sub></p>
+[PolyForm Noncommercial 1.0.0](LICENSE.md) — in plain words: use it, change
+it and share it freely for anything personal, educational or otherwise
+noncommercial. Using it commercially — in a company, for paid work — needs
+a commercial license: write to dev@exe-hq.net.
