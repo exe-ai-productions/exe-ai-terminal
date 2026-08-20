@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35 28" width="240">
+  <!-- The Exe AI mark, split into the four skin colours. Dark-ground
+       variant: the Exe band wears the dark theme's ink. -->
+  <defs>
+    <linearGradient id="vierbaender" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7e96c6"/>
+      <stop offset=".25" stop-color="#7e96c6"/>
+      <stop offset=".25" stop-color="#7d6cba"/>
+      <stop offset=".5" stop-color="#7d6cba"/>
+      <stop offset=".5" stop-color="#b1a687"/>
+      <stop offset=".75" stop-color="#b1a687"/>
+      <stop offset=".75" stop-color="#ecebe6"/>
+      <stop offset="1" stop-color="#ecebe6"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#vierbaender)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1.35" y="1.35" width="32.3" height="25.3" rx="7.5"/>
+    <path d="M9.5 10 L15.5 14.5 L9.5 19"/>
+    <path d="M20 19 H27"/>
+  </g>
+</svg>
