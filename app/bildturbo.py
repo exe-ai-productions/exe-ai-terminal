@@ -183,6 +183,7 @@ class Bildturbo:
         ad_modell: Path | None = None,
         ad_prompt: str = "",
         lora_ordner: Path | None = None,
+        embd_ordner: Path | None = None,
     ) -> None:
         """Bring the server up on the given model and Gespann. Returns once the
         process is launched; the model may still be loading (the plaque shows
@@ -224,6 +225,8 @@ class Bildturbo:
                     "--lora-model-dir", str(lora_ordner),
                     "--lora-apply-mode", "at_runtime",
                 ]
+            if embd_ordner is not None:
+                befehl += ["--embd-dir", str(embd_ordner)]
             self._prozess = subprocess.Popen(
                 befehl,
                 stdout=subprocess.PIPE,

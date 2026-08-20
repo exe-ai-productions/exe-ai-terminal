@@ -38,7 +38,7 @@ from collections.abc import Sequence
 # --- The parts ---------------------------------------------------------------
 
 GRUNDLAGE = """\
-You are the assistant inside Exe AI Terminal, a program running on the user's
+You are the assistant inside Exe AI, a program running on the user's
 own computer.
 
 Answer in the language the user writes in. Keep code, commands, paths and

@@ -47,6 +47,10 @@ ARTEN = {
     "chat": [],
     "einbettung": ["feature-extraction", "sentence-similarity"],
     "bild": ["text-to-image"],
+    # Video generation. No tab of its own in this window — the kind exists
+    # for the other Exe programs that share this search (Exe Motion asks
+    # with it), so the token and the tunnel stay in one place.
+    "video": ["image-to-video", "text-to-video"],
     # Accessories (VAE, LoRA, face detectors, drafters, projectors) have no
     # honest Hugging Face tag to search by — a tagless query would just spill
     # chat models into the tab. The tab is curated only; its search returns
@@ -61,7 +65,13 @@ ARTEN = {
 # checkpoints live on Hugging Face almost only as safetensors. A gguf filter
 # on the image tab hid exactly the models people came for; the text-to-image
 # tag keeps the tab to image models without it.
-DATEIFILTER = {"chat": "gguf", "einbettung": "gguf", "bild": None, "zubehoer": None}
+DATEIFILTER = {
+    "chat": "gguf",
+    "einbettung": "gguf",
+    "bild": None,
+    "video": None,
+    "zubehoer": None,
+}
 
 # The kinds a tagless chat query must drop so the tabs stay separate.
 KEIN_CHAT = {tag for tags in ARTEN.values() for tag in tags}

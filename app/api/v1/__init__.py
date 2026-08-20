@@ -33,6 +33,7 @@ from app.api.v1 import (
     notizen,
     runner,
     skills,
+    speicherblick,
     speicherorte,
     systemprompt,
     waechter,
@@ -54,6 +55,7 @@ router.include_router(eewserver.router)
 router.include_router(werkzeuge.router)
 router.include_router(dateien.router)
 router.include_router(dateisystem.router)
+router.include_router(speicherblick.router)
 router.include_router(speicherorte.router)
 router.include_router(systemprompt.router)
 router.include_router(gedaechtnis.router)

@@ -101,6 +101,10 @@ class Auftrag:
     # prompt syntax carries, so it is what the picture gets.
     loras: tuple[LoRA, ...] = ()
     lora_ordner: Path | None = None
+    # Textual-inversion embeddings: the folder is pointed at, and a file in
+    # it is called by its name inside the prompt. Only passed when the
+    # folder exists, so the flag never names a place that is not there.
+    embd_ordner: Path | None = None
     # An image to start from, and how much of it to paint over. 1.0 means
     # nothing of it survives, which is what a picture made from nothing is —
     # so without a starting image the value never leaves 1.0.
@@ -354,6 +358,8 @@ class Bildrunner:
             teile += ["--lora-apply-mode", "at_runtime"]
         # The quality companions. Each is left off entirely when unset, so the
         # command line carries only what was actually chosen.
+        if auftrag.embd_ordner is not None:
+            teile += ["--embd-dir", str(auftrag.embd_ordner)]
         if auftrag.clip_skip > 0:
             teile += ["--clip-skip", str(auftrag.clip_skip)]
         if auftrag.vae is not None:

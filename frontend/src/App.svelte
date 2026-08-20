@@ -28,6 +28,9 @@
   import Auftraege from './teile/Auftraege.svelte'
   import Agentenmarke from './teile/Agentenmarke.svelte'
   import Wasserzeichen from './teile/Wasserzeichen.svelte'
+  import Bildwarteschlange from './teile/Bildwarteschlange.svelte'
+  import Serverpunkt from './teile/Serverpunkt.svelte'
+  import Speicherpille from './teile/Speicherpille.svelte'
   import { api, antwortStrom } from './lib/api.js'
   import { t } from './lib/texte.svelte.js'
 
@@ -358,18 +361,26 @@
 
   async function bildEinesZeichnen(wunsch) {
     const chatId = wunsch.chat_id
-    zustand.nachrichten.push({ id: 'eigen-' + Date.now(), role: 'user', content: wunsch.prompt })
-    /* IMPORTANT: fetch the object back OUT of the list after the push —
-       only the list's copy is reactive. Whoever keeps the raw object writes
-       into the void, which is the bug where the picture only appeared after
-       switching chats. */
     const masse = { breite: wunsch.breite ?? 512, hoehe: wunsch.hoehe ?? 512 }
-    zustand.nachrichten.push({
-      id: null, role: 'assistant', content: '', bildLaeuft: true, stats: {}, werkzeuge: [],
-      bildMasse: masse,
-    })
-    const platzhalter = zustand.nachrichten[zustand.nachrichten.length - 1]
-    runter(true)
+    /* The queue may reach this wish while ANOTHER chat is on screen. Then
+       the visible list is a foreign one and gets nothing pushed into it —
+       the working message belongs to the drawing chat and comes back
+       through chatOeffnen the moment that chat is opened. Without this
+       guard the pair appeared in whichever chat happened to be open. */
+    let platzhalter = null
+    if (zustand.aktiverChat === chatId) {
+      zustand.nachrichten.push({ id: 'eigen-' + Date.now(), role: 'user', content: wunsch.prompt })
+      /* IMPORTANT: fetch the object back OUT of the list after the push —
+         only the list's copy is reactive. Whoever keeps the raw object writes
+         into the void, which is the bug where the picture only appeared after
+         switching chats. */
+      zustand.nachrichten.push({
+        id: null, role: 'assistant', content: '', bildLaeuft: true, stats: {}, werkzeuge: [],
+        bildMasse: masse,
+      })
+      platzhalter = zustand.nachrichten[zustand.nachrichten.length - 1]
+      runter(true)
+    }
     // Remember which chat is drawing, so switching away and back can put the
     // working message (and its filling frame) back — it is not on the server.
     zustand.bildLaeuftChat = chatId
@@ -810,40 +821,69 @@
   <!-- The Dark-Matter field, behind everything; paints only under that skin. -->
   <Materiefeld />
   <Himmelfeld />
-  <Menueleiste
-    bind:this={menue}
-    einstellungenOeffnen={() => {
-      zustand.promptStart = 'darstellung'
-      menueFensterOeffnen('prompt')
-    }}
-  />
-
-  <!-- The header says which half of the program you are in: in the agent
-       section it carries the agent mark, otherwise the wordmark. -->
+  <!-- The ONE header, the same single band the sibling programs wear: mark,
+       menu, folders, then the status group pressed against the right edge —
+       dot, memory pill, help, and the gear in its own slot flush at the
+       corner. The old menu bar above it is gone; its items sit in here. -->
   <div class="kopfleiste">
     {#if zustand.bereich === 'auftraege'}
       <Agentenmarke groesse={26} beschriftung={t('jobs.kopf')} />
     {:else}
-      <!-- The mark keeps the width of the sidebar, so the folders next to it
-           start exactly at its edge and not right after the lettering —
-           the header then reads in the same two
-           columns as everything below it. Collapsed, the rail is narrower
-           than the mark itself, so the block shrinks to the mark and no
-           further; it travels with the same timing as the bar. -->
-      <div class="markenplatz" class:schmal={zustand.seitenleisteEingeklappt}>
+      <!-- The mark takes only its own width: the menu reads on right after
+           the lettering, one line from left to right — no column split with
+           the sidebar below. -->
+      <div class="markenplatz">
         <Wortmarke />
       </div>
-      <!-- The header belongs to the working folders.
-           The model picker used to sit top right; it moved down into the
-           foot of the sidebar so this whole width is free. The folders fly
-           in here from above the input field as soon as the first message
-           is out — before that they stand down there, where they were set. -->
+    {/if}
+    <Menueleiste bind:this={menue} />
+    {#if zustand.bereich !== 'auftraege'}
+      <!-- The folders read on from the menu; min-width 0 so long names
+           truncate inside their pills instead of stretching the header. -->
       <div class="ordnerecke">
         {#if !nochLeer}
           <Ordnerpillen ort="kopf" />
         {/if}
       </div>
     {/if}
+    <div class="spacer"></div>
+    <span class="kopfstatus">
+      <!-- The picture count reflows in here on its own: it shows only
+           while pictures are being made. -->
+      <Bildwarteschlange />
+      <Serverpunkt />
+    </span>
+    <Speicherpille />
+    <!-- The manual: its own page, deliberately outside the app — it should
+         be able to stay open next to the app. -->
+    <button
+      class="kopfknopf hilfeknopf"
+      aria-label={t('menue.hilfe')}
+      title={t('menue.hilfe')}
+      onclick={() => window.open('https://exe-hq.net/docs/', '_blank')}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9.2 9a2.8 2.8 0 1 1 4 2.55c-.9.42-1.2 1.05-1.2 2.05v.4" />
+        <path d="M12 17.6 V17.7" />
+      </svg>
+    </button>
+    <button
+      class="kopfknopf"
+      aria-label={t('menue.settings')}
+      title={t('menue.settings')}
+      onclick={() => {
+        zustand.promptStart = 'darstellung'
+        menueFensterOeffnen('prompt')
+      }}
+    >
+      <!-- The sun-wheel — the house Settings mark the sibling programs wear. -->
+      <svg viewBox="0 0 100 100" width="22" height="22" fill="none" stroke="currentColor"
+           stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="50" cy="50" r="16" />
+        <path d="M50 22 V32 M50 68 V78 M22 50 H32 M68 50 H78 M30 30 l7 7 M63 63 l7 7 M70 30 l-7 7 M37 63 l-7 7" />
+      </svg>
+    </button>
   </div>
 
   <div class="rumpf">
@@ -976,43 +1016,77 @@
   .kopfleiste {
     display: flex;
     align-items: center;
-    height: 52px;
+    gap: 12px;
+    /* The sibling programs' single band: 44 px tall, no right padding —
+       the gear owns its own slot flush at the corner. */
+    height: 44px;
     flex: none;
-    padding: 0 18px;
+    padding: 0 0 0 18px;
     /* Header band. Transparent by default, so light and dark keep showing the
        ground through it exactly as before. Under Dark Matter it takes a solid
        dark cap (--kopf-bg) and a soft shadow (--kopf-schatten) so the whole
        header lifts off the nebula with a hard lower edge instead of melting
-       into the shimmer. position/z-index let the shadow fall on the content. */
+       into the shimmer. position/z-index let the shadow fall on the content —
+       and let the menu dropdown anchored in here stand above it. */
     background: var(--kopf-bg, transparent);
     border-bottom: 1px solid var(--linie);
     box-shadow: var(--kopf-schatten, none);
     position: relative;
-    z-index: 1;
+    z-index: 3;
   }
-  /* The model-picker corner: presses itself against the right edge,
-     opposite the wordmark. min-width: 0 so long model names truncate
-     instead of pushing. */
-  /* 248 px is the sidebar, minus the header's own 18 px of padding — that
-     puts the right edge of this block exactly on the bar's dividing line.
-     Collapsed the rail is 50 px, narrower than the mark, so the block stops
-     at the mark instead. Same timing as the bar, or the two would slide
-     apart while moving. */
+  .spacer {
+    flex: 1;
+  }
+  /* The status group left of the memory pill: dot and one quiet word,
+     capped so a long text never pushes the pill around. */
+  .kopfstatus {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 42vw;
+    font-size: 12.5px;
+    color: var(--text-leise);
+  }
+  /* No frame, no box — just the mark, softly lifted by a glow that blurs
+     out smoothly. The gear's 52 px slot sits flush at the right edge. */
+  .kopfknopf {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 44px;
+    flex: none;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: var(--text-leise);
+    cursor: pointer;
+    padding: 0;
+  }
+  .kopfknopf.hilfeknopf {
+    width: 36px;
+    margin-right: -12px;
+  }
+  .kopfknopf svg {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
+            drop-shadow(0 0 5px color-mix(in srgb, var(--text) 16%, transparent));
+    transition: color 0.12s, filter 0.12s;
+  }
+  .kopfknopf:hover {
+    color: var(--text);
+  }
+  .kopfknopf:hover svg {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35))
+            drop-shadow(0 0 8px color-mix(in srgb, var(--text) 32%, transparent));
+  }
+  /* Only as wide as the mark itself: the menu items follow right after
+     the lettering instead of waiting at the sidebar seam. */
   .markenplatz {
     flex: none;
-    /* Two pixels wider than the block edge below it: measured against the
-       sidebar seam, the first chip reads as aligned only slightly to the
-       right of it, not flush on it. */
-    width: 232px;
     display: flex;
     align-items: center;
-    transition: width 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
-  }
-  .markenplatz.schmal {
-    width: 170px;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .markenplatz { transition: none; }
   }
   /* The folders start at that edge and take what they need. No
      margin-left: auto — they belong to the left half, reading on from the

@@ -19,7 +19,7 @@
   import Zahlenfeld from './Zahlenfeld.svelte'
   import Turbozeichen from './Turbozeichen.svelte'
   import { api } from '../lib/api.js'
-  import { melde, zustand } from '../lib/zustand.svelte.js'
+  import { melde, zustand, chatsLaden } from '../lib/zustand.svelte.js'
   import { t } from '../lib/texte.svelte.js'
   import { seedlage } from '../lib/bildseed.svelte.js'
 
@@ -301,14 +301,31 @@
     }
   }
 
-  function zeichnen() {
+  async function zeichnen() {
     if (!bereit) return
-    /* No chat, no home for the picture. Starting anyway is how a run ends
-       up working for nobody — nowhere to show itself, nothing to stop it,
-       and a window left standing on "drawing…" for five minutes. */
-    if (!chatId) {
-      melde(t('bild.erst_chat'), 'hinweis')
-      return
+    /* No chat yet: then drawing OPENS one instead of refusing. Wanting a
+       picture is a complete wish of its own — it must not depend on a chat
+       model being loaded or a conversation having been started first. The
+       chat is created without a model on purpose; it gets one the moment
+       a message is sent in it. */
+    let ziel = chatId
+    if (!ziel) {
+      const titel = prompt.trim().length > 40
+        ? prompt.trim().slice(0, 40) + '…'
+        : prompt.trim() || t('eingabe.bild_titel')
+      try {
+        const chat = await api.chatAnlegen({
+          title: titel,
+          endpoint_id: zustand.modellId || null,
+        })
+        ziel = chat.id
+        zustand.aktiverChat = chat.id
+        zustand.nachrichten = []
+        chatsLaden()
+      } catch (fehler) {
+        melde(String(fehler.message || fehler), 'fehler')
+        return
+      }
     }
     /* The window STAYS open: pressing draw again queues the next picture, and
        the counter on the button climbs. It closes by a click into the main
@@ -316,7 +333,7 @@
     unberuehrt = false
     losZeichnen({
       modell,
-      chat_id: chatId,
+      chat_id: ziel,
       prompt: prompt.trim(),
       negativ: negativ.trim(),
       breite,
@@ -580,6 +597,16 @@
             </button>
           </div>
           <p class="hinweis">{t('bild.lora_eine_staerke')}</p>
+        </div>
+
+        <div class="feld">
+          <span>{t('bild.embedding')}</span>
+          <div class="lorafuss">
+            <button class="klein-knopf" onclick={() => api.bildBegleiterOrdner('embedding').catch(() => {})}>
+              {t('bild.embedding_ordner')}
+            </button>
+          </div>
+          <p class="hinweis">{t('bild.embedding_hinweis')}</p>
         </div>
 
         <div class="feld">

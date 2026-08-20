@@ -201,10 +201,17 @@ def test_katalog_antwortet_unsinn(client, katalog):
 def test_tab_namen_laufen_ueberall_gleich():
     """The kinds are named in the backend (ARTEN), in the frontend tab row
     (modellempfehlungen.js ARTEN) and as locale labels (katalog.art_*).
-    Nothing ties them together at runtime — this test does."""
+    Nothing ties them together at runtime — this test does.
+
+    Some kinds deliberately have NO tab: the sibling Exe programs share this
+    search (the video kind belongs to Exe Motion), and this window never
+    shows them. They are declared here so a missing tab stays a choice, not
+    an accident."""
     import json
     import re
     from pathlib import Path
+
+    OHNE_TAB = {"video"}
 
     wurzel = Path(__file__).resolve().parent.parent
     js = (wurzel / "frontend/src/lib/modellempfehlungen.js").read_text(encoding="utf-8")
@@ -212,9 +219,10 @@ def test_tab_namen_laufen_ueberall_gleich():
     assert treffer, "frontend ARTEN nicht gefunden"
     vorn = re.findall(r"'([a-z]+)'", treffer.group(1))
 
-    assert vorn == list(modellsuche.ARTEN), "Frontend-Tabs != Backend-Arten"
+    hinten = [art for art in modellsuche.ARTEN if art not in OHNE_TAB]
+    assert vorn == hinten, "Frontend-Tabs != Backend-Arten (ohne die tablosen)"
 
     for sprache in ("de", "en"):
         texte = json.loads((wurzel / f"app/locales/{sprache}.json").read_text(encoding="utf-8"))
-        for art in modellsuche.ARTEN:
+        for art in vorn:
             assert texte["katalog"].get(f"art_{art}"), f"{sprache}: katalog.art_{art} fehlt"

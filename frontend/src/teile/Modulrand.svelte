@@ -51,35 +51,45 @@
   })
 </script>
 
+{#snippet modulKnopf(name, beschriftung)}
+  <button
+    class="zeichen"
+    class:aktiv={leiste.offen && leiste.modul === name}
+    onclick={() => modulWaehlen(name)}
+    title={t(beschriftung)}
+    aria-label={t(beschriftung)}
+    aria-pressed={leiste.offen && leiste.modul === name}
+  >
+    {#if name === 'waechter'}
+      <EEWzeichen groesse={EEW_GROESSE} />
+    {:else}
+      <Modulzeichen modul={name} groesse={ZEICHEN_GROESSE} />
+    {/if}
+    {#if name === 'terminal' && laufzustand}
+      <span class="punkt"><Leuchtpunkt farbe={laufzustand} groesse={6} /></span>
+    {:else if name === 'waechter'}
+      <!-- The dot says whether the thing is switched on and answering, and
+           a standing finding wins over that: something waiting for you is
+           the more urgent of the two facts. -->
+      <span class="punkt">
+        <Leuchtpunkt farbe={befunde ? 'gelb' : eewPunktfarbe()} groesse={6} />
+      </span>
+    {/if}
+  </button>
+{/snippet}
+
 <div class="rand">
+  <!-- Everything but Extended Workflow reads from the top down. -->
   {#each MODULE as [name, beschriftung] (name)}
-    <button
-      class="zeichen"
-      class:aktiv={leiste.offen && leiste.modul === name}
-      onclick={() => modulWaehlen(name)}
-      title={t(beschriftung)}
-      aria-label={t(beschriftung)}
-      aria-pressed={leiste.offen && leiste.modul === name}
-    >
-      {#if name === 'waechter'}
-        <EEWzeichen groesse={EEW_GROESSE} />
-      {:else}
-        <Modulzeichen modul={name} groesse={ZEICHEN_GROESSE} />
-      {/if}
-      {#if name === 'terminal' && laufzustand}
-        <span class="punkt"><Leuchtpunkt farbe={laufzustand} groesse={6} /></span>
-      {:else if name === 'waechter'}
-        <!-- The dot says whether the thing is switched on and answering, and
-             a standing finding wins over that: something waiting for you is
-             the more urgent of the two facts. -->
-        <span class="punkt">
-          <Leuchtpunkt farbe={befunde ? 'gelb' : eewPunktfarbe()} groesse={6} />
-        </span>
-      {/if}
-    </button>
+    {#if name !== 'waechter'}
+      {@render modulKnopf(name, beschriftung)}
+    {/if}
   {/each}
-  <!-- Room below for whatever docks here next. -->
+  <!-- Extended Workflow sits at the very bottom of the rail — the thing the
+       program is built around gets the anchoring foot, not a slot in the row.
+       The spacer pushes it down and leaves room for whatever docks between. -->
   <span class="frei"></span>
+  {@render modulKnopf('waechter', 'waechter.titel')}
 </div>
 
 <style>

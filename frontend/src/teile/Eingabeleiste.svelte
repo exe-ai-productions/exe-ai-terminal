@@ -172,9 +172,15 @@
   const leer = $derived(!text.trim() && !anhang && !dokumentAnhang)
   /* The action button shows the stop sign only while a run has nothing to
      send beside it — with something in the field, sending (into the queue)
-     is what the hand is after. Image generation is not queued and keeps
-     its own stop. */
-  const stoppt = $derived(bildLokalLaeuft || (laeuftGerade && leer))
+     is what the hand is after.
+
+     A drawing picture only claims the button in the chat it is drawn FOR,
+     and only with an empty field. In every other chat the button keeps
+     sending — or typing a message anywhere would silently kill a picture
+     running elsewhere, and the model there could never be asked anything
+     while a picture draws. */
+  const bildHier = $derived(bildLokalLaeuft && zustand.bildLaeuftChat === zustand.aktiverChat)
+  const stoppt = $derived((bildHier || laeuftGerade) && leer)
   const BILD_TYPEN = ['image/png', 'image/jpeg', 'image/webp']
 
   /* Document attachment (4.1): image OR document, never
@@ -740,7 +746,7 @@
           class="aktion"
           class:stoppt={stoppt}
           class:leer={!laeuftGerade && leer}
-          onclick={() => (bildLokalLaeuft ? bildStoppen() : stoppt ? abbrechen() : absenden())}
+          onclick={() => (stoppt ? (bildHier ? bildStoppen() : abbrechen()) : absenden())}
           title={stoppt ? t('eingabe.abbrechen_tipp') : t('eingabe.senden')}
           aria-label={stoppt ? t('eingabe.abbrechen') : t('eingabe.senden')}
         >

@@ -282,16 +282,19 @@
     font: 700 10.5px var(--schrift);
     color: var(--text-leise);
   }
+  /* The house black-pearl, over tokens so it holds in every skin: a
+     near-black fill lifted off the ground, with pearl text — the same
+     filled-mark idiom the sibling programs use for their one strong badge. */
   .empfohlen {
     position: absolute;
     bottom: 20px;
     left: 20px;
-    background: #241d46;
-    border: 1px solid #7d6cba;
+    background: color-mix(in srgb, var(--text) 86%, var(--bg));
+    border: 1px solid transparent;
     border-radius: 99px;
     padding: 2px 9px;
     font: 600 10px var(--schrift);
-    color: #cbbcee;
+    color: var(--bg);
     white-space: nowrap;
   }
   .oben {

@@ -18,7 +18,7 @@ from tests.conftest import provider_setzen
 
 def test_ohne_alles_bleibt_das_noetigste():
     text = grundprompt.bauen()
-    assert "Exe AI Terminal" in text
+    assert "inside Exe AI" in text
     assert "language the user writes in" in text
     # Nothing about tools, folders or memory — none of it applies.
     assert "tool" not in text.lower()
@@ -87,7 +87,7 @@ def test_der_grundprompt_erreicht_das_modell(client, chat_id):
         "/api/v1/chat/completions",
         json={"chat_id": chat_id, "endpoint_id": "test", "content": "hallo"},
     )
-    assert "Exe AI Terminal" in _system(provider)
+    assert "inside Exe AI" in _system(provider)
 
 
 def test_ohne_werkzeuge_steht_nichts_ueber_werkzeuge_drin(client, chat_id):
@@ -135,7 +135,7 @@ def test_die_drei_schichten_stehen_in_der_richtigen_reihenfolge(client, chat_id)
         json={"chat_id": chat_id, "endpoint_id": "test", "content": "hallo"},
     )
     text = _system(provider)
-    assert text.index("Exe AI Terminal") < text.index("MEINPROMPT") < text.index("MEINFAKT")
+    assert text.index("inside Exe AI") < text.index("MEINPROMPT") < text.index("MEINFAKT")
 
 
 def test_skills_stehen_nur_mit_namen_und_einem_satz_drin():

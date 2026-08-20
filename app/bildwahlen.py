@@ -75,6 +75,10 @@ LORA_VORGABE = 0.70
 # The folder the LoRA files live in, below the image models.
 LORA_ORDNER = "lora"
 
+# The folder the textual-inversion embeddings live in, below the image
+# models. An embedding is called by its file name inside the prompt.
+EMBEDDING_ORDNER = "embedding"
+
 # How large a picture may be asked for, and in what step. The generator works
 # on a grid; an edge between the steps is rounded down rather than refused,
 # because a number typed into a field passes through every value on its way

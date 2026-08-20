@@ -363,6 +363,7 @@ def _verlauf_bauen(
     system_prompt: str,
     config=None,
     abschnitt_waehler=None,
+    vision: bool = True,
 ) -> list[ChatNachricht]:
     """Builds the message list for a request.
 
@@ -435,6 +436,33 @@ def _verlauf_bauen(
                         kopf = f'[Attached document "{dokument.filename}"]'
                         fuss = "[End of document]"
                     inhalt = f"{kopf}\n{volltext}\n{fuss}\n\n{inhalt}"
+        if gespeichert.role == "assistant" and gespeichert.bild:
+            # A picture the assistant carries was GENERATED, not seen. Image
+            # parts are only valid in user messages on OpenAI-style servers,
+            # and an assistant turn consisting of nothing but an image ends
+            # the next request with an error — the chat looks broken from
+            # then on. The model gets a sentence instead: enough to know the
+            # picture exists, and never an empty turn.
+            nachrichten.append(
+                ChatNachricht(
+                    role="assistant",
+                    content=inhalt or "[A generated image was shown here.]",
+                )
+            )
+            continue
+        if gespeichert.bild and not vision:
+            # An earlier attachment, but the model at the wheel now cannot
+            # see. Saying so beats silently dropping it: asked about the
+            # picture, the model can answer honestly instead of inventing
+            # its contents.
+            hinweis = "[An image was attached here that this model cannot see.]"
+            nachrichten.append(
+                ChatNachricht(
+                    role=gespeichert.role,
+                    content=f"{inhalt}\n{hinweis}" if inhalt else hinweis,
+                )
+            )
+            continue
         nachrichten.append(
             ChatNachricht(
                 role=gespeichert.role,
@@ -552,6 +580,7 @@ async def completions(
             # document ride along. Computed above, once per request, and
             # only when there is a cut-up document to choose from at all.
             abschnitt_waehler=abschnitt_waehler,
+            vision=zustand.kann("vision"),
         ),
         temperature=(
             daten.temperature if daten.temperature is not None else eingestellt.get("temperature")

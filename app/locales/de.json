@@ -58,6 +58,11 @@
     "werkzeuge": "Werkzeuge",
     "katalog": "Katalog"
   },
+  "kopf": {
+    "bereit": "Bereit",
+    "server_aus": "Server aus",
+    "speicher_titel": "Arbeitsspeicher in Benutzung"
+  },
   "eingabe": {
     "tps_einheit": "TPS",
     "platzhalter": "Nachricht schreiben …",
@@ -139,6 +144,9 @@
     "lora_hinzufuegen": "LoRA hinzufügen",
     "lora_staerke": "Stärke",
     "lora_ordner": "LoRA-Ordner öffnen",
+    "embedding": "Embeddings (Textual Inversion)",
+    "embedding_ordner": "Embedding-Ordner öffnen",
+    "embedding_hinweis": "Embedding-Dateien hier ablegen und im Prompt über den Dateinamen ohne Endung ansprechen.",
     "lora_keine": "Noch keine LoRA-Dateien im Ordner",
     "lora_unbekannt": "Eine LoRA mit diesem Namen gibt es nicht",
     "begleiter_unbekannt": "Eine Begleitdatei mit diesem Namen gibt es nicht",

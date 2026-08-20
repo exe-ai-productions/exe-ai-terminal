@@ -114,13 +114,19 @@
 <style>
   .schleier {
     position: fixed;
-    inset: 0;
+    /* The right edge reaches PAST the window on purpose: hidden scrollbars
+       are the house rule, but WebKit paints its overlay scrollbar for this
+       scroller regardless of the hiding CSS — a grey thumb floating over
+       the dialog. Pushed offscreen it can paint where nobody sees it; the
+       extra right padding gives the width back, so the dialog stays
+       centred on the visible window. */
+    inset: 0 -28px 0 0;
     background: rgba(0, 0, 0, 0.45);
     z-index: 70;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 13vh 16px 6vh;
+    padding: 13vh 44px 6vh 16px;
     overflow-y: auto;
   }
   /* The arrow rides in the top-left corner, and the window makes room for

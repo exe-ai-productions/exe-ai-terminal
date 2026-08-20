@@ -223,7 +223,7 @@ def test_aussetzen_gilt_nur_fuer_diesen_chat(client, chat_id):
     system = [n for n in provider.letzte_anfrage.nachrichten if n.role == "system"]
     assert len(system) == 1
     assert "Sei Mana." not in system[0].content
-    assert "Exe AI Terminal" in system[0].content
+    assert "inside Exe AI" in system[0].content
 
     # A new chat carries the user's layer again.
     neuer_id = client.post("/api/v1/chats", json={"title": "Neu"}).json()["id"]
@@ -241,3 +241,42 @@ def test_leerer_prompt_wird_nicht_vorangestellt(client, chat_id):
     chat = client.app.state.repositories.chats.holen(chat_id)
     verlauf = _verlauf_bauen(chat, client.app.state.repositories, "")
     assert all(n.role != "system" for n in verlauf)
+
+
+def test_erzeugtes_bild_reist_als_satz_nicht_als_bildteil(client, chat_id):
+    """A generated picture is stored as an assistant message with no text.
+
+    Sent onward as an image part it ends every following request on
+    OpenAI-style servers — image parts are only valid in user messages —
+    and the chat cannot be answered in any more. The model gets a sentence
+    instead, and never an empty turn.
+    """
+    from app.api.v1.generierung import _verlauf_bauen
+
+    repositories = client.app.state.repositories
+    repositories.messages.speichern(chat_id=chat_id, role="user", content="a dog")
+    repositories.messages.speichern(chat_id=chat_id, role="assistant", content="", bild="a.png")
+    chat = repositories.chats.holen(chat_id)
+    letzte = _verlauf_bauen(chat, repositories, "")[-1]
+    assert letzte.role == "assistant"
+    assert letzte.bild_url is None
+    assert letzte.content
+
+
+def test_bild_im_verlauf_faellt_ohne_vision_weg(client, chat_id):
+    """An earlier attachment must not reach a model that cannot see.
+
+    The guard on new uploads already refuses them; the history walked past
+    it. Dropped with a note, so the model can say so instead of inventing
+    the picture's contents.
+    """
+    from app.api.v1.generierung import _verlauf_bauen
+
+    repositories = client.app.state.repositories
+    repositories.messages.speichern(
+        chat_id=chat_id, role="user", content="what is this?", bild="a.png"
+    )
+    chat = repositories.chats.holen(chat_id)
+    letzte = _verlauf_bauen(chat, repositories, "", vision=False)[-1]
+    assert letzte.bild_url is None
+    assert "cannot see" in letzte.content

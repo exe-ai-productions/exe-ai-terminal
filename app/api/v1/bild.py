@@ -136,6 +136,12 @@ def _bildordner(config: Config) -> Path:
     return ort(config, "bildmodelle")
 
 
+def _embd_ordner(config: Config) -> Path | None:
+    """The embeddings folder, or nothing while it does not exist yet."""
+    ordner = _bildordner(config) / bildwahlen.EMBEDDING_ORDNER
+    return ordner if ordner.is_dir() else None
+
+
 def _bilderziel(config: Config) -> Path:
     """Where a finished picture is written and read back from — one named
     location, so the folder is asked for and never spelled out."""
@@ -220,7 +226,11 @@ def turbo_starten(
         # detector yet. The LoRA folder is pointed at from the start, so a LoRA
         # picture works straight away without a restart; a request that later
         # wants a VAE or a detector restarts onto that Gespann on its own.
-        turbo.starten(pfad, lora_ordner=_bildordner(config) / bildwahlen.LORA_ORDNER)
+        turbo.starten(
+            pfad,
+            lora_ordner=_bildordner(config) / bildwahlen.LORA_ORDNER,
+            embd_ordner=_embd_ordner(config),
+        )
     except BildturboFehler as fehler:
         raise HTTPException(
             status.HTTP_412_PRECONDITION_FAILED, t(fehler.grund, sprache)
@@ -398,7 +408,7 @@ def bild_stoppen(request: Request) -> bool:
 @router.post("/bild/begleiter-folder/{unterordner}", response_model=bool,
              summary="Begleiter-Ordner zeigen")
 def begleiterordner_zeigen(
-    unterordner: Literal["vae", "lora", "adetailer"],
+    unterordner: Literal["vae", "lora", "adetailer", "embedding"],
     config: Config = Depends(hole_config), sprache: str = Depends(hole_sprache),
 ) -> bool:
     """Open one of the picture server's companion sub-folders so a file can be
@@ -464,6 +474,7 @@ async def bild_erzeugen(
         scheduler=bildwahlen.scheduler_pruefen(wunsch.scheduler),
         loras=_loras(config, wunsch, sprache),
         lora_ordner=_bildordner(config) / bildwahlen.LORA_ORDNER,
+        embd_ordner=_embd_ordner(config),
         startbild=startbild,
         maske=maske,
         # Without a starting image the strength has nothing to act on.
@@ -520,6 +531,7 @@ async def bild_erzeugen(
                         turbo.starten, pfad,
                         vae=auftrag.vae, ad_modell=auftrag.ad_modell,
                         ad_prompt=auftrag.ad_prompt, lora_ordner=auftrag.lora_ordner,
+                        embd_ordner=auftrag.embd_ordner,
                     )
                     if not await asyncio.to_thread(turbo.bereit_abwarten):
                         raise BildturboFehler("bild.turbo_ladefehler")

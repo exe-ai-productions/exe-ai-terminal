@@ -58,6 +58,11 @@
     "werkzeuge": "Tools",
     "katalog": "Catalog"
   },
+  "kopf": {
+    "bereit": "Ready",
+    "server_aus": "Server off",
+    "speicher_titel": "Memory in use"
+  },
   "eingabe": {
     "tps_einheit": "TPS",
     "platzhalter": "Write a message …",
@@ -139,6 +144,9 @@
     "lora_hinzufuegen": "Add a LoRA",
     "lora_staerke": "Strength",
     "lora_ordner": "Open LoRA folder",
+    "embedding": "Embeddings (textual inversion)",
+    "embedding_ordner": "Open embedding folder",
+    "embedding_hinweis": "Drop embedding files here, then call one in the prompt by its file name without the extension.",
     "lora_keine": "No LoRA files in the folder yet",
     "lora_unbekannt": "There is no LoRA by that name",
     "begleiter_unbekannt": "There is no companion file by that name",

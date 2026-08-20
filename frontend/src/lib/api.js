@@ -185,6 +185,8 @@ export const api = {
   /* The model server on this machine: what is there, what runs, what it says.
      Fetching a model goes the same way — one button, no command. */
   runnerAuskunft: () => ruf('/runner'),
+  /* The machine's one memory pool, for the pill in the header. */
+  speicherBlick: () => ruf('/system/speicher'),
   runnerProtokoll: () => ruf('/runner/log'),
   runnerStarten: (daten) => ruf('/runner/start', { method: 'POST', body: alsText(daten) }),
   runnerStoppen: () => ruf('/runner/stop', { method: 'POST' }),

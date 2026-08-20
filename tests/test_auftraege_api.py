@@ -213,7 +213,7 @@ def test_prompt_ist_gestapelt_global_dann_agent(config, client):
     assert system.role == "system"
     # Three layers in order: shipped instructions, the user's prompt, the
     # agent's — the agent last, because that is what makes this run an agent.
-    assert "Exe AI Terminal" in system.content
+    assert "inside Exe AI" in system.content
     assert system.content.endswith("GLOBAL.\n\nDu bist der Rechercheur.")
     benutzer = provider.letzte_anfrage.nachrichten[1]
     assert (benutzer.role, benutzer.content) == ("user", "Los")
