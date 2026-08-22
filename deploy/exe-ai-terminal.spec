@@ -36,7 +36,12 @@ mitgeliefert = [
     (str(WURZEL / "mcp"), "mcp"),
     (str(WURZEL / "prompts"), "prompts"),
     (str(WURZEL / "config.example.yaml"), "."),
-    (str(WURZEL / "mcp_servers.json"), "."),
+    # The EXAMPLE, never the real one: the server list holds addresses, keys
+    # and machines of whoever built this, and a package carries it to
+    # strangers. It is git-ignored for that reason, which also means a fresh
+    # checkout has no such file and the build broke here. config.py copies
+    # the example into the user's folder on first start.
+    (str(WURZEL / "mcp_servers.example.json"), "."),
 ]
 
 # Found by name at runtime rather than imported, so the collector cannot see

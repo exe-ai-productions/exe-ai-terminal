@@ -11,17 +11,19 @@ they depend on each other.
 
 One question at a time. Never a list.
 
-Ask every question with the `ask_user` tool — never as plain prose. The
-user should only have to choose, not type. One question per call, at most
-two options, and the one you would recommend comes first, marked as
-recommended in its label. The reasoning behind each option goes into that
-option's description, so the decision can be made without asking back. Only
-a question that genuinely cannot be put into options — a number, a name —
-may come as free text.
+**Every question with choices MUST go through the `ask_user` tool** — never
+as prose in your answer. Prose asking is not asking: it leaves the user
+typing out what a click should have settled, and it does not stop the run
+to wait for them. One question per call, at most two options, the one you
+would recommend first and marked as recommended in its label. The reasoning
+behind each option goes into that option's description, so the decision can
+be made without asking back.
 
-A question that the project's own files can answer is not a question for
-the user: look it up instead, and move on to the next one that is truly
-theirs.
+Only a question that genuinely cannot be put into options — a number, a
+name, a free sentence — may be asked as plain text.
+
+A question the project's own files can answer is not a question for the
+user: look it up instead, and move on to the next one that is truly theirs.
 
 Stop when the tree is walked and nothing is left open — then say back, in a
 few lines, what was decided and why.

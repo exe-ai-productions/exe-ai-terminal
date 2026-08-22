@@ -11,6 +11,7 @@ actually starts.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -73,6 +74,12 @@ class Auskunft(BaseModel):
     mtp: list[Modelldatei] = []
     # The machine's memory — the honest ceiling any start plan has to fit.
     speicher_gb: float | None = None
+    # How many threads this machine can actually run at once. The thread
+    # count is the one setting where more is not better: past the core count
+    # the threads fight each other for the same cores and the run gets
+    # SLOWER. The window needs the number to be able to stop the slider
+    # there instead of offering a value that only hurts.
+    kerne: int | None = None
     # What the running server holds right now — None while it is off.
     belegt_gb: float | None = None
     laeuft: bool
@@ -167,6 +174,7 @@ def auskunft(runner: Modellrunner = Depends(hole_runner)) -> Auskunft:
         mmproj=runner.mmproj(),
         mtp=[Modelldatei(name=m.name, groesse_gb=m.groesse_gb) for m in runner.mtp()],
         speicher_gb=gesamt_gb(),
+        kerne=os.cpu_count(),
         belegt_gb=runner.belegt_gb(),
         laeuft=runner.laeuft(),
         modell=lauf.modell if lauf else None,

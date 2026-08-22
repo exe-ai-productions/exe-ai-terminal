@@ -352,11 +352,18 @@ class Bildturbo:
                 }
             rest = text[-64:]
 
-    def zeichnen(self, auftrag: dict) -> bytes:
+    def zeichnen(self, auftrag: dict, *, weg: str = "txt2img", paesse: int = 0) -> bytes:
         """Draw one picture over the running server and return the PNG bytes.
 
-        ``auftrag`` is the A1111 txt2img body already assembled by the caller —
-        this module only speaks HTTP and knows nothing of the parameter names.
+        ``auftrag`` is the A1111 body already assembled by the caller — this
+        module only speaks HTTP and knows nothing of the parameter names.
+        ``weg`` picks the entrance for the same reason: whether a body means
+        img2img is decided by what is in it, and what is in it is the
+        caller's business, not this module's.
+
+        ``paesse`` is how many painting passes the caller expects. Zero means
+        "work it out from the detector alone", which is what everything but a
+        highres run wants.
         """
         if not self.laeuft():
             raise BildturboFehler("bild.turbo_aus")
@@ -364,18 +371,19 @@ class Bildturbo:
         self._abgebrochen = False
         schritte = int(auftrag.get("steps") or 0)
         if schritte > 0:
-            # One painting pass, plus one more when the detector repaints.
+            # One painting pass, plus one more when the detector repaints —
+            # unless the caller knows better, which it does for highres.
             self._fortschritt = {"anteil": 0.0, "schritt": 0, "gesamt": schritte}
             self._zaehl = {
                 "schritte": schritte,
-                "paesse": 1 + (1 if self._ad_modell else 0),
+                "paesse": paesse or 1 + (1 if self._ad_modell else 0),
                 "fertige": 0,
                 "letzter": 0,
                 "malt": False,
             }
         try:
             antwort = httpx.post(
-                f"http://127.0.0.1:{PORT}/sdapi/v1/txt2img",
+                f"http://127.0.0.1:{PORT}/sdapi/v1/{weg}",
                 json=auftrag,
                 timeout=ZEICHENFRIST,
             )

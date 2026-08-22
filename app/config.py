@@ -441,8 +441,14 @@ def config_laden(pfad: str | Path | None = None) -> Config:
             shutil.copy2(vorlage, quelle)
             log.info("Erststart: %s aus %s angelegt", quelle.name, vorlage.name)
 
+    # The server list is personal the moment it is touched: it holds
+    # addresses, keys and machines of the person running this. It is
+    # therefore git-ignored like config.yaml, and what ships is the example
+    # beside it. Copied on first start, then it belongs to the user.
     _erststart_kopie(aufloesen("mcp_servers.json", schreibbar=True),
                      aufloesen("mcp_servers.json"))
+    _erststart_kopie(aufloesen("mcp_servers.json", schreibbar=True),
+                     aufloesen("mcp_servers.example.json"))
 
     if not quelle.exists():
         raise FileNotFoundError(

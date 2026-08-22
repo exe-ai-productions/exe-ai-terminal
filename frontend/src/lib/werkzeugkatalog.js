@@ -34,6 +34,7 @@ const NACH_WERKZEUG = {
   edit_file: 'stiftlinie',
   list_dir: 'ordner',
   ask_user: 'sprechblase',
+  draw_image: 'bild',
   generate_image: 'bild',
   image_to_image: 'bild',
   inpaint_image: 'bild',

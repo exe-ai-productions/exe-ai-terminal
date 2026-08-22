@@ -23,6 +23,11 @@ export function malflaeche(breite, hoehe) {
   const flaeche = document.createElement('canvas')
   flaeche.width = Math.max(1, Math.round(breite))
   flaeche.height = Math.max(1, Math.round(hoehe))
+  // Claimed on the first call, which is what fixes the layer's kind for
+  // every later one: this layer is read back as well as drawn on (checking
+  // whether anything is painted, inverting, exporting), and a layer told so
+  // in advance keeps its pixels where reading them is cheap.
+  flaeche.getContext('2d', { willReadFrequently: true })
   return flaeche
 }
 
@@ -52,6 +57,24 @@ export function strich(flaeche, von, bis, groesse, radieren = false) {
 
 export function leeren(flaeche) {
   flaeche.getContext('2d').clearRect(0, 0, flaeche.width, flaeche.height)
+}
+
+/* Swap painted and unpainted: what was marked is released, what was left
+   alone is marked — and on an empty layer this IS "fill everything", which
+   is why no separate fill exists. Only the alpha channel decides, the same
+   rule the export follows, so a mask survives any number of inversions
+   unchanged. */
+export function umkehren(flaeche) {
+  const stift = flaeche.getContext('2d')
+  const daten = stift.getImageData(0, 0, flaeche.width, flaeche.height)
+  for (let i = 0; i < daten.data.length; i += 4) {
+    const war = daten.data[i + 3] > 8
+    daten.data[i] = 255
+    daten.data[i + 1] = 255
+    daten.data[i + 2] = 255
+    daten.data[i + 3] = war ? 0 : 255
+  }
+  stift.putImageData(daten, 0, 0)
 }
 
 /* Has anything been painted at all?
@@ -116,10 +139,19 @@ export function alsDatei(flaeche, name = 'maske.png') {
 
 /* A point on the shown picture, translated to a point on the mask.
 
-   The editor shows the picture scaled to the window; the strokes belong to
-   the picture's own pixels. Without this the mask would land offset and
-   the wrong part of the picture would be redrawn — the kind of bug that
-   looks like the generator misbehaving.
+   The editor shows the picture scaled to the window, and it can be zoomed
+   and dragged on top of that; the strokes belong to the picture's own
+   pixels. Without this the mask would land offset and the wrong part of the
+   picture would be redrawn — the kind of bug that looks like the generator
+   misbehaving.
+
+   Zoom and offset need no term of their own here. They are one transform on
+   the box that carries picture and mask together, and a bounding rectangle
+   is measured AFTER transforms: the rectangle read here is where the
+   picture actually is on screen, at whatever size it is currently shown.
+   Reading it fresh on every event is what keeps the aim true while zooming
+   and dragging — and it is why the same rectangle also gives the scale for
+   the brush ring.
 */
 export function aufFlaeche(ereignis, anzeige, flaeche) {
   const kasten = anzeige.getBoundingClientRect()

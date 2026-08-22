@@ -19,6 +19,7 @@
   import { katalogOeffnen, melde } from '../lib/zustand.svelte.js'
   import Servertafel from './Servertafel.svelte'
   import Zahlenfeld from './Zahlenfeld.svelte'
+  import { setzeStartAktion, loescheStartAktion } from '../lib/startknopf.svelte.js'
 
   let auskunft = $state(null)
   let gewaehlt = $state('')
@@ -59,13 +60,24 @@
   const bereit = $derived(Boolean(gewaehlt) && Boolean(auskunft?.programm))
 
   const auswahl = $derived((auskunft?.modelle ?? []).map((name) => ({ wert: name, text: name })))
+
+  // Publish this panel's start/stop action to the rail's foot button.
+  $effect(() => {
+    setzeStartAktion({
+      text: laeuft ? t('modell.server_anhalten') : t('modell.server_starten'),
+      punkt: laeuft ? 'gruen' : 'still',
+      gesperrt: arbeitet || (!laeuft && !bereit),
+      onTat: schalten,
+    })
+    return () => loescheStartAktion()
+  })
 </script>
 
 <Servertafel
   titel={t('einbettungsserver.titel')}
   unter={laeuft ? t('einbettungsserver.laeuft', { port: auskunft.port }) : t('einbettungsserver.aus')}
   standfarbe={laeuft ? 'gruen' : 'still'}
-  standtext={laeuft ? t('status.erreichbar') : t('status.nicht_erreichbar')}
+  standtext={laeuft ? t('status.aktiv') : t('status.inaktiv')}
   wofuer={t('einbettungsserver.wofuer')}
   modelle={auswahl}
   bind:gewaehlt
@@ -74,10 +86,6 @@
   leerText={auskunft ? t('einbettungsserver.kein_modell') : ''}
   katalogTat={() => katalogOeffnen('einbettung')}
   speicherort="einbettung"
-  tatText={laeuft ? t('einbettungsserver.stoppen') : t('einbettungsserver.starten')}
-  tatPunkt={laeuft ? 'gruen' : 'still'}
-  tatGesperrt={arbeitet || (!laeuft && !bereit)}
-  onTat={schalten}
 >
   {#snippet mitte()}
     <div class="feld">

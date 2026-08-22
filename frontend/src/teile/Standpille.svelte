@@ -32,10 +32,12 @@
     justify-content: center;
     flex: none;
     line-height: 1;
-    font-size: 11px;
+    font-size: 14px;
     white-space: nowrap;
     border: 1px solid var(--linie-stark);
-    border-radius: 99px;
+    /* A control's corner, not a pill's: it reports a state beside a heading,
+       and every other bordered thing in these panels wears this radius. */
+    border-radius: 9px;
     color: var(--text-still);
     /* One pixel less above than below. Measured, not guessed — and the
        measurement went against the guess: with even padding the ink of these

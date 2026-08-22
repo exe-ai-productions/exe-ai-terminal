@@ -89,6 +89,13 @@
     flex: none;
     z-index: 5;
   }
+  /* Gone while a window is open. It lies BEHIND the veil already, but the
+     veil only half covers what is under it — and a bright vertical bar
+     showing through beside a dialog reads as a scrollbar, not as the handle
+     of a sidebar nobody can reach right now. */
+  :global(body:has(.schleier)) .zone {
+    display: none;
+  }
   /* The catch area, wider than what it shows — 26 px is what a mouse finds
      without being aimed. */
   .zone::before {

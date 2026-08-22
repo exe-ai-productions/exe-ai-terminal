@@ -55,7 +55,23 @@ def test_kein_text_steht_unuebersetzt_in_beiden_katalogen():
         # technical names, the same word in both languages.
         "katalog.sorte_vae", "katalog.sorte_lora", "katalog.sorte_adetailer",
         "katalog.sorte_mmproj",
+        # A port is a port in both languages.
+        "kopf.port",
+        # "8-Bit" is a unit, written the same in both languages.
+        "modell.feld_kv_wert",
+        # Memory Lock and MoE-Experts on CPU are what the flags are
+        # called, in both languages.
+        "modell.feld_mlock", "modell.feld_moe",
+        # "Auto" is the same word in both languages.
+        "modell.faeden_auto",
+        # Embeddings, VAE and ADetailer are called that in both languages —
+        # technical names of the file kinds, not words to translate.
+        "bild.embedding", "bild.vae", "bild.adetailer",
+        # "Default" is the word both languages use for the setting that is
+        # already in place.
+        "bild.vae_keins",
         # Words English and German share unchanged.
+        "downloads.titel",
         "chat.alle", "menue.chat", "menue.cloud", "jobs.bereich_chats",
         "editor.quelle_tools", "werkzeuge.eingebaut", "modell.server_offline",
         "editor.gruppe_app", "editor.gruppe_prompts", "jobs.agent_waehlen",

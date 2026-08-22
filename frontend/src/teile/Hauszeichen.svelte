@@ -107,7 +107,14 @@
     <path d="M14 3.5 V7.5 h4" />
     <path d="M10 12.5 l2.2 2.2-2.2 2.2" />
   {:else if zeichen === 'ordner'}
-    <path d="M3 7 a2 2 0 0 1 2-2 h4 l2 2.5 h8 a2 2 0 0 1 2 2 V17 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 Z" />
+    <path d="M3.75 18 V6 H9.75 L11.63 8.25 H18 V11.25" />
+    <path d="M3.75 18 H16.5 L20.25 11.25 H7.5 Z" />
+  {:else if zeichen === 'auskoppeln'}
+    <!-- Pop out: a frame with an arrow breaking out of its top-right corner,
+         the sign for the same thing shown large in a window of its own. -->
+    <path d="M18 13 V19 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 V8 a2 2 0 0 1 2-2 H11" />
+    <path d="M14 4 H20 V10" />
+    <path d="M20 4 L10.5 13.5" />
   {:else if zeichen === 'bild'}
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <circle cx="8.5" cy="9.5" r="1.6" />

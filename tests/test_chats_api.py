@@ -243,6 +243,39 @@ def test_leerer_prompt_wird_nicht_vorangestellt(client, chat_id):
     assert all(n.role != "system" for n in verlauf)
 
 
+def test_ask_user_frage_und_antwort_bleiben_im_verlauf(client, chat_id):
+    """The model's question and the user's answer survive the run.
+
+    Both lived only in the tool log; a later request rebuilt the history
+    without them, so the model no longer knew what it had asked — and
+    answered as if the exchange never happened.
+    """
+    from app.api.v1.generierung import _verlauf_bauen
+
+    repositories = client.app.state.repositories
+    repositories.messages.speichern(chat_id=chat_id, role="user", content="pick one")
+    repositories.messages.speichern(
+        chat_id=chat_id,
+        role="assistant",
+        content="Done.",
+        stats={
+            "werkzeuge": [
+                {
+                    "name": "ask_user",
+                    "argumente": {"question": "Blue or green?"},
+                    "ergebnis": "green",
+                    "fehlgeschlagen": False,
+                }
+            ]
+        },
+    )
+    chat = repositories.chats.holen(chat_id)
+    letzte = _verlauf_bauen(chat, repositories, "")[-1]
+    assert "Blue or green?" in letzte.content
+    assert "green" in letzte.content
+    assert "Done." in letzte.content
+
+
 def test_erzeugtes_bild_reist_als_satz_nicht_als_bildteil(client, chat_id):
     """A generated picture is stored as an assistant message with no text.
 

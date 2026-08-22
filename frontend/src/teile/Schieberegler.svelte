@@ -82,15 +82,10 @@
       aria-valuetext={text}
       oninput={geschoben}
     />
-    {#if gestuft}
-      <!-- One mark per real step, behind the track: it says where the hand
-           can come to rest, and it says it without a legend. -->
-      <div class="marken" aria-hidden="true">
-        {#each stufen as _, i}
-          <i class:erreicht={i <= platz} style="left: {(i / (stufen.length - 1)) * 100}%"></i>
-        {/each}
-      </div>
-    {/if}
+    <!-- No marks on the track. They were drawn to say where the hand can
+         come to rest, but a stepped slider snaps to those places anyway —
+         and beside a field that takes any number at all, a row of ticks
+         reads as a limit that is not there. -->
   </div>
   {#if mit_zahl}
     <span class="zahl">{text}</span>
@@ -131,33 +126,42 @@
   input[type='range']:disabled {
     cursor: default;
   }
+  /* A timeline, not a bar: a hairline to travel along and the house
+     playhead riding above it — the same shape the mask editor and the
+     picture window wear, so one kind of control looks like one kind of
+     control wherever it turns up. */
   input[type='range']::-webkit-slider-runnable-track {
-    height: 3px;
-    border-radius: 99px;
-    background: var(--linie-stark);
+    height: 2px;
+    border-radius: 2px;
+    background: var(--text-leise);
   }
   input[type='range']::-moz-range-track {
-    height: 3px;
-    border-radius: 99px;
-    background: var(--linie-stark);
+    height: 2px;
+    border-radius: 2px;
+    background: var(--text-leise);
   }
+  /* Point down, sitting ON the line: a mark that straddles the line would
+     hide the spot it marks. */
   input[type='range']::-webkit-slider-thumb {
     appearance: none;
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    margin-top: -5.5px;
-    border-radius: 99px;
-    background: var(--text);
+    width: 12px;
+    height: 8px;
+    margin-top: -7px;
+    background: var(--text-leise);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
     border: none;
   }
   input[type='range']::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    border-radius: 99px;
-    background: var(--text);
+    width: 12px;
+    height: 8px;
+    background: var(--text-leise);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
     border: none;
+    border-radius: 0;
   }
+  input[type='range']:not(:disabled):hover::-webkit-slider-thumb { background: var(--text); }
+  input[type='range']:not(:disabled):hover::-moz-range-thumb { background: var(--text); }
 
   /* Blue is the house's colour for "switched on, in use" — a step already
      passed is exactly that, and the ones ahead stay a quiet line. */

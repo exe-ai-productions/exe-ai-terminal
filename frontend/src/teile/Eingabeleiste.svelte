@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte'
   import Werkzeugfrage from './Werkzeugfrage.svelte'
   import Arbeitsordner from './Arbeitsordner.svelte'
   import Benutzerfrage from './Benutzerfrage.svelte'
@@ -27,6 +28,21 @@
 
   let text = $state('')
   let feld = $state(null)
+  /* One draft per conversation. What is typed and not sent belongs to the
+     chat it was typed in — switching away parks it here, switching back
+     restores it, and a foreign chat never shows another chat's words.
+     Session-only on purpose: a draft is a thought, not a document. */
+  const entwuerfe = new Map()
+  let entwurfChat = zustand.aktiverChat
+  $effect(() => {
+    const chat = zustand.aktiverChat
+    if (chat === entwurfChat) return
+    untrack(() => {
+      entwuerfe.set(entwurfChat, text)
+      text = entwuerfe.get(chat) ?? ''
+      entwurfChat = chat
+    })
+  })
   /* Vision: one image per message. The chip
      above the field shows it, ✕ removes it, it is sent along with the
      text. */
@@ -39,6 +55,11 @@
      business). */
   /* The parameter window for the picture made on this machine. */
   let bildfensterOffen = $state(false)
+  /* The catalogue can send a picture model here — starting one means
+     landing where it is used. The window itself picks the model up. */
+  $effect(() => {
+    if (zustand.bildModellWunsch) bildfensterOffen = true
+  })
 
   /* Image-Turbo: the optional persistent picture server. It is switched INSIDE
      the picture window now (its animated gauge lives in that window's header);
@@ -358,12 +379,15 @@
        swallowed. The field empties either way, so typing on feels the same
        whether something runs or not.
 
-       Unless the model is the one waiting: a standing question holds the
-       run open, so `laeuftGerade` is true — but what was typed IS the
+       Unless the model is the one waiting HERE: a standing question holds
+       the run open, so `laeuftGerade` is true — but what was typed IS the
        answer to that question, not a new message. Queueing it would leave
        the run waiting for something that is sitting in a queue waiting for
-       the run. `senden` knows what to do with it. */
-    if (laeuftGerade && !zustand.benutzerfrage) {
+       the run. `senden` knows what to do with it. A question standing in
+       ANOTHER chat does not turn this chat's typing into its answer. */
+    const frageHier = zustand.benutzerfrage
+      && zustand.benutzerfrage.chatId === zustand.aktiverChat
+    if (laeuftGerade && !frageHier) {
       einreihen(zustand.aktiverChat, auftrag)
       return
     }
@@ -395,7 +419,9 @@
   <!-- Hangs above the field and is exactly as wide. Nothing shifts: the
        zone sits at the bottom edge anyway, the box grows upward into the
        history. -->
-  {#if zustand.werkzeugfrage}
+  <!-- Both boxes only in the chat they belong to: a question travelling
+       into a foreign conversation reads as that conversation asking. -->
+  {#if zustand.werkzeugfrage && zustand.werkzeugfrage.chatId === zustand.aktiverChat}
     <div class="frageplatz">
       <Werkzeugfrage frage={zustand.werkzeugfrage} antworten={werkzeugfrageBeantworten} />
     </div>
@@ -403,7 +429,7 @@
 
   <!-- The model's own question, in the same spot: it waits for an answer
        just as the confirmation does. -->
-  {#if zustand.benutzerfrage}
+  {#if zustand.benutzerfrage && zustand.benutzerfrage.chatId === zustand.aktiverChat}
     <div class="frageplatz">
       <Benutzerfrage frage={zustand.benutzerfrage} antworten={benutzerfrageBeantworten} />
     </div>

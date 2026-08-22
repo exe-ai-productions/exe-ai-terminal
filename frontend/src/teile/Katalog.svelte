@@ -18,10 +18,17 @@
   import Schriftzug from './Schriftzug.svelte'
   import Modellkarte from './Modellkarte.svelte'
   import Modelldetail from './Modelldetail.svelte'
+  import Downloadknopf from './Downloadknopf.svelte'
+  import Downloadfenster from './Downloadfenster.svelte'
+  import {
+    downloads, einreihen, fertigMerken, antreiben,
+  } from '../lib/downloads.svelte.js'
   import { api } from '../lib/api.js'
   import { weg, zurueckgehen } from '../lib/fensterweg.svelte.js'
   import { t } from '../lib/texte.svelte.js'
-  import { melde, modelleLaden, zustand } from '../lib/zustand.svelte.js'
+  import {
+    melde, modelleLaden, zustand, bildfensterOeffnen,
+  } from '../lib/zustand.svelte.js'
   import {
     ARTEN, ZUBEHOER_ZIEL, SPALTEN_ZUBEHOER, ZUBEHOER_ORDNER, SUCHBARE_ARTEN,
     kartePasst, katalogFuer, passendeFassung,
@@ -80,7 +87,6 @@
   let maschineGb = $state(null)
   let vorhanden = $state([])
   let stand = $state(null)
-  let nachzuege = []
 
   /* Which model the detail shows, or null for the gallery. */
   let detail = $state(null)
@@ -136,7 +142,12 @@
   )
 
   $effect(() => {
-    if (!offen) return
+    // Closing the window puts the panel away with it: reopening should show
+    // the catalogue, not whatever was hanging open last time.
+    if (!offen) {
+      downloads.offen = false
+      return
+    }
     const holen = async () => {
       try {
         stand = await api.modellHolenStand()
@@ -179,16 +190,20 @@
           }
         }
         vorhanden = liste
-        if (stand?.fertig && !stand.fehler && nachzuege.length) {
-          while (nachzuege.length && vorhanden.includes(nachzuege[0].ziel)) nachzuege.shift()
-          const n = nachzuege.shift()
-          if (n) {
-            try {
-              stand = await api.modellHolen(n.repo, n.datei, n.ziel ?? null, n.gehoert_zu ?? null, n.rolle ?? null, n.art ?? 'chat', n.unterordner ?? null)
-            } catch {
-              // A broken link ends the chain; the button offers the rest.
-              nachzuege = []
-            }
+        // A file that arrived stays in the panel as a receipt; a cancelled
+        // or failed one does not.
+        if (stand && stand.fertig && !stand.fehler) fertigMerken(stand.datei, stand.gesamt)
+        // The panel's own copy, so the header count is right even while the
+        // list below still shows the card that started it.
+        downloads.laufend = stand && !stand.fertig && !stand.fehler ? stand : null
+        // Nothing running any more: the next in the row goes. Cancelling
+        // ONE download is not cancelling the others that were asked for.
+        if (!downloads.laufend && downloads.warteschlange.length) {
+          try {
+            const naechster = await antreiben(vorhanden)
+            if (naechster) stand = naechster
+          } catch (fehler) {
+            melde(fehler.message, 'fehler')
           }
         }
       } catch {
@@ -216,14 +231,21 @@
     if (karte?.zubehoer) return ZUBEHOER_ZIEL[karte.sorte] ?? { art }
     return { art }
   }
+  /* Every wish goes into the queue; the driver decides what actually
+     starts. Clicking is thus the same act whether something runs or not —
+     and no click can race the poll into a "already running" error. */
   async function starteJob(job, rest, ziel) {
+    const gerichtet = (j) => ({
+      ...j,
+      rolle: j.rolle ?? ziel.rolle ?? null,
+      art: ziel.art,
+      unterordner: ziel.unterordner ?? null,
+    })
+    for (const j of [job, ...rest]) einreihen(gerichtet(j))
+    downloads.offen = true
     try {
-      stand = await api.modellHolen(
-        job.repo, job.datei, job.ziel ?? null,
-        job.gehoert_zu ?? null, job.rolle ?? ziel.rolle ?? null,
-        ziel.art, ziel.unterordner ?? null,
-      )
-      nachzuege = rest.map((j) => ({ ...j, art: ziel.art, unterordner: ziel.unterordner ?? null }))
+      const frisch = await antreiben(vorhanden)
+      if (frisch) stand = frisch
     } catch (fehler) {
       melde(fehler.message, 'fehler')
     }
@@ -262,6 +284,13 @@
         // An embedding model belongs to the embedding server, not the chat
         // runner — the chat runner would refuse it as outside its folder.
         await api.einbettungStarten(f.datei)
+      } else if (art === 'bild') {
+        // A picture model has no server to bring up: it lies in the picture
+        // side's own folder and is chosen per picture. Handing it to the
+        // chat runner earned "this file is not in the model folder" —
+        // true, and useless. Starting it means going where it is used.
+        bildfensterOeffnen(f.ziel ?? f.datei)
+        return
       } else {
         await api.runnerStarten({
           modell: f.datei,
@@ -363,6 +392,10 @@
   const zahlKurz = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n))
 </script>
 
+<!-- A click anywhere else puts the panel away; the button and the panel
+     itself stop the click from reaching here. -->
+<svelte:window onclick={() => (downloads.offen = false)} />
+
 <Fenster bind:offen art="galerie" zurueck={weg.zurueck ? zurueckgehen : null}>
   <div class="kat-kopf">
     <div class="marke">
@@ -388,12 +421,21 @@
         </button>
       {/each}
     </div>
-    {#if maschineGb}
-      <div class="maschine">
-        <span class="wort">{t('katalog.maschine')}:</span>
-        <span class="wert">{maschineGb} GB</span>
-      </div>
-    {/if}
+    <div class="kopfecke">
+      {#if maschineGb}
+        <div class="maschine">
+          <span class="wort">{t('katalog.maschine')}:</span>
+          <span class="wert">{maschineGb} GB</span>
+        </div>
+      {/if}
+      <!-- Beside the memory figure, and outside the tab switch on purpose:
+           a download belongs to no tab, so the way into it stands on all
+           of them and on a model's detail page too. -->
+      <Downloadknopf />
+      {#if downloads.offen}
+        <Downloadfenster {stand} tempo={mbs} onAbbrechen={abbrechen} />
+      {/if}
+    </div>
   </div>
 
   {#if detail}
@@ -445,12 +487,13 @@
             <div class="zspalte">
               <div class="zkopf">
                 <span class="ztitel">{t(`katalog.sorte_${sorte}`)}</span>
-                <button class="ordnerknopf" onclick={() => ordnerOeffnen(sorte)}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                <button class="ordnerknopf" onclick={() => ordnerOeffnen(sorte)}
+                        title={t('katalog.ordner_zeigen')} aria-label={t('katalog.ordner_zeigen')}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <path d="M3.75 18 V6 H9.75 L11.63 8.25 H18 V11.25" />
+                    <path d="M3.75 18 H16.5 L20.25 11.25 H7.5 Z" />
                   </svg>
-                  {t('katalog.ordner_zeigen')}
                 </button>
               </div>
               {#each karten.filter((k) => k.sorte === sorte) as karte (karte.id)}
@@ -547,6 +590,17 @@
     margin: 4px 0 14px;
     flex: none;
     flex-wrap: wrap;
+    /* The download panel hangs off this corner. */
+    position: relative;
+  }
+  /* Memory figure and the way into the downloads, as one block at the far
+     right — the panel drops from its right edge. */
+  .kopfecke {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    position: relative;
   }
   /* The three catalogue tabs — Chat always reachable from the other two,
      the other two always reachable from Chat. The same segmented switch

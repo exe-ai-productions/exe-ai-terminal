@@ -15,6 +15,8 @@ because it is the only one where guessing would be dangerous.
 from __future__ import annotations
 
 import asyncio
+import base64
+import functools
 import secrets
 import threading
 import uuid
@@ -498,21 +500,25 @@ async def bild_erzeugen(
     # The generator is a separate program that runs for half a minute; run
     # in a thread so the service keeps answering while it draws.
     #
-    # Image-Turbo takes the picture when it is up AND the request stays within
-    # what the persistent server can carry. LoRA, an external VAE and ADetailer
-    # now ride along: LoRA travels in the prompt (the server is always started
-    # with the LoRA folder), VAE and detector are the "Gespann" the server is
-    # started on. A request wanting a different Gespann (other model, VAE or
-    # detector) restarts the turbo ONCE with the new flags — the load is paid a
-    # single time, then the whole series runs warm. What still falls to sd-cli:
-    # a starting image, a mask, highres fix and clip-skip — those are not clean
-    # per-request fields on this server's HTTP body, so the authoritative path
-    # keeps them and the turbo never quietly drops a control.
+    # Image-Turbo takes the picture whenever it is up. LoRA travels in the
+    # prompt (the server is always started with the LoRA folder), VAE and
+    # detector are the "Gespann" the server is started on; a request wanting a
+    # different Gespann restarts the turbo ONCE with the new flags, so the load
+    # is paid a single time and the whole series runs warm.
+    #
+    # A starting image, a mask, highres fix and clip-skip used to fall back to
+    # sd-cli here, on the belief that this server had no per-request fields for
+    # them. The pinned build does, and each was checked against the running
+    # server: the picture really is used rather than swallowed, the mask is
+    # read with the same polarity the rest of the program uses, highres reaches
+    # the asked-for size, clip-skip changes the result, and a size that differs
+    # from the starting picture is scaled exactly as sd-cli scales it.
+    #
+    # The rule behind the switch stands unchanged: whatever the turbo cannot
+    # do goes to sd-cli. A control silently dropped is the worst outcome —
+    # worse than slow.
     turbo = request.app.state.bildturbo
-    turbo_faehig = not (
-        auftrag.startbild or auftrag.maske or auftrag.hires or auftrag.clip_skip > 0
-    )
-    ueber_turbo = turbo_faehig and turbo.laeuft()
+    ueber_turbo = turbo.laeuft()
     try:
         if ueber_turbo:
             # The turbo path borrows the runner's one-picture lock: a second
@@ -535,7 +541,17 @@ async def bild_erzeugen(
                     )
                     if not await asyncio.to_thread(turbo.bereit_abwarten):
                         raise BildturboFehler("bild.turbo_ladefehler")
-                daten = await asyncio.to_thread(turbo.zeichnen, _turbo_auftrag(auftrag))
+                # A body carrying a starting picture belongs at the other
+                # entrance; which one it is stays the caller's judgement.
+                koerper = _turbo_auftrag(auftrag)
+                daten = await asyncio.to_thread(
+                    functools.partial(
+                        turbo.zeichnen,
+                        koerper,
+                        weg="img2img" if "init_images" in koerper else "txt2img",
+                        paesse=_erwartete_paesse(auftrag),
+                    )
+                )
                 ziel.parent.mkdir(parents=True, exist_ok=True)
                 ziel.write_bytes(daten)
             finally:
@@ -599,13 +615,22 @@ async def bild_erzeugen(
 
 
 def _turbo_auftrag(auftrag: Auftrag) -> dict:
-    """The A1111 txt2img body Image-Turbo speaks. The base fields, plus the
-    LoRA stack written into the prompt in WebUI syntax — the same way sd-cli
-    takes it (``<lora:name:strength>``), which the server resolves against the
-    ``--lora-model-dir`` it was started with. VAE and detector are NOT here:
-    they are bound to the running server as start flags, not per-request body
-    fields. Starting image, mask, highres and clip-skip never reach this path
-    at all — a request with them took sd-cli instead."""
+    """The A1111 body Image-Turbo speaks.
+
+    The base fields, plus the LoRA stack written into the prompt in WebUI
+    syntax — the same way sd-cli takes it (``<lora:name:strength>``), which
+    the server resolves against the ``--lora-model-dir`` it was started with.
+    VAE and detector are NOT here: they are bound to the running server as
+    start flags, not per-request body fields.
+
+    A starting image, a mask, highres and clip-skip DO travel this path. They
+    were kept from it for a long time on the belief that the server had no
+    fields for them; the build this program pins does, and each was checked
+    against the running server before being opened up. The mask keeps the
+    polarity the rest of the program uses — white means "draw this again" —
+    because the server was measured to read it the same way, so no inversion
+    flag is set.
+    """
     prompt = auftrag.prompt
     for lora in auftrag.loras:
         prompt += f" <lora:{Path(lora.name).stem}:{lora.staerke}>"
@@ -622,7 +647,38 @@ def _turbo_auftrag(auftrag: Auftrag) -> dict:
         body["negative_prompt"] = auftrag.negativ
     if auftrag.scheduler:
         body["scheduler"] = auftrag.scheduler
+    if auftrag.startbild is not None:
+        body["init_images"] = [_alsb64(auftrag.startbild)]
+        body["denoising_strength"] = auftrag.staerke
+        # Only ever alongside a starting image — the caller already dropped a
+        # mask that arrived without one.
+        if auftrag.maske is not None:
+            body["mask"] = _alsb64(auftrag.maske)
+    if auftrag.hires:
+        body["enable_hr"] = True
+        body["hr_scale"] = auftrag.hires_scale
+    if auftrag.clip_skip > 0:
+        body["clip_skip"] = auftrag.clip_skip
     return body
+
+
+def _erwartete_paesse(auftrag: Auftrag) -> int:
+    """How many painting passes this run takes: the base one, plus highres,
+    plus the detailer's repaint.
+
+    The same arithmetic the sd-cli runner does (see ``app/bildrunner.py``),
+    and it has to stay the same: two paths that count differently would draw
+    the same picture behind two different bars. WHOEVER CHANGES ONE READS
+    THE OTHER.
+    """
+    return 1 + (1 if auftrag.hires else 0) + (1 if auftrag.ad_modell else 0)
+
+
+def _alsb64(pfad: Path) -> str:
+    """A picture on disk as the base64 the server takes. The bytes go from
+    the file into the request and nowhere else — nothing about the picture
+    is read, logged or kept."""
+    return base64.b64encode(pfad.read_bytes()).decode()
 
 
 def _ins_gespraech(

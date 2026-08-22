@@ -17,6 +17,7 @@
   --bg-leiste: #d9cfba;
   --bg-seite: #d9cfba;
   --bg-erhoben: #ece4d3;
+  --bg-hoch: #f3ecdc;
   --linie: #cabfa6;
   --linie-stark: #b1a687;
   /* The unified contrast accent: one warm taupe for every NEUTRAL emphasis —
@@ -88,6 +89,7 @@
   --bg-leiste: #1a1a18;
   --bg-seite: #171716;
   --bg-erhoben: #1f1f1d;
+  --bg-hoch: #272724;
   --linie: #2e2e2a;
   --linie-stark: #3d3d38;
   --kontrast: #3d3d38;
@@ -111,6 +113,7 @@
     --bg-leiste: #1a1a18;
     --bg-seite: #171716;
     --bg-erhoben: #1f1f1d;
+    --bg-hoch: #272724;
     --linie: #2e2e2a;
     --linie-stark: #3d3d38;
     --kontrast: #3d3d38;
@@ -161,6 +164,7 @@
      than the nebula ground so they step out of it instead of dissolving into
      it — the third brightness between the dark frame and the glowing middle. */
   --bg-erhoben: #241d46;
+  --bg-hoch: #2d2556;
   /* Lines run a touch brighter than the surfaces here on purpose: on the
      lilac shimmer a near-black hairline vanishes, and the header would lose
      its lower edge — the "missing top boundary". Lifted, every frame (header,
@@ -224,6 +228,7 @@
   --kopf-schatten: 0 10px 26px -10px rgba(64, 92, 138, 0.3);
   --bg-seite: #dbe5f3;
   --bg-erhoben: #f6f9fd;
+  --bg-hoch: #ffffff;
   --linie: #c2d1e7;
   --linie-stark: #a2b7d8;
   --kontrast: #8fa8d0;

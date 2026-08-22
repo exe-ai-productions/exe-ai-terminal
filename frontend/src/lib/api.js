@@ -166,6 +166,9 @@ export const api = {
     ruf('/skills', { method: 'POST', body: alsText({ name, inhalt }) }),
   skillAuto: (name, auto) =>
     ruf(`/skills/${encodeURIComponent(name)}`, { method: 'PATCH', body: alsText({ auto }) }),
+  skillDatei: (name) => ruf(`/skills/${encodeURIComponent(name)}`),
+  skillSichern: (name, inhalt) =>
+    ruf(`/skills/${encodeURIComponent(name)}`, { method: 'PUT', body: alsText({ inhalt }) }),
   skillZuruecksetzen: (name) =>
     ruf(`/skills/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   // config.yaml and .env, editable in the settings mask.

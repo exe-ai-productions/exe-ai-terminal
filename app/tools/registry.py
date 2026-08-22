@@ -32,7 +32,9 @@ from app.paketierung import ist_eingefroren, programmpfad
 MCP_SERVER = {"websuche", "searxng"}
 import httpx
 
-from app.tools import dateiwerkzeuge, frage_werkzeug, grenzen, memory, shell, skill
+from app.tools import (
+    bild_werkzeug, dateiwerkzeuge, frage_werkzeug, grenzen, memory, shell, skill,
+)
 from app.tools.mcp_client import MCPFehler, MCPStdioClient, MCPWerkzeug
 from app.tools.mcp_http import MCPHttpClient
 
@@ -165,6 +167,7 @@ class WerkzeugRegistry:
         shell_an: bool = False,
         memory_pfad: Path | None = None,
         skills_orte: tuple[Path, Path] | None = None,
+        bild_zugang: tuple[str, Path] | None = None,
     ) -> None:
         self.eintraege = eintraege
         self.arbeitsverzeichnis = arbeitsverzeichnis
@@ -180,6 +183,11 @@ class WerkzeugRegistry:
         # The two skill folders, shipped and the user's, for the same reason
         # as the memory path. None means the two skill tools do not exist.
         self.skills_orte = skills_orte
+        # This service's own API root and its picture folder, for the
+        # drawing tool. Built in like the memory path: the address and the
+        # folder belong to the program, never to a model's argument. None
+        # means the tool does not exist.
+        self.bild_zugang = bild_zugang
         # The OAuthVermittler (mcp_auth) — for hosted servers without a
         # fixed key. None means: such servers remain unconnected.
         self.oauth = oauth
@@ -349,6 +357,8 @@ class WerkzeugRegistry:
             namen.append(shell.WERKZEUG_NAME)
             namen.append(frage_werkzeug.WERKZEUG_NAME)
             namen += list(dateiwerkzeuge.NAMEN)
+        if self.bild_zugang is not None:
+            namen.append(bild_werkzeug.WERKZEUG_NAME)
         return sorted(namen)
 
     def uebersicht(self) -> list[dict[str, Any]]:
@@ -381,6 +391,18 @@ class WerkzeugRegistry:
                         "needs_confirmation": False,
                     }
                 )
+        if self.bild_zugang is not None:
+            beschreibung = bild_werkzeug.werkzeug_beschreibung()
+            eintraege.append(
+                {
+                    "name": beschreibung.name,
+                    "beschreibung": beschreibung.beschreibung,
+                    "server": beschreibung.server,
+                    # Draws locally into the program's own folders — nothing
+                    # leaves the machine and nothing of the user's is touched.
+                    "needs_confirmation": False,
+                }
+            )
         if self.shell_an:
             beschreibung = shell.werkzeug_beschreibung()
             eintraege.append(
@@ -464,6 +486,12 @@ class WerkzeugRegistry:
                 for b in skill.werkzeug_beschreibungen()
                 if (nur is None or b.name in nur) and b.name not in self.abgeschaltet
             ]
+        if (
+            self.bild_zugang is not None
+            and (nur is None or bild_werkzeug.WERKZEUG_NAME in nur)
+            and bild_werkzeug.WERKZEUG_NAME not in self.abgeschaltet
+        ):
+            liste.append(bild_werkzeug.werkzeug_beschreibung().als_openai_werkzeug())
         return liste
 
     def server_von(self, name: str) -> str:
@@ -483,6 +511,8 @@ class WerkzeugRegistry:
             return memory.SERVER_NAME if self.memory_pfad is not None else ""
         if name in (skill.LADEN, skill.SCHREIBEN):
             return skill.SERVER_NAME if self.skills_orte is not None else ""
+        if name == bild_werkzeug.WERKZEUG_NAME:
+            return bild_werkzeug.SERVER_NAME if self.bild_zugang is not None else ""
         eintrag = self._werkzeuge.get(name)
         return eintrag[1].server if eintrag else ""
 
@@ -590,6 +620,17 @@ class WerkzeugRegistry:
                 "ask_user is answered by the user, not executed. It only works "
                 "in a chat."
             )
+
+        if name == bild_werkzeug.WERKZEUG_NAME:
+            if self.bild_zugang is None:
+                raise WerkzeugVerboten(f"Werkzeug '{name}' ist nicht freigegeben.")
+            basis, bilderordner = self.bild_zugang
+            try:
+                return await bild_werkzeug.ausfuehren(
+                    argumente, basis, bilderordner, bild_senke
+                )
+            except bild_werkzeug.BildWerkzeugFehler as fehler:
+                raise WerkzeugVerboten(str(fehler)) from fehler
 
         if (datei_modul := dateiwerkzeuge.modul(name)) is not None:
             if not self.shell_an:

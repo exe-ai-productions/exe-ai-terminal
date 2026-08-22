@@ -52,6 +52,11 @@ _Sicherungen/
 # start your own copy is created from it.
 config.yaml
 
+# The server list is personal too: it holds addresses, keys and machines of
+# whoever runs this. What ships is mcp_servers.example.json; on first start
+# your own copy is created from it. Never let this one into the repository.
+mcp_servers.json
+
 
 # Packaging output — rebuilt from the spec, never committed.
 dist/

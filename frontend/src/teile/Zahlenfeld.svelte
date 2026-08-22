@@ -83,9 +83,12 @@
     display: flex;
     align-items: center;
     width: 100%;
-    height: 32px;
+    /* The one height every long control in the house stands at, and the
+       palette's corner for a control — so a row of fields, pickers and
+       buttons reads as one line of equals. */
+    height: 36px;
     border: 1px solid var(--linie-stark);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--bg);
   }
   input {
@@ -94,7 +97,7 @@
     border: none;
     background: none;
     color: var(--text);
-    font: 400 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 400 13.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
     padding: 6px 4px 6px 10px;
     text-align: right;
     outline: none;
@@ -113,7 +116,7 @@
   .nullwort {
     position: absolute;
     right: 34px;
-    font: 400 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 400 13.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--text-still);
     pointer-events: none;
   }

@@ -163,10 +163,17 @@ def test_die_modellwahl_ueberlebt_das_speichern():
     assert waechterwahl.schalter_pruefen({"modell": " klein.gguf "}) == {
         "modell": "klein.gguf"
     }
-    # Nothing picked is not a choice: the window sends null, and an empty
-    # string stored here would override the scope above with nothing.
-    assert waechterwahl.schalter_pruefen({"an": True, "modell": None}) == {"an": True}
-    assert waechterwahl.schalter_pruefen({"an": True, "modell": "   "}) == {"an": True}
+    # "No model of its own" is one of the entries the picker offers, so it is
+    # stored like any other choice — dropping it here let the server default
+    # walk back in on the next load.
+    assert waechterwahl.schalter_pruefen({"an": True, "modell": None}) == {
+        "an": True,
+        "modell": "",
+    }
+    assert waechterwahl.schalter_pruefen({"an": True, "modell": "   "}) == {
+        "an": True,
+        "modell": "",
+    }
     lang = waechterwahl.schalter_pruefen({"modell": "x" * 500})
     assert len(lang["modell"]) == waechterwahl.MODELL_HOECHSTLAENGE
 

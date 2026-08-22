@@ -57,7 +57,10 @@
     flex-direction: column;
     gap: 8px;
     align-items: center;
-    padding-top: 12px;
+    /* Clear of the camera notch: on a fullscreen notebook the first
+       12 px sit under the housing, and a toast that starts there is a
+       toast half swallowed. */
+    padding-top: 46px;
     pointer-events: none;
   }
   /* Borderless and

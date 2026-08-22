@@ -20,6 +20,7 @@
   import ModelleCloud from './teile/ModelleCloud.svelte'
   import Werkzeuge from './teile/Werkzeuge.svelte'
   import Frage from './teile/Frage.svelte'
+  import Protokollfenster from './teile/Protokollfenster.svelte'
   import Bildschau from './teile/Bildschau.svelte'
   import Meldungen from './teile/Meldungen.svelte'
   import Wortmarke from './teile/Wortmarke.svelte'
@@ -29,6 +30,7 @@
   import Agentenmarke from './teile/Agentenmarke.svelte'
   import Wasserzeichen from './teile/Wasserzeichen.svelte'
   import Bildwarteschlange from './teile/Bildwarteschlange.svelte'
+  import Flashpunkt from './teile/Flashpunkt.svelte'
   import Serverpunkt from './teile/Serverpunkt.svelte'
   import Speicherpille from './teile/Speicherpille.svelte'
   import { api, antwortStrom } from './lib/api.js'
@@ -227,7 +229,11 @@
     /* A question from the model is waiting: then what was typed IS the
        answer, not a new message. Free text always counts — the buttons are
        an offer, not a cage. */
-    if (zustand.benutzerfrage && inhalt?.trim()) {
+    if (
+      zustand.benutzerfrage
+      && zustand.benutzerfrage.chatId === zustand.aktiverChat
+      && inhalt?.trim()
+    ) {
       await benutzerfrageBeantworten(inhalt.trim())
       return
     }
@@ -608,7 +614,10 @@
               aufrufId: ereignis.aufruf_id,
               name: ereignis.name,
               argumente: ereignis.argumente,
-              chatId: zustand.aktiverChat,
+              // The RUN's chat, not whatever is on screen: whoever switched
+              // away must not find a foreign question hanging over their
+              // input field.
+              chatId: zustand.laeuft?.chatId ?? zustand.aktiverChat,
               // Why this call is being asked about — empty when the tool is
               // simply configured to always ask.
               grund: ereignis.grund || '',
@@ -619,15 +628,31 @@
           /* The model wants a decision that belongs to the user. The run
              stands still until it gets one. */
           klingen('wartet')
+          /* The question also lands in the history like any other tool
+             call: the server sends no tool_call for ask_user, so the entry
+             is created here — the tool_result later fills it, and question
+             plus answer stay visible as a block instead of vanishing. */
+          platzhalter.werkzeuge.push({
+            aufruf_id: ereignis.aufruf_id,
+            name: 'ask_user',
+            server: '',
+            argumente: { question: ereignis.frage },
+            ergebnis: null,
+            fehlgeschlagen: false,
+          })
           zustand.benutzerfrage = {
             generationId: zustand.laeuft?.generationId,
             aufrufId: ereignis.aufruf_id,
             frage: ereignis.frage,
             optionen: ereignis.optionen || [],
-            // Which conversation is asking — the sidebar lights the right
-            // row by it, and only that one.
-            chatId: zustand.aktiverChat,
+            // The RUN's chat, not whatever is on screen — the sidebar
+            // lights the right row by it, and the box only shows there.
+            chatId: zustand.laeuft?.chatId ?? zustand.aktiverChat,
+            // Which question of this run this is — the box wears the
+            // count as a small pill.
+            nummer: platzhalter.werkzeuge.filter((w) => w.name === 'ask_user').length,
           }
+          runter()
         } else if (ereignis.typ === 'tool_call') {
           /* Stays up until the result is in — then the same notification
              is rewritten instead of putting a second one next to it. */
@@ -851,39 +876,15 @@
       <!-- The picture count reflows in here on its own: it shows only
            while pictures are being made. -->
       <Bildwarteschlange />
+      <Flashpunkt />
+      <span class="statustrenner" aria-hidden="true"></span>
       <Serverpunkt />
+      <span class="statustrenner" aria-hidden="true"></span>
+      <!-- The figures name themselves, like the two readings before them. -->
+      <span class="wort">{t('kopf.speicher')}</span>
     </span>
     <Speicherpille />
-    <!-- The manual: its own page, deliberately outside the app — it should
-         be able to stay open next to the app. -->
-    <button
-      class="kopfknopf hilfeknopf"
-      aria-label={t('menue.hilfe')}
-      title={t('menue.hilfe')}
-      onclick={() => window.open('https://exe-hq.net/docs/', '_blank')}
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M9.2 9a2.8 2.8 0 1 1 4 2.55c-.9.42-1.2 1.05-1.2 2.05v.4" />
-        <path d="M12 17.6 V17.7" />
-      </svg>
-    </button>
-    <button
-      class="kopfknopf"
-      aria-label={t('menue.settings')}
-      title={t('menue.settings')}
-      onclick={() => {
-        zustand.promptStart = 'darstellung'
-        menueFensterOeffnen('prompt')
-      }}
-    >
-      <!-- The sun-wheel — the house Settings mark the sibling programs wear. -->
-      <svg viewBox="0 0 100 100" width="22" height="22" fill="none" stroke="currentColor"
-           stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="50" cy="50" r="16" />
-        <path d="M50 22 V32 M50 68 V78 M22 50 H32 M68 50 H78 M30 30 l7 7 M63 63 l7 7 M70 30 l-7 7 M37 63 l-7 7" />
-      </svg>
-    </button>
+
   </div>
 
   <div class="rumpf">
@@ -993,6 +994,10 @@
 <!-- The house's prompt dialog — lies above everything, even the windows. -->
 <Frage />
 
+<!-- The server log, shown large. At the root for the same reason as the
+     prompt: a window that must lie over everything cannot sit inside one. -->
+<Protokollfenster />
+
 <!-- Version and credit, quiet in the corner. The version comes from the
      service, so the corner can never disagree with /meta. -->
 {#if zustand.version}
@@ -1017,11 +1022,13 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    /* The sibling programs' single band: 44 px tall, no right padding —
-       the gear owns its own slot flush at the corner. */
+    /* The sibling programs' single band, 44 px tall. The manual and the
+       settings moved into the module rail, so what stands at the right edge
+       now is what the header reports — and it keeps the same distance from
+       the corner the rail's signs keep from theirs. */
     height: 44px;
     flex: none;
-    padding: 0 0 0 18px;
+    padding: 0 2px 0 18px;
     /* Header band. Transparent by default, so light and dark keep showing the
        ground through it exactly as before. Under Dark Matter it takes a solid
        dark cap (--kopf-bg) and a soft shadow (--kopf-schatten) so the whole
@@ -1039,6 +1046,21 @@
   }
   /* The status group left of the memory pill: dot and one quiet word,
      capped so a long text never pushes the pill around. */
+  /* A hairline between two readouts that report different things: without
+     it the dots and words run together into one sentence. */
+  .kopfstatus .wort {
+    flex: none;
+    white-space: nowrap;
+  }
+  .statustrenner {
+    flex: none;
+    width: 1px;
+    /* Well short of the line's own height, with air on both sides: a mark
+       between two readings, not a rule drawn through the header. */
+    height: 9px;
+    margin: 0 4px;
+    background: var(--linie-stark);
+  }
   .kopfstatus {
     display: inline-flex;
     align-items: center;
@@ -1048,38 +1070,6 @@
     max-width: 42vw;
     font-size: 12.5px;
     color: var(--text-leise);
-  }
-  /* No frame, no box — just the mark, softly lifted by a glow that blurs
-     out smoothly. The gear's 52 px slot sits flush at the right edge. */
-  .kopfknopf {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 52px;
-    height: 44px;
-    flex: none;
-    border: none;
-    border-radius: 0;
-    background: none;
-    color: var(--text-leise);
-    cursor: pointer;
-    padding: 0;
-  }
-  .kopfknopf.hilfeknopf {
-    width: 36px;
-    margin-right: -12px;
-  }
-  .kopfknopf svg {
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
-            drop-shadow(0 0 5px color-mix(in srgb, var(--text) 16%, transparent));
-    transition: color 0.12s, filter 0.12s;
-  }
-  .kopfknopf:hover {
-    color: var(--text);
-  }
-  .kopfknopf:hover svg {
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35))
-            drop-shadow(0 0 8px color-mix(in srgb, var(--text) 32%, transparent));
   }
   /* Only as wide as the mark itself: the menu items follow right after
      the lettering instead of waiting at the sidebar seam. */

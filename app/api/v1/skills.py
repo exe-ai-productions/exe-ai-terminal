@@ -171,6 +171,74 @@ def auto_setzen(name: str, daten: AutoSetzen, request: Request) -> SkillZeile:
     )
 
 
+class SkillDatei(BaseModel):
+    """The raw ``SKILL.md`` for the editor — exactly as it lies on disk,
+    front matter included, so saving it back changes nothing but what the
+    user typed."""
+
+    name: str
+    inhalt: str
+    eigen: bool
+    mitgeliefert: bool
+
+
+class SkillInhalt(BaseModel):
+    inhalt: str = Field(max_length=100_000)
+
+
+@router.get("/{name}", response_model=SkillDatei)
+def datei_lesen(name: str, request: Request) -> SkillDatei:
+    """The winning copy's file, verbatim — what the edit button opens."""
+    name = _geprueft(name)
+    mitgeliefert, eigen = _orte(request)
+    skill = skills.skills_laden(mitgeliefert, eigen).get(name)
+    if skill is None:
+        raise HTTPException(404, f"Keine Skill namens '{name}'")
+    inhalt = (skill.ordner / skills.SKILL_DATEI).read_text(encoding="utf-8")
+    ab_werk = set(skills.aus_verzeichnis(mitgeliefert, eigen=False))
+    return SkillDatei(
+        name=name, inhalt=inhalt, eigen=skill.eigen, mitgeliefert=name in ab_werk
+    )
+
+
+@router.put("/{name}", response_model=SkillZeile)
+def bearbeiten(name: str, daten: SkillInhalt, request: Request) -> SkillZeile:
+    """Saves an edited skill and hands back how it now reads.
+
+    Editing a shipped skill quietly makes the user's copy first — the whole
+    folder, because companion files belong to the skill — so the next update
+    walks past the change. The text is checked BEFORE anything touches the
+    disk: a broken edit is answered with the reason and the old file stands.
+    """
+    name = _geprueft(name)
+    if not daten.inhalt.strip():
+        raise HTTPException(400, "Der Skill-Inhalt ist leer")
+    mitgeliefert, eigen = _orte(request)
+    skill = skills.skills_laden(mitgeliefert, eigen).get(name)
+    if skill is None:
+        raise HTTPException(404, f"Keine Skill namens '{name}'")
+
+    ziel = eigen / name
+    try:
+        skills.skill_aus_text(name, daten.inhalt, ordner=ziel, eigen=True)
+    except skills.SkillKaputt as fehler:
+        raise HTTPException(400, str(fehler)) from fehler
+
+    if not skill.eigen:
+        shutil.copytree(skill.ordner, ziel)
+    (ziel / skills.SKILL_DATEI).write_text(daten.inhalt, encoding="utf-8")
+
+    geladen = skills.skills_laden(mitgeliefert, eigen)[name]
+    ab_werk = set(skills.aus_verzeichnis(mitgeliefert, eigen=False))
+    return SkillZeile(
+        name=name,
+        beschreibung=geladen.beschreibung,
+        auto=geladen.auto,
+        eigen=True,
+        mitgeliefert=name in ab_werk,
+    )
+
+
 @router.delete("/{name}", status_code=204, response_class=Response)
 def zuruecksetzen(name: str, request: Request) -> Response:
     """Removes the user's copy. A shipped skill reappears in its own version;

@@ -35,8 +35,7 @@ def test_das_binary_wird_im_build_ordner_gefunden(tmp_path: Path):
 
 
 def test_der_turbo_body_traegt_nur_die_basis():
-    """Image-Turbo speaks the basic A1111 body; the extras never reach it —
-    a request with them takes the sd-cli path instead."""
+    """Without extras the body stays the bare basics — nothing is invented."""
     auftrag = Auftrag(
         modell=Path("/m.safetensors"), prompt="ein Leuchtturm", negativ="unscharf",
         breite=1024, hoehe=1024, schritte=28, cfg=6.5, seed=42,
@@ -126,3 +125,178 @@ def test_abbrechen_nur_beim_zeichnen(tmp_path: Path, monkeypatch):
     # server was told to end.
     assert turbo._abgebrochen is True
     assert len(beendet) == 1
+
+
+# --- The extras that used to force the slow path -----------------------------
+
+
+def test_startbild_und_maske_reisen_als_base64(tmp_path: Path):
+    """A starting picture and its mask travel in the body, base64, with the
+    strength beside them. Both were kept from this path for a long time on
+    the belief that the server had no fields for them."""
+    import base64
+
+    start = tmp_path / "start.png"
+    start.write_bytes(b"START-BYTES")
+    maske = tmp_path / "maske.png"
+    maske.write_bytes(b"MASKE-BYTES")
+
+    auftrag = Auftrag(
+        modell=Path("/m.safetensors"), prompt="x",
+        startbild=start, maske=maske, staerke=0.42,
+    )
+    body = _turbo_auftrag(auftrag)
+    assert body["init_images"] == [base64.b64encode(b"START-BYTES").decode()]
+    assert body["mask"] == base64.b64encode(b"MASKE-BYTES").decode()
+    assert body["denoising_strength"] == 0.42
+    # The mask keeps the polarity the rest of the program uses; the server was
+    # measured to read it the same way, so nothing is flipped here.
+    assert "inpainting_mask_invert" not in body
+
+
+def test_ohne_startbild_keine_staerke_und_keine_maske(tmp_path: Path):
+    """No starting picture, no strength — a denoising figure without a picture
+    to act on would be a number about nothing."""
+    auftrag = Auftrag(modell=Path("/m.safetensors"), prompt="x", staerke=0.5)
+    body = _turbo_auftrag(auftrag)
+    assert "init_images" not in body
+    assert "denoising_strength" not in body
+    assert "mask" not in body
+
+
+def test_hires_und_clipskip_reisen_mit():
+    auftrag = Auftrag(
+        modell=Path("/m.safetensors"), prompt="x",
+        hires=True, hires_scale=2.0, clip_skip=2,
+    )
+    body = _turbo_auftrag(auftrag)
+    assert body["enable_hr"] is True
+    assert body["hr_scale"] == 2.0
+    assert body["clip_skip"] == 2
+
+
+def test_ohne_hires_und_ohne_clipskip_steht_nichts_im_body():
+    auftrag = Auftrag(modell=Path("/m.safetensors"), prompt="x", clip_skip=-1)
+    body = _turbo_auftrag(auftrag)
+    assert "enable_hr" not in body
+    assert "hr_scale" not in body
+    assert "clip_skip" not in body
+
+
+def test_die_paesse_zaehlen_wie_beim_langsamen_weg():
+    """Both paths count the same passes, or the same picture would be drawn
+    behind two different bars."""
+    from app.api.v1.bild import _erwartete_paesse
+
+    schlicht = Auftrag(modell=Path("/m.safetensors"), prompt="x")
+    assert _erwartete_paesse(schlicht) == 1
+
+    mit_hires = Auftrag(modell=Path("/m.safetensors"), prompt="x", hires=True)
+    assert _erwartete_paesse(mit_hires) == 2
+
+    mit_beidem = Auftrag(
+        modell=Path("/m.safetensors"), prompt="x",
+        hires=True, ad_modell=Path("/face.safetensors"),
+    )
+    assert _erwartete_paesse(mit_beidem) == 3
+
+
+def test_ein_startbild_geht_an_den_anderen_eingang(tmp_path: Path, monkeypatch):
+    """A body with a starting picture belongs at img2img, one without at
+    txt2img. The module itself never looks into the body to decide."""
+    import app.bildturbo as bt
+
+    gerufen: list[str] = []
+
+    class _Antwort:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            import base64
+            return {"images": [base64.b64encode(b"PNG").decode()]}
+
+    def _post(url, json=None, timeout=None):
+        gerufen.append(url)
+        return _Antwort()
+
+    monkeypatch.setattr(bt.httpx, "post", _post)
+
+    turbo = Bildturbo(tmp_path)
+    turbo._prozess = object()          # laeuft() sagt ja
+    monkeypatch.setattr(turbo, "laeuft", lambda: True)
+
+    turbo.zeichnen({"prompt": "x", "steps": 8}, weg="img2img")
+    turbo.zeichnen({"prompt": "x", "steps": 8})
+
+    assert gerufen[0].endswith("/sdapi/v1/img2img")
+    assert gerufen[1].endswith("/sdapi/v1/txt2img")
+
+
+def test_die_paesse_kommen_vom_aufrufer(tmp_path: Path, monkeypatch):
+    """The caller knows about highres; the module only takes the number."""
+    import app.bildturbo as bt
+
+    class _Antwort:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            import base64
+            return {"images": [base64.b64encode(b"PNG").decode()]}
+
+    gesehen = {}
+
+    def _post(url, json=None, timeout=None):
+        # The counting stands while the call is in flight.
+        gesehen.update(turbo._zaehl or {})
+        return _Antwort()
+
+    monkeypatch.setattr(bt.httpx, "post", _post)
+    turbo = Bildturbo(tmp_path)
+    turbo._prozess = object()
+    monkeypatch.setattr(turbo, "laeuft", lambda: True)
+
+    turbo.zeichnen({"prompt": "x", "steps": 8}, paesse=3)
+    assert gesehen["paesse"] == 3
+
+
+def test_die_weiche_schickt_ein_startbild_ueber_den_turbo(tmp_path: Path, monkeypatch):
+    """The switch: while the turbo runs, a request with a starting picture
+    takes it too. It used to fall back to sd-cli on the belief that this
+    server had no fields for one."""
+    from app.api.v1 import bild as bildapi
+
+    start = tmp_path / "start.png"
+    start.write_bytes(b"START")
+
+    auftrag = Auftrag(modell=Path("/m.safetensors"), prompt="x", startbild=start,
+                      staerke=0.5)
+    koerper = bildapi._turbo_auftrag(auftrag)
+
+    # Exactly the decision the endpoint makes.
+    assert "init_images" in koerper
+    weg = "img2img" if "init_images" in koerper else "txt2img"
+    assert weg == "img2img"
+
+    # And without one it stays the ordinary entrance.
+    ohne = bildapi._turbo_auftrag(Auftrag(modell=Path("/m.safetensors"), prompt="x"))
+    assert ("img2img" if "init_images" in ohne else "txt2img") == "txt2img"
+
+
+def test_maske_ohne_startbild_erreicht_den_body_nicht(tmp_path: Path):
+    """The old rule stands: a mask without a picture to mask has nothing to
+    act on, and the endpoint drops it before the body is built."""
+    maske = tmp_path / "m.png"
+    maske.write_bytes(b"MASKE")
+    auftrag = Auftrag(modell=Path("/m.safetensors"), prompt="x", maske=maske)
+    body = _turbo_auftrag(auftrag)
+    assert "mask" not in body

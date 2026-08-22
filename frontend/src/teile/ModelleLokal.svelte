@@ -27,6 +27,7 @@
   import { ausFenster } from '../lib/fensterweg.svelte.js'
   import { zustand } from '../lib/zustand.svelte.js'
   import { modellwahl, auswahlLaden, istAn, schalten, lokale } from '../lib/modelle.svelte.js'
+  import { startAktion } from '../lib/startknopf.svelte.js'
 
   let { offen = $bindable(false) } = $props()
 
@@ -113,18 +114,26 @@
       </div>
       <div class="markensatz">{t('modell.lokal_satz')}</div>
     </div>
-    {#if maschineGb || zustand.serverPlan}
-      <div class="vramzeile">
+    <div class="vramzeile">
         {#if maschineGb}
           <span class="vramwort">{t('modell.vram_label')}:</span>
           <span class="vramwert">{maschineGb} GB</span>
         {/if}
+        {#if maschineGb && zustand.serverPlan}
+          <span class="vramtrenner" aria-hidden="true"></span>
+        {/if}
         {#if zustand.serverPlan}
-          <span class="vramwort">{t('modell.vram_erwartet')}:</span>
+          <span class="vramwort"><span class="mittel" aria-hidden="true">⌀</span>{t('modell.vram_erwartet')}:</span>
           <span class="vramwert">{zustand.serverPlan.gesamt.toFixed(1)} GB</span>
         {/if}
+        <!-- Where the server answers, beside what it costs: both are facts
+             about the same running thing, and the header had no business
+             carrying one of them alone. A dash while nothing runs — the row
+             must not jump when a server comes up. -->
+        <span class="vramtrenner" aria-hidden="true"></span>
+        <span class="vramwort">{t('kopf.port')}:</span>
+        <span class="vramwert">{laeuft ? (auskunft?.port ?? '—') : '—'}</span>
       </div>
-    {/if}
   </div>
 
   {#if !reise}
@@ -133,9 +142,50 @@
 
   <div class="zwei">
     <div class="links" use:rollfade>
-      <h4 class="abschnitt">{t('modell.laeuft_gerade')}</h4>
+      <div class="linksinhalt">
+      <h4 class="abschnitt">{t('modell.einrichten')}</h4>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('modell.server')}
+          gewaehlt={gezeigt === SERVER}
+          onclick={() => (gezeigt = SERVER)}
+          ariaLabel={t('modell.server')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="server" groesse="gross" />{/snippet}
+          {#snippet lampe()}<Leuchtpunkt farbe={laeuft ? 'gruen' : 'still'} groesse={7} />{/snippet}
+          {#snippet rechts()}<svg class="pfeil" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 6.75 L12.75 12 L7.5 17.25" /><path d="M13.5 6.75 L18.75 12 L13.5 17.25" /></svg>{/snippet}
+        </Kachel>
+      </div>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('einbettungsserver.titel')}
+          gewaehlt={gezeigt === EINBETTUNG}
+          onclick={() => (gezeigt = EINBETTUNG)}
+          ariaLabel={t('einbettungsserver.titel')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="einbettung" groesse="gross" />{/snippet}
+          {#snippet lampe()}<Leuchtpunkt farbe={einbettungStand?.laeuft ? 'gruen' : 'still'} groesse={7} />{/snippet}
+          {#snippet rechts()}<svg class="pfeil" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 6.75 L12.75 12 L7.5 17.25" /><path d="M13.5 6.75 L18.75 12 L13.5 17.25" /></svg>{/snippet}
+        </Kachel>
+      </div>
+      <div class="kachelzeile">
+        <Kachel
+          titel={t('bildserver.titel')}
+          gewaehlt={gezeigt === BILD}
+          onclick={() => (gezeigt = BILD)}
+          ariaLabel={t('bildserver.titel')}
+        >
+          {#snippet zeichen()}<Hauszeichen zeichen="bild" groesse="gross" />{/snippet}
+          {#snippet lampe()}<Leuchtpunkt farbe={BILDFARBE[bildStand?.stand] ?? 'still'} groesse={7} />{/snippet}
+          {#snippet rechts()}<svg class="pfeil" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 6.75 L12.75 12 L7.5 17.25" /><path d="M13.5 6.75 L18.75 12 L13.5 17.25" /></svg>{/snippet}
+        </Kachel>
+      </div>
+      <h4 class="abschnitt zweit">{t('modell.laeuft_gerade')}</h4>
       {#if reise}
-        <p class="leerzeile">{t(ordnerLeer ? 'modell.kein_modell_satz' : 'modell.nichts_laeuft')}</p>
+        <!-- A single dash while nothing is loaded: the heading already says
+             what this place is for, and a sentence explaining the absence
+             takes more room than the absence is worth. -->
+        <p class="leerzeile" aria-label={t(ordnerLeer ? 'modell.kein_modell_satz' : 'modell.nichts_laeuft')}>—</p>
       {:else}
         {#each modelle as m (m.id)}
           <div class="kachelzeile">
@@ -161,71 +211,16 @@
           </div>
         {/each}
       {/if}
-
-      <h4 class="abschnitt zweit">{t('modell.einrichten')}</h4>
-      <div class="kachelzeile">
-        <Kachel
-          titel={t('modell.katalog')}
-          onclick={() => ausFenster(
-            () => { offen = false; zustand.katalogOffen = true },
-            () => { zustand.katalogOffen = false; offen = true },
-          )}
-          ariaLabel={t('modell.katalog')}
-        >
-          {#snippet zeichen()}<Hauszeichen zeichen="raster" groesse="mittel" />{/snippet}
-          {#snippet unter()}
-            {ordnerLeer && maschineGb ? t('modell.katalog_unter_erst', { gb: maschineGb }) : t('modell.katalog_unter')}
-          {/snippet}
-          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
-        </Kachel>
       </div>
-      <div class="kachelzeile">
-        <Kachel
-          titel={t('modell.server')}
-          gewaehlt={gezeigt === SERVER}
-          onclick={() => (gezeigt = SERVER)}
-          ariaLabel={t('modell.server')}
-        >
-          {#snippet zeichen()}<Hauszeichen zeichen="server" groesse="mittel" />{/snippet}
-          {#snippet unter()}
-            <Leuchtpunkt farbe={laeuft ? 'gruen' : 'still'} groesse={6} />
-            {laeuft ? t('modell.server_unter_an', { port: auskunft.port }) : t('modell.server_unter_aus')}
-          {/snippet}
-          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
-        </Kachel>
-      </div>
-      <div class="kachelzeile">
-        <Kachel
-          titel={t('einbettungsserver.titel')}
-          gewaehlt={gezeigt === EINBETTUNG}
-          onclick={() => (gezeigt = EINBETTUNG)}
-          ariaLabel={t('einbettungsserver.titel')}
-        >
-          {#snippet zeichen()}<Hauszeichen zeichen="einbettung" groesse="mittel" />{/snippet}
-          {#snippet unter()}
-            <Leuchtpunkt farbe={einbettungStand?.laeuft ? 'gruen' : 'still'} groesse={6} />
-            {einbettungStand?.laeuft
-              ? t('einbettungsserver.laeuft', { port: einbettungStand.port })
-              : t('einbettungsserver.aus')}
-          {/snippet}
-          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
-        </Kachel>
-      </div>
-      <div class="kachelzeile">
-        <Kachel
-          titel={t('bildserver.titel')}
-          gewaehlt={gezeigt === BILD}
-          onclick={() => (gezeigt = BILD)}
-          ariaLabel={t('bildserver.titel')}
-        >
-          {#snippet zeichen()}<Hauszeichen zeichen="bild" groesse="mittel" />{/snippet}
-          {#snippet unter()}
-            <Leuchtpunkt farbe={BILDFARBE[bildStand?.stand] ?? 'still'} groesse={6} />
-            {t(`bildserver.stand_${bildStand?.stand ?? 'kein_programm'}`)}
-          {/snippet}
-          {#snippet rechts()}<span class="pfeil">→</span>{/snippet}
-        </Kachel>
-      </div>
+      <!-- The one start/stop control for whichever server the rail shows,
+           lifted out of the panel on the right into the base of the rail —
+           full width, its label and light following the shown panel. -->
+      {#if startAktion()}
+        <button class="startknopf" disabled={startAktion().gesperrt} onclick={startAktion().onTat}>
+          <Leuchtpunkt farbe={startAktion().punkt} groesse={8} />
+          {startAktion().text}
+        </button>
+      {/if}
     </div>
 
     <div class="rechts" use:rollfade>
@@ -282,11 +277,27 @@
   }
   .vramwort {
     font-size: 13.5px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
     font-weight: 600;
     color: var(--text);
   }
-  .vramwort + .vramwert {
-    margin-right: 10px;
+  /* The header's own hairline: two readings side by side need the seam that
+     says they are two. */
+  .vramtrenner {
+    flex: none;
+    width: 1px;
+    height: 9px;
+    margin: 0 4px;
+    background: var(--linie-stark);
+  }
+  /* The average sign is the whole difference between the two labels, and at
+     the text's size it reads as a smudge — it gets a step of its own. */
+  .mittel {
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 400;
   }
   .vramwert {
     border: 1px solid var(--linie-stark);
@@ -318,7 +329,40 @@
     border-right: 1px solid var(--linie);
     background: var(--bg-seite);
     padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  /* The tiles scroll; the start button stays pinned to the foot of the rail. */
+  .linksinhalt {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
+  }
+  .startknopf {
+    flex: none;
+    margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font: inherit;
+    font-size: 13.5px;
+    padding: 11px 14px;
+    border: 1px solid var(--linie-stark);
+    border-radius: 9px;
+    background: var(--linie-stark);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .startknopf:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .startknopf:not(:disabled):hover {
+    background: var(--linie);
   }
   .abschnitt {
     font-size: 10.5px;

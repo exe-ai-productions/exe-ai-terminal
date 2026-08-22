@@ -288,3 +288,44 @@ def test_ein_name_ist_nie_ein_pfad(client):
     assert client.delete("/api/v1/skills/..").status_code in (400, 404, 405)
     assert client.delete("/api/v1/skills/etc%2Fpasswd").status_code in (400, 404, 405)
     assert client.delete("/api/v1/skills/Gross Raum").status_code == 400
+
+
+def test_skill_datei_lesen_und_bearbeiten(client):
+    """The edit button's round trip: read the raw file, save it changed.
+
+    The raw text comes back verbatim — front matter included — so saving
+    it unchanged changes nothing. A broken edit is refused and the old
+    file stands.
+    """
+    client.post("/api/v1/skills", json={"name": "planer", "inhalt": NEU})
+
+    datei = client.get("/api/v1/skills/planer")
+    assert datei.status_code == 200
+    assert datei.json()["inhalt"] == NEU
+    assert datei.json()["eigen"] is True
+
+    geaendert = NEU.replace("short plan", "long plan")
+    antwort = client.put("/api/v1/skills/planer", json={"inhalt": geaendert})
+    assert antwort.status_code == 200
+    assert client.get("/api/v1/skills/planer").json()["inhalt"] == geaendert
+
+    # Broken content never reaches the disk.
+    kaputt = client.put("/api/v1/skills/planer", json={"inhalt": "no front matter"})
+    assert kaputt.status_code == 400
+    assert client.get("/api/v1/skills/planer").json()["inhalt"] == geaendert
+
+
+def test_bearbeiten_eines_mitgelieferten_legt_die_eigene_fassung_an(client, tmp_path):
+    """Editing a shipped skill copies it to the user's folder first, so the
+    next update walks past the change."""
+    mitgeliefert, _ = client.app.state.config.skillverzeichnisse
+    ordner = mitgeliefert / "werk"
+    ordner.mkdir(parents=True)
+    (ordner / "SKILL.md").write_text(NEU, encoding="utf-8")
+
+    geaendert = NEU.replace("short plan", "careful plan")
+    antwort = client.put("/api/v1/skills/werk", json={"inhalt": geaendert})
+    assert antwort.status_code == 200
+    assert antwort.json()["eigen"] is True
+    assert antwort.json()["mitgeliefert"] is True
+    assert client.get("/api/v1/skills/werk").json()["inhalt"] == geaendert

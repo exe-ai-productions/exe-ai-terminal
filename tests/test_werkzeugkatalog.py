@@ -23,7 +23,9 @@ import pytest
 WURZEL = Path(__file__).resolve().parent.parent
 KATALOG = WURZEL / "frontend/src/lib/werkzeugkatalog.js"
 ZEICHNUNG = WURZEL / "frontend/src/teile/Werkzeugzeichen.svelte"
-SERVER_DATEI = WURZEL / "mcp_servers.json"
+# The shipped list, not the user's own: theirs is git-ignored and holds
+# whatever machines they added, which this repository never sees.
+SERVER_DATEI = WURZEL / "mcp_servers.example.json"
 
 
 def _katalog_text() -> str:
@@ -58,7 +60,7 @@ def test_jeder_konfigurierte_server_hat_ein_zeichen():
     server = set(json.loads(SERVER_DATEI.read_text(encoding="utf-8"))["mcpServers"])
     fehlend = server - _server_im_katalog()
     assert not fehlend, (
-        f"Diese Server stehen in mcp_servers.json, aber nicht im Katalog: "
+        f"Diese Server stehen in mcp_servers.example.json, aber nicht im Katalog: "
         f"{sorted(fehlend)} — ihre Werkzeuge bekämen den grauen Winkel."
     )
 

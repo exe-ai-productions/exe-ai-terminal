@@ -155,7 +155,6 @@
   {#if status === 'bereit'}
     <div class="fuss">
       <span class="pille"><Leuchtpunkt farbe="still" groesse={7} /> {t('katalog.im_ordner')}</span>
-      <button class="knopf wichtig" onclick={(e) => halt(e, onStart)}>{t('katalog.starten')}</button>
     </div>
   {:else if status === 'laedt'}
     <div class="laufbalken">

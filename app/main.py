@@ -138,6 +138,12 @@ async def lebenszyklus(app: FastAPI):
             shell_an=config.features.shell_tool,
             memory_pfad=config.pfad(config.app.memory_file),
             skills_orte=config.skillverzeichnisse,
+            # The drawing tool talks to this very service's picture API and
+            # hands the finished file over from the picture folder.
+            bild_zugang=(
+                f"http://127.0.0.1:{config.app.port}/api/v1",
+                ort(config, "bilder"),
+            ),
         )
         await registry.starten()
     app.state.werkzeuge = registry

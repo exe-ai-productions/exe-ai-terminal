@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vorschau — Bugfixes am Exe AI Terminal</title>
+<style>
+  /* ---- Farben/Fonts 1:1 aus frontend/src/stil/global.css übernommen ---- */
+  :root {
+    --bg: #f7f6f2;
+    --bg-leiste: #f2f1ec;
+    --bg-seite: #f2f1ec;
+    --bg-erhoben: #fff;
+    --linie: #e2e0d8;
+    --linie-stark: #cbc8bd;
+    --text: #1a1a18;
+    --text-leise: #6f6d66;
+    --text-still: #9a978e;
+    --blase: #f1efe9;
+    --radius: 10px;
+    --gruen: #6b8e6f;
+    --gelb: #c9a227;
+    --blau: #5b8dbe;
+    --rot: #b4544c;
+    --code-bg: #fbfaf7;
+    --schrift: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui,
+      sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+    --schrift-fest: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  :root[data-modus='dunkel'] {
+    --bg: #131312;
+    --bg-leiste: #1a1a18;
+    --bg-seite: #171716;
+    --bg-erhoben: #1f1f1d;
+    --linie: #2e2e2a;
+    --linie-stark: #3d3d38;
+    --text: #ecebe6;
+    --text-leise: #a3a099;
+    --text-still: #6f6d66;
+    --blase: #232320;
+    --code-bg: #191918;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--schrift);
+    font-size: 14.5px;
+    background: var(--bg-seite);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+
+  /* ---- Nur für diese Vorschau-Seite: Kopfleiste + Umschalter, kein Hausstil-Bauteil ---- */
+  .vorschau-kopf {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 22px;
+    background: var(--bg-leiste);
+    border-bottom: 1px solid var(--linie);
+  }
+  .vorschau-kopf h1 {
+    font-size: 14px;
+    margin: 0;
+    font-weight: 600;
+  }
+  .vorschau-kopf .hinweis {
+    font-size: 12px;
+    color: var(--text-still);
+    margin-top: 2px;
+  }
+  .modusknopf {
+    border: 1px solid var(--linie-stark);
+    background: var(--bg-erhoben);
+    color: var(--text);
+    font: 600 12.5px var(--schrift);
+    padding: 6px 13px;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  .modusknopf:hover { background: var(--linie); }
+
+  .buehne {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 34px;
+  }
+  .abschnittstitel {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-still);
+    font-weight: 700;
+    margin: 0 0 10px;
+  }
+  .abschnittstext {
+    font-size: 12.5px;
+    color: var(--text-leise);
+    margin: -6px 0 14px;
+    line-height: 1.5;
+  }
+  .karte {
+    border: 1px solid var(--linie);
+    border-radius: 14px;
+    background: var(--bg-erhoben);
+    padding: 18px 20px;
+  }
+
+  /* ================================================================
+     PUNKT 2 — KATALOG: drei feste Tabs
+     ================================================================ */
+  .kat-kopf-vorschau {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .kat-marke {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text);
+    font: 700 17px var(--schrift);
+  }
+  .reiterleiste {
+    display: inline-flex;
+    border: 1px solid var(--linie-stark);
+    border-radius: 999px;
+    padding: 3px;
+    background: var(--bg);
+    gap: 2px;
+  }
+  .reiterleiste button {
+    border: none;
+    background: none;
+    padding: 6px 15px;
+    border-radius: 999px;
+    font: 600 12.5px var(--schrift);
+    color: var(--text-leise);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .reiterleiste button:hover { color: var(--text); }
+  .reiterleiste button.aktiv {
+    background: var(--text);
+    color: var(--bg);
+  }
+  .suchfeld-mock {
+    border: 1px solid var(--linie-stark);
+    border-radius: 18px;
+    background: var(--bg);
+    color: var(--text-still);
+    font: 14px var(--schrift);
+    padding: 11px 16px;
+  }
+  .raster-mock {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .karte-mock {
+    border: 1px solid var(--linie);
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--bg);
+    font-size: 12px;
+    color: var(--text-still);
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ================================================================
+     MODELLSERVER-SEITE — begradigt (Punkt 4) + KV-Schalter (1) + FA (3)
+     ================================================================ */
+  .kopfkarte {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--linie);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .kk-min { min-width: 0; }
+  .kk-gross { font-size: 15px; }
+  .kk-unter { font-size: 12.5px; color: var(--text-still); margin-top: 2px; }
+  .standpille {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--linie-stark);
+    border-radius: 999px;
+    padding: 4px 11px;
+    font: 600 11.5px var(--schrift);
+    color: var(--text-leise);
+    flex: none;
+  }
+  .punkt {
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+  }
+  .punkt.gruen { background: var(--gruen); box-shadow: 0 0 4px color-mix(in srgb, var(--gruen) 55%, transparent); }
+
+  /* Eine einzige Überschrift-Definition für ALLE Abschnittsköpfe —
+     TEMPO / SPEICHER & KONTEXT / ERWEITERT / NETZWERK sehen jetzt gleich aus. */
+  .gruppenname, .klappkopf-text {
+    font: 600 11px var(--schrift);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-leise);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .gruppenname::after, .klappkopf-mock::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--linie);
+  }
+  .klappkopf-mock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .winkel-mock { color: var(--text-leise); transform: rotate(90deg); display: inline-flex; }
+  .klapphilfe-mock {
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-still);
+    font-size: 11.5px;
+  }
+
+  .gruppe { margin-bottom: 20px; }
+  .gruppe:last-child { margin-bottom: 0; }
+  .regler-zeile {
+    display: grid;
+    grid-template-columns: minmax(150px, 190px) 1fr;
+    gap: 10px 14px;
+    align-items: center;
+    margin-bottom: 11px;
+  }
+  .regler-zeile:last-child { margin-bottom: 0; }
+  label.feldname {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  /* Alle Unter-Texte unter einem Feldnamen — gleiche Größe/Farbe, egal ob
+     normales Label oder die Klapp-Erklärung daneben. */
+  label.feldname span, .unterzeile-text {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text-still);
+  }
+
+  /* Das EEW-Zeichen sitzt jetzt HINTER dem Namen, mit kleinem Abstand —
+     die Namensflucht (linke Kante aller Zeilennamen) bleibt gerade. */
+  .eew-hinten {
+    display: inline-flex;
+    vertical-align: -3px;
+    margin-left: 2px;
+  }
+
+  /* -- Auswahlfeld-Mock (unverändert übernommenes Bauteil) -- */
+  .auswahl-mock {
+    width: 100%;
+    height: 32px;
+    border: 1px solid var(--linie-stark);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 13px var(--schrift);
+    padding: 0 10px;
+  }
+
+  /* -- Schalter (Punkt 1: KV-Cache) -- */
+  .schalter-zeile { display: flex; align-items: center; gap: 10px; }
+  .schalter {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex: none;
+    border: none;
+    padding: 0;
+    border-radius: 11px;
+    background: var(--linie-stark);
+    cursor: pointer;
+  }
+  .schalter i {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--bg-erhoben);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: transform 0.2s cubic-bezier(0.2,0.9,0.3,1);
+  }
+  .schalter.an { background: color-mix(in srgb, var(--text) 80%, var(--bg)); }
+  .schalter.an i { transform: translateX(16px); }
+  .schalter-status { font-size: 12px; color: var(--text-leise); }
+
+  /* -- Leuchtpunkt (Punkt 3: Flash-Attention) -- */
+  .fa-zeile { display: flex; align-items: center; gap: 9px; }
+  .lp {
+    width: 12px; height: 12px; border-radius: 50%; flex: none;
+  }
+  .lp.gruen { background: var(--gruen); box-shadow: 0 0 5px color-mix(in srgb, var(--gruen) 60%, transparent); }
+  .lp.rot { background: var(--rot); box-shadow: 0 0 5px color-mix(in srgb, var(--rot) 60%, transparent); }
+  .lp.still { background: var(--text-still); }
+  .fa-text { font-size: 12.5px; color: var(--text); }
+  .fa-text .klein { color: var(--text-still); font-size: 11.5px; display: block; margin-top: 1px; }
+
+  /* -- Kontext: Regler bleibt, Zahlenfeld kommt DAZU -- */
+  .kontext-zeile { display: flex; align-items: center; gap: 10px; }
+  .bahn-mock {
+    position: relative;
+    flex: 1.4;
+    height: 22px;
+    display: flex;
+    align-items: center;
+  }
+  .bahn-mock .strich {
+    position: absolute; left: 0; right: 0; height: 3px; border-radius: 99px;
+    background: var(--linie-stark);
+  }
+  .bahn-mock .fuellung {
+    position: absolute; left: 0; width: 62%; height: 3px; border-radius: 99px;
+    background: var(--blau);
+  }
+  .bahn-mock .griff {
+    position: absolute; left: 62%; width: 14px; height: 14px; margin-left: -7px;
+    border-radius: 99px; background: var(--text);
+  }
+  .kontext-zahl {
+    flex: none; min-width: 5ch; text-align: right;
+    font-family: var(--schrift-fest); font-size: 12px; color: var(--text);
+  }
+  .zahlenfeld-mock {
+    flex: none;
+    width: 108px;
+    display: flex;
+    align-items: center;
+    height: 32px;
+    border: 1px solid var(--linie-stark);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .zahlenfeld-mock input {
+    flex: 1; min-width: 0; border: none; background: none; color: var(--text);
+    font: 400 12.5px var(--schrift-fest); padding: 6px 4px 6px 10px; text-align: right; outline: none;
+  }
+  .zahlenfeld-mock .treppe {
+    display: flex; flex-direction: column; padding: 2px 6px 2px 2px; color: var(--text-still);
+  }
+  .zahlenfeld-mock .treppe span { font-size: 8px; line-height: 1.1; }
+  .neu-markierung {
+    display: inline-flex;
+    align-items: center;
+    font: 700 9.5px var(--schrift);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--blau);
+    border: 1px solid color-mix(in srgb, var(--blau) 45%, transparent);
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: 6px;
+  }
+
+  .legende {
+    margin-top: 26px;
+    border-top: 1px dashed var(--linie-stark);
+    padding-top: 14px;
+    font-size: 12px;
+    color: var(--text-leise);
+    line-height: 1.7;
+  }
+  .legende b { color: var(--text); }
+</style>
+</head>
+<body data-modus="hell">
+
+  <div class="vorschau-kopf">
+    <div>
+      <h1>Vorschau — Bugfixes & Feinschliff am Exe AI Terminal</h1>
+      <div class="hinweis">Statische Optik-Vorschau, nichts ist verdrahtet · nach Freigabe geht’s an den echten Code</div>
+    </div>
+    <button class="modusknopf" onclick="document.body.dataset.modus = document.body.dataset.modus === 'dunkel' ? 'hell' : 'dunkel'">
+      Hell / Dunkel
+    </button>
+  </div>
+
+  <div class="buehne">
+
+    <!-- ============================================================
+         PUNKT 2 — KATALOG: drei feste Tabs
+         ============================================================ -->
+    <section>
+      <div class="abschnittstitel">Punkt 2 — Katalog: drei feste Tabs</div>
+      <div class="abschnittstext">Chat · Einbettung · Bild, immer sichtbar, in beide Richtungen wechselbar. Jeder Tab sucht streng nur seine Art.</div>
+      <div class="karte">
+        <div class="kat-kopf-vorschau">
+          <div class="kat-marke">
+            <svg viewBox="0 0 100 100" width="30" height="30" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="20" y="24" width="60" height="52" rx="11" />
+              <path d="M35 40 h30 M35 50 h30 M35 60 h18" />
+            </svg>
+            Katalog
+          </div>
+          <div class="reiterleiste">
+            <button class="aktiv">Chat</button>
+            <button>Einbettung</button>
+            <button>Bild</button>
+          </div>
+        </div>
+        <div class="suchfeld-mock">Modell suchen …</div>
+        <div class="raster-mock">
+          <div class="karte-mock">Gemma 4 31B<br>Karten-Vorschau</div>
+          <div class="karte-mock">Ternary Bonsai 27B</div>
+          <div class="karte-mock">Exe Turbo S</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         MODELLSERVER-SEITE — Kopfkarte + Gruppe TEMPO
+         ============================================================ -->
+    <section>
+      <div class="abschnittstitel">Modellserver-Seite — begradigt</div>
+      <div class="abschnittstext">Alle Abschnittsköpfe (TEMPO, SPEICHER &amp; KONTEXT, ERWEITERT, NETZWERK) jetzt in einer Schrift, Größe und Farbe. Das Extended-Workflow-Zeichen sitzt hinter dem Namen, die Namensflucht ist gerade.</div>
+      <div class="karte">
+        <div class="kopfkarte">
+          <div class="kk-min">
+            <div class="kk-gross">Exe Turbo S · Q6_K</div>
+            <div class="kk-unter">Läuft auf Port 8080 · Kontext 32k · 6.9 GB im Speicher</div>
+          </div>
+          <div class="standpille"><span class="punkt gruen"></span>erreichbar</div>
+        </div>
+
+        <div class="gruppe">
+          <div class="gruppenname">Tempo</div>
+          <div class="regler-zeile">
+            <label class="feldname">Speed-Modul<span>macht Antworten schneller</span></label>
+            <select class="auswahl-mock"><option>Keins</option></select>
+          </div>
+          <div class="regler-zeile">
+            <label class="feldname">
+              Extended-Workflow-Modell<span>das kleine Modell, das die Vorschläge schreibt</span>
+            </label>
+            <select class="auswahl-mock">
+              <option>Exe Guard Dynamic · 2.4 GB</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="gruppe">
+          <div class="gruppenname">Speicher &amp; Kontext</div>
+          <div class="regler-zeile">
+            <label class="feldname">Kontext<span>wie viel es sich merkt <span class="neu-markierung">neu: Zahlenfeld</span></span></label>
+            <div class="kontext-zeile">
+              <div class="bahn-mock">
+                <div class="strich"></div>
+                <div class="fuellung"></div>
+                <div class="griff"></div>
+              </div>
+              <span class="kontext-zahl">32k</span>
+              <div class="zahlenfeld-mock">
+                <input type="text" value="32768" />
+                <span class="treppe"><span>▲</span><span>▼</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="regler-zeile">
+            <label class="feldname">Schichten auf der Grafikkarte<span>wie viel davon auf der Grafikkarte liegt</span></label>
+            <div class="kontext-zeile">
+              <div class="bahn-mock"><div class="strich"></div><div class="fuellung" style="width:99%"></div><div class="griff" style="left:99%"></div></div>
+              <span class="kontext-zahl">alle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==========================================================
+             ERWEITERT — KV-Schalter (Punkt 1) + FA-Leuchtpunkt (Punkt 3)
+             ========================================================== -->
+        <div class="gruppe">
+          <div class="klappkopf-mock">
+            <span class="winkel-mock">▸</span>
+            <span class="klappkopf-text" style="margin:0;">Erweitert<span class="klapphilfe-mock">für zu knappen Grafikspeicher</span></span>
+          </div>
+
+          <div class="regler-zeile">
+            <label class="feldname">KV-Cache<span>spart Speicher bei großem Kontext</span></label>
+            <div class="schalter-zeile">
+              <button class="schalter an"><i></i></button>
+              <span class="schalter-status">an — halbiert (q8_0)</span>
+            </div>
+          </div>
+
+          <div class="regler-zeile">
+            <label class="feldname">Flash-Attention</label>
+            <div class="fa-zeile">
+              <span class="lp gruen"></span>
+              <span class="fa-text">Aktiv<span class="klein">immer automatisch, hier steht nur was der Server tatsächlich tut</span></span>
+            </div>
+          </div>
+
+          <div class="regler-zeile">
+            <label class="feldname">Threads<span>0 = der Server entscheidet</span></label>
+            <div class="zahlenfeld-mock" style="width:100%"><input type="text" value="0" /><span class="treppe"><span>▲</span><span>▼</span></span></div>
+          </div>
+        </div>
+
+        <div class="gruppe">
+          <div class="gruppenname">Netzwerk</div>
+          <div class="regler-zeile">
+            <label class="feldname">Port<span>worüber der Server erreichbar ist</span></label>
+            <div class="zahlenfeld-mock" style="width:100%"><input type="text" value="8080" /><span class="treppe"><span>▲</span><span>▼</span></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         EEW-ZEICHEN — vorher/nachher, isoliert gezeigt
+         ============================================================ -->
+    <section>
+      <div class="abschnittstitel">Extended-Workflow-Zeichen — vorher / nachher</div>
+      <div class="abschnittstext">Vorher: grauer Bogen-Pfeil (Modulzeichen „waechter") <b>vor</b> dem Namen, bricht die Namensflucht. Nachher: das echte goldene Monogramm (EEWzeichen), <b>hinter</b> dem Namen, Namensflucht gerade.</div>
+      <div class="karte" style="display:flex; gap:40px; align-items:center; justify-content:center; padding:26px;">
+        <div style="text-align:center;">
+          <div style="font-size:11px; color:var(--text-still); margin-bottom:10px; text-transform:uppercase; letter-spacing:.08em;">vorher</div>
+          <label class="feldname" style="justify-content:center;">
+            <span style="display:inline-flex; margin-right:6px; color:var(--text-still);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 16 H6.5" /><path d="M6.5 16 a5.5 5.5 0 0 1 11 0" /><path d="M17.5 16 H20" /><path d="M18 13.5 L21 16 l-3 2.5" /></svg>
+            </span>
+            Extended-Workflow-Modell
+          </label>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:11px; color:var(--text-still); margin-bottom:10px; text-transform:uppercase; letter-spacing:.08em;">nachher</div>
+          <label class="feldname" style="justify-content:center;">
+            Extended-Workflow-Modell
+            <span class="eew-hinten">
+              <svg width="16" height="16" viewBox="0 0 1024 1024" aria-hidden="true">
+                <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8F6C10"/><stop offset="0.45" stop-color="#E7CE7A"/><stop offset="0.6" stop-color="#C9A227"/><stop offset="1" stop-color="#7A5C0C"/></linearGradient></defs>
+                <path fill="url(#g1)" d="M512 60L860 260V620L512 960L164 620V260L512 60Z" />
+                <path fill="#F2E2A0" opacity="0.85" d="M512 200L720 320V620L512 780L304 620V320L512 200Z" />
+              </svg>
+            </span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <div class="legende">
+      <b>Was hier gezeigt wird:</b> Punkt 1 (KV-Schalter), Punkt 2 (Katalog-Tabs), Punkt 3 (FA-Leuchtpunkt), Punkt 4 (begradigtes Layout + Kontext-Zahlenfeld + EEW-Zeichen hinten). Alle Farben/Schriften 1:1 aus dem echten Stylesheet übernommen. Rechts oben zwischen Hell/Dunkel wechseln, um beide Modi zu sehen.<br>
+      Nach Freigabe wird das eins zu eins in <span style="font-family:var(--schrift-fest); font-size:11.5px;">Modellserver.svelte</span>, <span style="font-family:var(--schrift-fest); font-size:11.5px;">Katalog.svelte</span> und den zugehörigen Backend-Dateien umgesetzt.
+    </div>
+
+  </div>
+</body>
+</html>

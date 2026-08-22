@@ -19,7 +19,7 @@
   import { terminal } from '../lib/terminalfenster.svelte.js'
   import { punktfarbe as eewPunktfarbe } from '../lib/eew.svelte.js'
   import { offeneAnzahl } from '../lib/waechter.svelte.js'
-  import { zustand } from '../lib/zustand.svelte.js'
+  import { zustand, menueFensterOeffnen } from '../lib/zustand.svelte.js'
 
   /* One size for every stroke sign on this strip, and one larger one for the
      gold mark. Numbers rather than feel: the strip reads as a row only while
@@ -27,6 +27,9 @@
      purpose. */
   const ZEICHEN_GROESSE = 23
   const EEW_GROESSE = 28
+  /* The manual and the settings: their drawings sit well inside their boxes,
+     so they take a larger number to read the same size as the module signs. */
+  const NEBEN_GROESSE = 31
 
   const MODULE = [
     ['terminal', 'terminal.titel'],
@@ -45,6 +48,11 @@
   /* The state of the last run, as a colour — read from the same place the
      panel reads it, so the strip and the entry one click away can never
      disagree about the same run. */
+  function einstellungenOeffnen() {
+    zustand.promptStart = 'darstellung'
+    menueFensterOeffnen('prompt')
+  }
+
   const laufzustand = $derived.by(() => {
     const letzte = terminal.laeufe[terminal.laeufe.length - 1]
     return letzte ? laufampel(letzte.zustand) : null
@@ -90,6 +98,42 @@
        The spacer pushes it down and leaves room for whatever docks between. -->
   <span class="frei"></span>
   {@render modulKnopf('waechter', 'waechter.titel')}
+  <!-- The manual and the settings close the rail. They are not modules and
+       open no panel beside it — but they are the two other places a hand
+       goes from anywhere in the program, and a header that carried them had
+       them sitting among readings that only report. Same size as the signs
+       above them, so the column reads as one. -->
+  <button
+    class="zeichen"
+    onclick={() => window.open('https://exe-hq.net/docs/', '_blank')}
+    title={t('menue.hilfe')}
+    aria-label={t('menue.hilfe')}
+  >
+    <!-- Drawn larger than the module signs beside it: both of these fill
+         far less of their box than a module sign does, so equal numbers made
+         them look the smaller of the two. Measured by eye against the row,
+         not by the value. -->
+    <svg width={NEBEN_GROESSE} height={NEBEN_GROESSE} viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+         stroke-linejoin="round" aria-hidden="true">
+      <path d="M9.2 9a2.8 2.8 0 1 1 4 2.55c-.9.42-1.2 1.05-1.2 2.05v.4" />
+      <path d="M12 17.6 V17.7" />
+    </svg>
+  </button>
+  <button
+    class="zeichen"
+    onclick={einstellungenOeffnen}
+    title={t('menue.settings')}
+    aria-label={t('menue.settings')}
+  >
+    <!-- The sun-wheel — the house Settings mark the sibling programs wear. -->
+    <svg viewBox="0 0 100 100" width={NEBEN_GROESSE} height={NEBEN_GROESSE} fill="none"
+         stroke="currentColor" stroke-width="6.5" stroke-linecap="round"
+         stroke-linejoin="round" aria-hidden="true">
+      <circle cx="50" cy="50" r="16" />
+      <path d="M50 22 V32 M50 68 V78 M22 50 H32 M68 50 H78 M30 30 l7 7 M63 63 l7 7 M70 30 l-7 7 M37 63 l-7 7" />
+    </svg>
+  </button>
 </div>
 
 <style>

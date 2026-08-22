@@ -384,6 +384,25 @@ def _verlauf_bauen(
     for gespeichert in repositories.messages.auflisten(chat_id=chat.id):
         # The reasoning does not belong in the history — it is display, not context.
         inhalt = gespeichert.content
+        # The model's own questions must survive the run they were asked
+        # in: a later request rebuilds the history from stored messages,
+        # and question and answer lived only in the tool log. Folded into
+        # the assistant text, so the model still knows what it asked and
+        # what the user decided.
+        fragen = [
+            w
+            for w in (gespeichert.stats or {}).get("werkzeuge") or []
+            if w.get("name") == frage_werkzeug.WERKZEUG_NAME
+        ]
+        if gespeichert.role == "assistant" and fragen:
+            zeilen = "\n".join(
+                "[You asked: {frage} — the user answered: {antwort}]".format(
+                    frage=(w.get("argumente") or {}).get("question", ""),
+                    antwort=w.get("ergebnis", ""),
+                )
+                for w in fragen
+            )
+            inhalt = f"{zeilen}\n{inhalt}" if inhalt else zeilen
         if gespeichert.dokument:
             # Documents ride along through the whole history like images:
             # the extracted text is prepended to the

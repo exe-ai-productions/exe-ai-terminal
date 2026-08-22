@@ -115,11 +115,9 @@
 
   <div class="dfuss">
     <button class="knopf" onclick={onClose}>{t('katalog.schliessen')}</button>
-    {#if status === 'bereit'}
-      <button class="knopf wichtig" onclick={() => onStart?.(aktuelle)}>{t('katalog.starten')}</button>
-    {:else if status === 'laedt'}
+    {#if status === 'laedt'}
       <button class="knopf" onclick={onCancel}>{t('katalog.abbrechen')}</button>
-    {:else}
+    {:else if status !== 'bereit'}
       <button class="knopf wichtig" onclick={() => onDownload?.(aktuelle)}>
         {t('katalog.herunterladen_gb', { gb: aktuelle.groesse })}
       </button>

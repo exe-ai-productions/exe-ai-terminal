@@ -23,19 +23,31 @@
   import { empfehlungFuer } from '../lib/modellempfehlungen.js'
   import { FEINEINSTELLUNGEN } from '../lib/feineinstellungen.js'
   import Auswahlfeld from './Auswahlfeld.svelte'
-  import EEWzeichen from './EEWzeichen.svelte'
   import { eew, modellWaehlen as eewModellWaehlen } from '../lib/eew.svelte.js'
   import Schalter from './Schalter.svelte'
   import Schieberegler from './Schieberegler.svelte'
+  import EEWzeichen from './EEWzeichen.svelte'
   import Servertafel from './Servertafel.svelte'
   import Zahlenfeld from './Zahlenfeld.svelte'
   import Leuchtpunkt from './Leuchtpunkt.svelte'
+  import Hauszeichen from './Hauszeichen.svelte'
+  import { setzeStartAktion, loescheStartAktion } from '../lib/startknopf.svelte.js'
+  import {
+    protokollOffen,
+    oeffneProtokoll,
+    setzeProtokollZeilen,
+  } from '../lib/protokollfenster.svelte.js'
 
   let auskunft = $state(null)
   let protokoll = $state([])
-  let protokollOffen = $state(false)
+  let protokollAuf = $state(false)
   let arbeitet = $state(false)
   let protokollKasten = $state(null)
+
+  // Keep the big log window fed while it is open.
+  $effect(() => {
+    if (protokollOffen()) setzeProtokollZeilen(protokoll)
+  })
   let programmStand = $state(null)
   const programmLaedt = $derived(
     Boolean(programmStand) && !programmStand.fertig && !programmStand.fehler,
@@ -60,6 +72,9 @@
     if (protokollKasten) protokollKasten.scrollTop = protokollKasten.scrollHeight
   })
 
+  /* Held back until the remembered numbers are in: without it the watcher
+     below would write the defaults over them on the very first pass. */
+  let zahlenStehen = $state(false)
   let kontext = $state(32768)
   let schichten = $state(99)
   let port = $state(8080)
@@ -125,16 +140,18 @@
   })
 
   const laeuft = $derived(Boolean(auskunft?.laeuft))
-  /* One mapping decides dot AND word for the flash-attention row — two
-     separate ternary chains would drift apart on exactly the case that
-     matters. */
-  const flashLage = $derived(
-    !laeuft || auskunft?.flash_aktiv == null
-      ? { punkt: 'still', wort: 'flash_unbekannt' }
-      : auskunft.flash_aktiv
-        ? { punkt: 'gruen', wort: 'flash_aktiv' }
-        : { punkt: 'rot', wort: 'flash_inaktiv' },
-  )
+
+  // Publish this panel's start/stop action to the rail's foot button.
+  $effect(() => {
+    setzeStartAktion({
+      text: laeuft ? t('modell.server_anhalten') : t('modell.server_starten'),
+      punkt: laeuft ? 'gruen' : 'still',
+      gesperrt: arbeitet || (!laeuft && !modell),
+      onTat: laeuft ? anhalten : starten,
+    })
+    return () => loescheStartAktion()
+  })
+
   const hatProgramm = $derived(Boolean(auskunft?.programm))
   const hatModelle = $derived((auskunft?.modelle?.length ?? 0) > 0)
   const maschineGb = $derived(auskunft?.speicher_gb ?? null)
@@ -159,6 +176,12 @@
   /* 99 is llama.cpp's own way of saying "all of them", and the right-hand
      stop of the slider says the same thing in words. */
   const MAX_SCHICHTEN = 99
+  /* The machine's own core count, read from the server. More threads than
+     cores makes a run SLOWER — they fight for the same cores — so the track
+     stops where the machine does instead of offering a value that only
+     hurts. The fallback is a small, safe number for the moment before the
+     first answer arrives. */
+  const MAX_FAEDEN = $derived(auskunft?.kerne ?? 8)
 
   /* The advanced section. Shut on start: somebody who does not know what a
      KV cache is should never have to find out. */
@@ -233,9 +256,8 @@
      rest of the house uses. The speed module is named here too — it is the
      one running fact the form below does not repeat while locked. */
   const laufzeile = $derived.by(() => {
-    if (!laeuft) return modell || t('modell.server_aus')
+    if (!laeuft) return ''
     const teile = [
-      auskunft.modell,
       t('modell.laeuft_port', { port: auskunft.port }),
       t('modell.kontext_kurz', { n: kurzK(auskunft.kontext) }),
     ]
@@ -267,9 +289,13 @@
     ...(auskunft?.mmproj ?? []).map((name) => ({ wert: name, text: name })),
   ])
 
-  const modellauswahl = $derived(
-    (auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
-  )
+  /* An empty choice at the top, like the three module rows have: a fresh
+     install ships with nothing loaded, and a list that cannot be set back to
+     nothing would make "no model" a state only the first start ever sees. */
+  const modellauswahl = $derived([
+    { wert: '', text: t('modell.modell_keiner') },
+    ...(auskunft?.modelle ?? []).map((m) => ({ wert: m.name, text: `${m.name} · ${m.groesse_gb} GB` })),
+  ])
 
   async function laden() {
     try {
@@ -281,10 +307,9 @@
            choice — including a remembered "none" — before the catalogue's
            recorded pairing gets to guess. */
         const gemerkt = localStorage.getItem('runner:modell')
-        modell =
-          auskunft.modell ||
-          (gemerkt && auskunft.modelle.some((m) => m.name === gemerkt) ? gemerkt : '') ||
-          auskunft.modelle[0]?.name || ''
+        const gemerktGilt =
+          gemerkt !== null && (gemerkt === '' || auskunft.modelle.some((m) => m.name === gemerkt))
+        modell = auskunft.modell || (gemerktGilt ? gemerkt : auskunft.modelle[0]?.name || '')
         const drafterGemerkt = localStorage.getItem('runner:drafter:' + modell)
         if (drafterGemerkt !== null) {
           drafter = drafterGemerkt
@@ -292,6 +317,10 @@
           const z = auskunft.zuordnung?.[modell]
           if (z?.mtp) drafter = z.mtp
         }
+        kontext = gemerkteZahl('kontext', kontext)
+        schichten = gemerkteZahl('schichten', schichten)
+        port = gemerkteZahl('port', port)
+        zahlenStehen = true
         const visionGemerkt = localStorage.getItem('runner:vision:' + modell)
         if (visionGemerkt !== null) {
           vision = visionGemerkt
@@ -312,7 +341,7 @@
         if (!feinGeladen && auskunft.fein) feinUebernehmen(auskunft.fein)
       }
       if (!feinGeladen && !auskunft.laeuft) await feinLaden()
-      if (protokollOffen || auskunft.laeuft) protokoll = await api.runnerProtokoll()
+      if (protokollAuf || protokollOffen() || auskunft.laeuft) protokoll = await api.runnerProtokoll()
       if (!auskunft.programm) {
         programmStand = await api.serverProgrammStand()
         tempoMessen(
@@ -333,10 +362,46 @@
     return () => clearInterval(takt)
   })
 
+  $effect(() => {
+    if (!zahlenStehen) return
+    merken('kontext', kontext)
+    merken('schichten', schichten)
+    merken('port', port)
+  })
+
   /* Picking a model pre-picks its speed module: first the choice the hand
      made last time for THIS model (a remembered "none" counts), then the
      association the catalogue wrote when it fetched them. */
+  /* What the hand set stays set. Every control in this panel writes its
+     choice down the moment it is made, and the panel reads them back when it
+     opens — a value that only survives a start would be a value the reload
+     two seconds later throws away.
+
+     Written as strings and read back with a guard: an empty string is a
+     deliberate "none", which is why a plain falsy test would lose it. */
+  function merken(name, wert) {
+    localStorage.setItem('runner:' + name, String(wert))
+  }
+  function gemerkteZahl(name, ersatz) {
+    const wert = localStorage.getItem('runner:' + name)
+    const zahl = Number(wert)
+    return wert !== null && wert !== '' && Number.isFinite(zahl) ? zahl : ersatz
+  }
+
+  function drafterGewaehlt() {
+    merken('drafter:' + modell, drafter)
+  }
+  function visionGewaehlt() {
+    merken('vision:' + modell, vision)
+  }
+
   function modellGewaehlt() {
+    /* Remembered the moment it is picked, not only when a server starts:
+       an empty choice never starts anything, and without this the reload a
+       second later would find no model and pre-pick one again — the choice
+       would not survive its own row. The empty string is a remembered
+       "none", exactly as it is for the modules below. */
+    localStorage.setItem('runner:modell', modell)
     const gemerkt = localStorage.getItem('runner:drafter:' + modell)
     drafter = gemerkt !== null ? gemerkt : (auskunft?.zuordnung?.[modell]?.mtp ?? '')
     const vGemerkt = localStorage.getItem('runner:vision:' + modell)
@@ -355,7 +420,7 @@
       localStorage.setItem('runner:modell', modell)
       localStorage.setItem('runner:drafter:' + modell, drafter || '')
       localStorage.setItem('runner:vision:' + modell, vision || '')
-      protokollOffen = true
+      protokollAuf = true
       await modelleLaden(true)
     } catch (fehler) {
       melde(fehler.message, 'fehler')
@@ -444,11 +509,10 @@
          head card's second line now, and the start button moved down to the
          foot where the other two panels keep theirs. -->
     <Servertafel
-      titel={t('modell.server')}
+      titel={t('modell.server_stand')}
       unter={laufzeile}
       standfarbe={laeuft ? 'gruen' : 'still'}
-      standtext={laeuft ? t('status.erreichbar') : t('status.nicht_erreichbar')}
-      wofuer={t('modell.server_wofuer')}
+      standtext={laeuft ? t('status.aktiv') : t('status.inaktiv')}
       modelle={modellauswahl}
       bind:gewaehlt={modell}
       modellBeschriftung={t('modell.feld_modell')}
@@ -457,65 +521,74 @@
       leerText={t('modell.kein_modell_da')}
       katalogTat={() => katalogOeffnen('chat')}
       speicherort="modelle"
-      tatText={laeuft ? t('modell.server_anhalten_kurz') : t('modell.server_starten_kurz')}
-      tatPunkt={laeuft ? 'gruen' : 'still'}
-      tatGesperrt={arbeitet || (!laeuft && !modell)}
-      onTat={laeuft ? anhalten : starten}
     >
       {#snippet mitte()}
         <div class="gruppe">
-          <div class="gruppenname">{t('modell.gruppe_tempo')}</div>
-          <div class="regler">
-            <label for="rs-drafter">{t('modell.feld_speedmodul')}<span>{t('modell.feld_speedmodul_hilfe')}</span></label>
+          <div class="gruppenname">
+            <!-- A block that docks into a rail: the three rows below are
+                 exactly that — small models that plug into the big one. -->
+            <svg class="gruppenzeichen" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true">
+              <rect x="3.75" y="13.5" width="16.5" height="6.75" rx="1.5" />
+              <rect x="8.25" y="3.75" width="7.5" height="5.6" rx="1.1" />
+              <path d="M10.1 9.4 V13.5 M13.9 9.4 V13.5" />
+            </svg>{t('modell.gruppe_tempo')}</div>
+          <!-- The three modules in one frame: they are one choice made three
+               times over — which small model helps the big one — and a frame
+               says that faster than a heading can. Same box the head card
+               wears, so the panel keeps one vocabulary of shapes. -->
+          <div class="regler kasten modulkasten">
+            <label for="rs-drafter"><svg class="modulzeichen blitzfarbe" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 L5 13.5 H10.5 L9.5 21 L17.5 10.5 H12 Z" /></svg>{t('modell.feld_speedmodul')}</label>
             <Auswahlfeld
               id="rs-drafter"
               bind:wert={drafter}
               eintraege={drafterauswahl}
               gesperrt={laeuft}
               beschriftung={t('modell.feld_speedmodul')}
+              gewaehlt={drafterGewaehlt}
             />
 
-            <label for="rs-vision">{t('modell.feld_vision')}<span>{t('modell.feld_vision_hilfe')}</span></label>
+            <label for="rs-vision"><svg class="modulzeichen augenfarbe" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12 C6 6.5, 18 6.5, 21.5 12 C18 17.5, 6 17.5, 2.5 12 Z" /><circle cx="12" cy="12" r="3" /></svg>{t('modell.feld_vision')}</label>
             <Auswahlfeld
               id="rs-vision"
               bind:wert={vision}
               eintraege={visionauswahl}
               gesperrt={laeuft}
               beschriftung={t('modell.feld_vision')}
+              gewaehlt={visionGewaehlt}
             />
 
             <!-- The third row, and deliberately no tile of its own: which
                  small model Extended Workflow uses is a model choice like
                  the two above it, and a fourth tile under SET UP would
-                 promise a page that has nothing else on it. The sign rides
-                 behind the name, the same house rule every row's name obeys
-                 — it marks which module the row belongs to, it does not
-                 lead the line and break the column of names. -->
-            <label for="rs-eew">
-              {t('modell.feld_eew')}<span>{t('modell.feld_eew_hilfe')}</span>
-            </label>
-            <!-- The sign moves off the heading to ride at the dropdown's left,
-                 vertically centred and a size larger — it reads as the mark of
-                 the control it belongs to instead of a footnote on the name. -->
-            <div class="eew-zeile">
-              <span class="eew-marke" aria-hidden="true"><EEWzeichen groesse={20} /></span>
-              <div class="eew-feld">
-                <Auswahlfeld
-                  id="rs-eew"
-                  wert={eew.modell}
-                  eintraege={eewauswahl}
-                  beschriftung={t('modell.feld_eew')}
-                  gewaehlt={eewModellWaehlen}
-                />
-              </div>
-            </div>
+                 promise a page that has nothing else on it. -->
+            <label for="rs-eew"><span class="modulzeichen"><EEWzeichen groesse={16.2} /></span>{t('modell.feld_eew')}</label>
+            <Auswahlfeld
+              id="rs-eew"
+              wert={eew.modell}
+              eintraege={eewauswahl}
+              beschriftung={t('modell.feld_eew')}
+              gewaehlt={eewModellWaehlen}
+            />
           </div>
         </div>
 
         <div class="gruppe">
-          <div class="gruppenname">{t('modell.gruppe_speicher')}</div>
-          <div class="regler">
-            <label for="rs-kontext">{t('modell.feld_kontext')}<span>{t('modell.feld_kontext_hilfe')}</span></label>
+          <div class="gruppenname">
+            <!-- A memory module: the board, its chips, and the contacts it
+                 stands on. -->
+            <svg class="gruppenzeichen" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true">
+              <rect x="2.8" y="6.6" width="18.4" height="10.2" rx="1.6" />
+              <path d="M8 10 V13.4 M12 10 V13.4 M16 10 V13.4" stroke-width="1.5" />
+              <path d="M7.5 16.8 V19.6 M16.5 16.8 V19.6" stroke-width="1.5" />
+            </svg>{t('modell.gruppe_speicher')}</div>
+          <!-- The three numbers that decide what a run costs, in one frame —
+               the same box the modules above wear. -->
+          <div class="regler kasten">
+            <label for="rs-kontext">{t('modell.feld_kontext')}</label>
             <!-- Dragged for the steps everybody needs, typed for the one
                  case that is not a step at all: a context above 128k, which
                  the slider's fixed marks were never meant to reach. The
@@ -536,16 +609,37 @@
               <Zahlenfeld bind:wert={kontext} gesperrt={laeuft} min={512} max={1048576} schritt={1024} />
             </div>
 
-            <label for="rs-schichten">{t('modell.feld_schichten')}<span>{t('modell.feld_schichten_hilfe')}</span></label>
-            <Schieberegler
-              id="rs-schichten"
-              bind:wert={schichten}
-              min={0}
-              max={MAX_SCHICHTEN}
-              gesperrt={laeuft}
-              beschriftung={t('modell.feld_schichten')}
-              endtext={t('modell.schichten_alle')}
-            />
+            <label for="rs-schichten">{t('modell.feld_schichten')}</label>
+            <div class="kontextzeile">
+              <Schieberegler
+                id="rs-schichten"
+                bind:wert={schichten}
+                min={0}
+                max={MAX_SCHICHTEN}
+                gesperrt={laeuft}
+                beschriftung={t('modell.feld_schichten')}
+                endtext={t('modell.schichten_alle')}
+                mit_zahl={false}
+              />
+              <Zahlenfeld bind:wert={schichten} gesperrt={laeuft} min={0} max={MAX_SCHICHTEN} />
+            </div>
+
+            <label for="rs-faeden">{t('modell.feld_faeden')}</label>
+            <!-- Dragged like the two above it: three numbers that decide what
+                 a run costs, set the same way, on tracks of one length. -->
+            <div class="kontextzeile">
+              <Schieberegler
+                id="rs-faeden"
+                bind:wert={faeden}
+                min={0}
+                max={MAX_FAEDEN}
+                gesperrt={laeuft}
+                beschriftung={t('modell.feld_faeden')}
+                endtext={t('modell.faeden_auto')}
+                mit_zahl={false}
+              />
+              <Zahlenfeld bind:wert={faeden} gesperrt={laeuft} min={0} max={MAX_FAEDEN} />
+            </div>
 
             {#if schaetzung && maschineGb}
               <span class="schaetz">{t('modell.schaetz_zeile', { plan: schaetzung.gesamt.toFixed(1), gesamt: maschineGb })}</span>
@@ -565,46 +659,57 @@
               </svg>
             </span>
             {t('modell.gruppe_erweitert')}
-            <span class="klapphilfe">{t('modell.erweitert_hilfe')}</span>
           </button>
           {#if erweitertOffen}
-            <div class="regler">
-              <label>{t('modell.feld_kv')}<span>{t('modell.feld_kv_hilfe')}</span></label>
-              <Schalter an={fein.kv_cache === 'q8_0'} gesperrt={laeuft}
-                        beschriftung={t('modell.feld_kv')}
-                        onschalten={() => (fein.kv_cache = fein.kv_cache === 'q8_0' ? 'f16' : 'q8_0')} />
+            <!-- Three switches on one line: each is a single yes or no, and
+                 a column of three would leave the width beside them empty
+                 for no reason. Measured to fit — the longest of them still
+                 has room. -->
+            <div class="schalterreihe">
+              <!-- Each switch keeps its name beside it, the pairs spread
+                   across the full width with a hairline between them: three
+                   yes/no settings on one line, first name flush left, last
+                   switch flush right. -->
+              <span class="paar">
+                <!-- What the switch turns the cache INTO. Without it the row
+                     asks a yes/no question about a word, and the answer only
+                     means something to somebody who already knows the
+                     default is 16-bit. -->
+                <label>{t('modell.feld_kv')}<i class="labeltrenner" aria-hidden="true"></i><i class="labelwert">{t('modell.feld_kv_wert')}</i></label>
+                <Schalter an={fein.kv_cache === 'q8_0'} gesperrt={laeuft}
+                          beschriftung={t('modell.feld_kv')}
+                          onschalten={() => (fein.kv_cache = fein.kv_cache === 'q8_0' ? 'f16' : 'q8_0')} />
+              </span>
 
-              <label>{t('modell.feld_flash')}<span>{t('modell.feld_flash_hilfe')}</span></label>
-              <div class="fazeile">
-                <Leuchtpunkt farbe={flashLage.punkt} groesse={9} />
-                <span>{t(`modell.${flashLage.wort}`)}</span>
-              </div>
+              <span class="reihentrenner" aria-hidden="true"></span>
 
-              <label for="rs-faeden">{t('modell.feld_faeden')}<span>{t('modell.feld_faeden_hilfe')}</span></label>
-              <Zahlenfeld id="rs-faeden" bind:wert={faeden} gesperrt={laeuft} min={0} max={256} />
+              <span class="paar">
+                <label>{t('modell.feld_moe')}</label>
+                <Schalter an={fein.moe_auf_cpu} gesperrt={laeuft}
+                          beschriftung={t('modell.feld_moe')}
+                          onschalten={() => (fein.moe_auf_cpu = !fein.moe_auf_cpu)} />
+                {#if fein.moe_auf_cpu}
+                  <Zahlenfeld id="rs-moe-n" bind:wert={moeSchichten} gesperrt={laeuft} min={0} max={999} />
+                {/if}
+              </span>
 
-              <label>{t('modell.feld_moe')}<span>{t('modell.feld_moe_hilfe')}</span></label>
-              <Schalter an={fein.moe_auf_cpu} gesperrt={laeuft}
-                        beschriftung={t('modell.feld_moe')}
-                        onschalten={() => (fein.moe_auf_cpu = !fein.moe_auf_cpu)} />
+              <span class="reihentrenner" aria-hidden="true"></span>
 
-              {#if fein.moe_auf_cpu}
-                <label for="rs-moe-n">{t('modell.feld_moe_schichten')}<span>{t('modell.feld_moe_schichten_hilfe')}</span></label>
-                <Zahlenfeld id="rs-moe-n" bind:wert={moeSchichten} gesperrt={laeuft} min={0} max={999} />
-              {/if}
-
-              <label>{t('modell.feld_mlock')}<span>{t('modell.feld_mlock_hilfe')}</span></label>
-              <Schalter an={fein.festnageln} gesperrt={laeuft}
-                        beschriftung={t('modell.feld_mlock')}
-                        onschalten={() => (fein.festnageln = !fein.festnageln)} />
+              <span class="paar">
+                <label>{t('modell.feld_mlock')}</label>
+                <Schalter an={fein.festnageln} gesperrt={laeuft}
+                          beschriftung={t('modell.feld_mlock')}
+                          onschalten={() => (fein.festnageln = !fein.festnageln)} />
+              </span>
             </div>
           {/if}
         </div>
 
         <div class="gruppe">
           <div class="gruppenname">{t('modell.gruppe_netz')}</div>
-          <div class="regler">
-            <label for="rs-port">{t('modell.feld_port')}<span>{t('modell.feld_port_hilfe')}</span></label>
+          <!-- The same frame the two groups above wear. -->
+          <div class="regler kasten">
+            <label for="rs-port">{t('modell.feld_port')}</label>
             <Zahlenfeld id="rs-port" bind:wert={port} gesperrt={laeuft} min={1024} max={65535} />
           </div>
         </div>
@@ -614,11 +719,18 @@
         <!-- The log is not an action, so it does not sit in the foot row
              with the one that is. -->
         <div class="protokollzeile">
-          <button class="klapper" onclick={() => (protokollOffen = !protokollOffen)}>
-            {t('modell.protokoll')} {protokollOffen ? '▾' : '▸'}
+          <button class="klapper" onclick={() => (protokollAuf = !protokollAuf)}>
+            {t('modell.protokoll')} {protokollAuf ? '▾' : '▸'}
+          </button>
+          <!-- Same log, popped out into a window: the collapsed strip is for a
+               glance, the window for reading it. -->
+          <button class="vergroessern" onclick={() => oeffneProtokoll(t('modell.protokoll_titel'))}
+                  title={t('modell.protokoll_vergroessern')}
+                  aria-label={t('modell.protokoll_vergroessern')}>
+            <Hauszeichen zeichen="auskoppeln" groesse="klein" />
           </button>
         </div>
-        {#if protokollOffen}
+        {#if protokollAuf}
           <pre class="protokoll" use:rollfade bind:this={protokollKasten}>{protokoll.join('\n') || '—'}</pre>
         {/if}
       {/snippet}
@@ -670,6 +782,9 @@
      and read as if the page had two hands; now there is exactly one place
      that says what a section head looks like. Both classes take it, so a
      row of divs and a row with a button behind it end up identical. */
+  .gruppenzeichen {
+    flex: none;
+  }
   .gruppenname,
   .klappkopf {
     font: 600 11px var(--schrift);
@@ -722,6 +837,12 @@
   .gruppe {
     margin-bottom: 16px;
   }
+  /* A group of rows read as one thing, framed like the card at the top. */
+  .kasten {
+    border: 1px solid var(--linie);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
   .regler {
     display: grid;
     grid-template-columns: minmax(150px, 190px) 1fr;
@@ -730,27 +851,67 @@
   }
   label {
     font-size: 13px;
+    white-space: nowrap;
   }
+  /* Sign and word on one line — only where there are signs. */
+  .modulkasten label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  /* The capability colours the model cards use — bolt blue, eye violet —
+     so one capability wears one colour wherever it turns up. */
+  .modulzeichen {
+    flex: none;
+    display: inline-flex;
+  }
+  /* The header's own hairline, inside a label: it separates the name of a
+     setting from the value the switch puts it at. */
+  /* Not a span: the helper-line rule sets every span inside a label to
+     block, and these two belong ON the line, not under it. */
+  .labeltrenner {
+    display: inline-block;
+    font-style: normal;
+    width: 1px;
+    height: 9px;
+    margin: 0 8px;
+    vertical-align: -1px;
+    background: var(--linie-stark);
+  }
+  .labelwert {
+    font-style: normal;
+    color: var(--text-still);
+  }
+  /* Name and switch stay a pair; the pairs sit side by side and wrap only
+     if a narrow window forces it. */
+  .schalterreihe {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .paar {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+  .paar label {
+    margin: 0;
+  }
+  /* The header's hairline again, between the pairs. */
+  .reihentrenner {
+    flex: none;
+    width: 1px;
+    height: 9px;
+    background: var(--linie-stark);
+  }
+  .blitzfarbe { color: #5b8dbe; }
+  .augenfarbe { color: #8d78bd; }
   label span {
     display: block;
     font-size: 11.5px;
     color: var(--text-still);
-  }
-  /* The Extended-Workflow sign sits at the dropdown's left, vertically
-     centred with it, a size larger than the row names. The field takes the
-     rest of the width; min-width:0 lets it shrink instead of overflowing. */
-  .eew-zeile {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-  }
-  .eew-marke {
-    flex: none;
-    display: inline-flex;
-  }
-  .eew-feld {
-    flex: 1;
-    min-width: 0;
   }
   .kontextzeile {
     display: flex;
@@ -765,12 +926,6 @@
     flex: none;
     width: 108px;
   }
-  .fazeile {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-  }
   .schaetz {
     grid-column: 2;
     font-size: 11.5px;
@@ -780,6 +935,8 @@
   .protokollzeile {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
+    gap: 2px;
   }
   .klapper {
     border: none;
@@ -788,6 +945,19 @@
     font: 12px var(--schrift);
     cursor: pointer;
     padding: 6px 4px;
+  }
+  .vergroessern {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--text-still);
+    cursor: pointer;
+    padding: 6px 4px;
+  }
+  .vergroessern:hover {
+    color: var(--text);
   }
 
   .protokoll {

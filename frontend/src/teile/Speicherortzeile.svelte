@@ -56,14 +56,29 @@
 <div class="zeile">
   {#if etikett}<span class="etikett">{etikett}</span>{/if}
   <span class="pfad" title={pfad}>{pfad}</span>
-  <button class="knopf" onclick={oeffnen}>{t('speicherorte.oeffnen')}</button>
-  <button class="ordnerknopf" onclick={aendern} title={t('speicherorte.aendern')}
-          aria-label={t('speicherorte.aendern')}>
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    </svg>
-  </button>
+  <!-- Open and change as a tight pair of square icon buttons, held closer to
+       each other than to the path, so the two read as one cluster of tools. -->
+  <div class="knopfpaar">
+    <button class="ordnerknopf" onclick={oeffnen} title={t('speicherorte.oeffnen')}
+            aria-label={t('speicherorte.oeffnen')}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.75 18 V6 H9.75 L11.63 8.25 H18 V11.25" />
+        <path d="M3.75 18 H16.5 L20.25 11.25 H7.5 Z" />
+      </svg>
+    </button>
+    <button class="ordnerknopf" onclick={aendern} title={t('speicherorte.aendern')}
+            aria-label={t('speicherorte.aendern')}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- The house pencil, not a folder: this button does not open the
+             folder — the one beside it does — it CHANGES which folder is
+             meant. Two buttons wearing one sign taught two different lessons
+             in two different windows. -->
+        <path d="M17 3l4 4L8 20l-5 1 1-5L17 3z" />
+      </svg>
+    </button>
+  </div>
 </div>
 {#if neustartNoetig}
   <p class="hinweis">{t('speicherorte.neustart')}</p>
@@ -98,7 +113,12 @@
     font: 400 11px var(--schrift-fest, ui-monospace, monospace);
     color: var(--text-still);
   }
-  .knopf,
+  .knopfpaar {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
   .ordnerknopf {
     flex: none;
     font: inherit;
@@ -109,15 +129,20 @@
     border-radius: 8px;
     cursor: pointer;
   }
-  .knopf { padding: 4px 10px; }
+  /* Square, and the size of the catalogue button it stands under: two
+     buttons in one column that end on different edges read as an accident,
+     not as an arrangement. */
   .ordnerknopf {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 7px;
+    width: 36px;
+    height: 36px;
+    box-sizing: border-box;
+    padding: 0;
+    border-radius: 9px;
     color: var(--text-leise);
   }
-  .knopf:hover,
   .ordnerknopf:hover { background: var(--linie); }
   .hinweis {
     margin: 6px 0 0;

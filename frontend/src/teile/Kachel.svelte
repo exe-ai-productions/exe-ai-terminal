@@ -24,6 +24,11 @@
     onclick = null,
     ariaLabel = '',
     zeichen,
+    /* A state lamp in front of the name. Sign, lamp, name — the sign says
+       WHAT this is, the lamp says how it stands, and the name says which
+       one; a lamp under the name, on a line of its own, made the tile twice
+       as tall to carry one dot. */
+    lampe,
     marke,
     unter,
     rechts,
@@ -50,7 +55,7 @@
   {/if}
 
   <div class="mitte">
-    <div class="titel">{titel}</div>
+    <div class="titel">{#if lampe}<span class="lampe">{@render lampe()}</span>{/if}{titel}</div>
     {#if unter}<div class="unter">{@render unter()}</div>{/if}
   </div>
 
@@ -88,12 +93,14 @@
 
   /* The sign badge on the left — a bordered square that holds a drawn
      sign, radius 9 like every control. */
+  /* No frame around the sign any more: a sign large enough to be read needs
+     no box to be found, and a box around every row drew four rectangles that
+     said nothing the sign did not already say. The width stays, so the names
+     beside them still start on one line. */
   .zbox {
     width: 32px;
     height: 32px;
     flex: none;
-    border-radius: 9px;
-    border: 1px solid var(--linie);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -111,10 +118,17 @@
     min-width: 0;
   }
   .titel {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     font: 600 12.5px var(--schrift);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .lampe {
+    flex: none;
+    display: inline-flex;
   }
   .unter {
     font-size: 11px;

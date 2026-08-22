@@ -32,6 +32,10 @@ export const eew = $state({
   /* Which model it uses. The server names its own default; the dropdown on
      the model server page writes this. */
   modell: '',
+  /* Whether that choice was actually made rather than merely absent: an
+     empty model is a valid answer, and without this flag the server's
+     default would fill it back in on the next load. */
+  gewaehlt: false,
   vorgabe: '',
 })
 
@@ -55,7 +59,13 @@ export async function standLaden() {
   try {
     const stand = await api.einstellungAufgeloest(SCHLUESSEL)
     if (stand?.wert && typeof stand.wert.an === 'boolean') eew.an = stand.wert.an
-    if (stand?.wert?.modell) eew.modell = stand.wert.modell
+    /* A stored empty string is a deliberate "none", not a missing value —
+       tested by kind, because a falsy test would throw exactly that choice
+       away and the server's default would take its place on every load. */
+    if (typeof stand?.wert?.modell === 'string') {
+      eew.modell = stand.wert.modell
+      eew.gewaehlt = true
+    }
   } catch {
     /* Leaves the default standing — shipped on. */
   }
@@ -67,7 +77,7 @@ export async function serverStandLaden() {
     const a = await api.eewAuskunft()
     eew.laeuft = Boolean(a.laeuft)
     eew.vorgabe = a.vorgabe || ''
-    if (!eew.modell) eew.modell = a.modell || a.vorgabe || ''
+    if (!eew.modell && !eew.gewaehlt) eew.modell = a.modell || a.vorgabe || ''
   } catch {
     eew.laeuft = false
   }
@@ -104,7 +114,7 @@ export function schalten(an) {
     const vorher = eew.an
     eew.an = an
     try {
-      await api.einstellungSetzen('global', SCHLUESSEL, { an, modell: eew.modell || null })
+      await api.einstellungSetzen('global', SCHLUESSEL, { an, modell: eew.modell })
     } catch {
       eew.an = vorher
       throw new Error('einstellung')
@@ -118,6 +128,7 @@ export function schalten(an) {
 export function modellWaehlen(name) {
   return nacheinander(async () => {
     eew.modell = name
+    eew.gewaehlt = true
     try {
       await api.einstellungSetzen('global', SCHLUESSEL, { an: eew.an, modell: name })
     } catch {

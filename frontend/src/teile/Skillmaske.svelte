@@ -31,17 +31,36 @@ auto: false
 Write the instruction here. When this skill is chosen, the model follows
 what stands below.
 `
+  /* Editing reuses the same form. `bearbeitet` carries the name of the
+     skill whose file is open — null while writing a fresh one. The name
+     field is locked during an edit: the name IS the identity, and a
+     changed name would quietly write a second skill instead. */
+  let bearbeitet = $state(null)
   function neuAnfangen() {
+    bearbeitet = null
     neuName = ''
     neuInhalt = VORLAGE
     schreibt = true
+  }
+  async function bearbeiten(zeile) {
+    try {
+      const datei = await api.skillDatei(zeile.name)
+      bearbeitet = zeile.name
+      neuName = zeile.name
+      neuInhalt = datei.inhalt
+      schreibt = true
+    } catch (fehler) {
+      melde(String(fehler.message || fehler), 'fehler')
+    }
   }
   async function neuSpeichern() {
     const name = neuName.trim()
     if (!name || !neuInhalt.trim()) return
     try {
-      await api.skillSchreiben(name, neuInhalt)
+      if (bearbeitet) await api.skillSichern(bearbeitet, neuInhalt)
+      else await api.skillSchreiben(name, neuInhalt)
       schreibt = false
+      bearbeitet = null
       await laden()
       skillsLaden()
       melde(t('skills.geschrieben', { name }), 'erfolg')
@@ -131,6 +150,7 @@ what stands below.
       placeholder={t('skills.neu_name')}
       spellcheck="false"
       autocapitalize="off"
+      readonly={bearbeitet !== null}
     />
     <textarea class="inhaltsfeld" bind:value={neuInhalt} spellcheck="false"></textarea>
     <div class="formfuss">
@@ -171,6 +191,12 @@ what stands below.
       </div>
       <div class="was">{zeile.beschreibung}</div>
     </div>
+    <!-- Every skill can be opened and edited — a shipped one is quietly
+         copied to the user's folder on save, so the change survives the
+         next update. -->
+    <button class="zurueck" onclick={() => bearbeiten(zeile)}>
+      {t('skills.bearbeiten')}
+    </button>
     <!-- Only what the user owns can go: a shipped skill would be back with
          the next update, so it stays switchable and nothing more. -->
     {#if zeile.eigen}

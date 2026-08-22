@@ -58,6 +58,11 @@
   // columns so it is broad and short, not one endlessly long tube.
   const BREITE = { frage: '460px', bild: '860px', liste: '1040px', vorschau: '1200px', galerie: '1040px' }
 
+  /* `werk` is the one kind without a number: a workbench window takes the
+     size of the work on its table — a canvas window hugs its canvas, tall
+     for a portrait, broad for a landscape — where every other kind holds a
+     width so its content cannot push it around. */
+
   /* `schrumpfen` closes the window the way the first-start window does:
      it collapses to a point instead of fading. Reserved for a window whose
      closing IS the start of something — the work then appears where the
@@ -75,11 +80,13 @@
 
 {#if offen}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="schleier" class:weit={art === 'vorschau'} transition:fade={{ duration: 150 }}
+  <div class="schleier" class:weit={art === 'vorschau' || art === 'werk'} transition:fade={{ duration: 150 }}
        onclick={(e) => { if (e.target === e.currentTarget) offen = false }}>
     <div class="popup" class:liste={art === 'liste'} class:vorschau={art === 'vorschau'}
          class:galerie={art === 'galerie'} class:mitweg={Boolean(zurueck)}
-         style="width:min({BREITE[art] ?? BREITE.frage}, 92vw)"
+         style={art === 'werk'
+           ? 'width:fit-content;max-width:92vw'
+           : `width:min(${BREITE[art] ?? BREITE.frage}, 92vw)`}
          transition:scale={schrumpfen
            ? { duration: 420, start: 0.03, opacity: 0, easing: cubicIn }
            : { duration: 190, start: 0.97 }}>
@@ -192,6 +199,9 @@
     z-index: 2;
     display: flex;
     align-items: center;
+    /* Controls that sit side by side need a seam, or the two read as one
+       wide control with a line drawn through it. */
+    gap: 8px;
   }
 
   /* The body. For a question it follows the content; for a list window it is
@@ -211,7 +221,10 @@
   /* A preview window stands higher up and starts lower down than the
      others: a document wants the height, and the drop from the top edge
      that suits a question would take it away on a laptop screen. */
-  .schleier.weit { padding: 6vh 16px 5vh; }
+  /* Only the vertical padding changes here. The right side keeps the 44px
+     that pay back the 28px this layer is pushed off-screen by — write a plain
+     value there and the hidden scrollbar lands back inside the window. */
+  .schleier.weit { padding: 6vh 44px 5vh 16px; }
 
   /* Taller than a list window, for the same reason it is wider. */
   .popup.vorschau .leib {

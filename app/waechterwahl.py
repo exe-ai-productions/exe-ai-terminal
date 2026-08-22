@@ -39,10 +39,10 @@ def schalter_pruefen(wert: Any) -> dict[str, Any]:
     ever since the model can be picked, so the choice was written, silently
     dropped, and gone again after a restart with nothing anywhere saying so.
 
-    An empty name is not a choice and is removed rather than stored: the
-    window sends ``null`` when nothing is picked, and an empty string
-    written into the settings would override the default from the scope
-    above with nothing at all.
+    An empty name IS a choice: "no model of its own" is one of the entries
+    the picker offers, and dropping it would let the server's default walk
+    back in on the next load — the setting has to be able to say "nothing"
+    as clearly as it says a file name.
     """
     if not isinstance(wert, dict):
         return {}
@@ -50,9 +50,7 @@ def schalter_pruefen(wert: Any) -> dict[str, Any]:
     if "an" in wert:
         sauber["an"] = bool(wert["an"])
     if "modell" in wert:
-        name = str(wert["modell"] or "").strip()[:MODELL_HOECHSTLAENGE]
-        if name:
-            sauber["modell"] = name
+        sauber["modell"] = str(wert["modell"] or "").strip()[:MODELL_HOECHSTLAENGE]
     return sauber
 
 

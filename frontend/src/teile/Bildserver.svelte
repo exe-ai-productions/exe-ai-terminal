@@ -77,9 +77,6 @@
     if (gewaehlt) zustand.bildModell = gewaehlt
   })
 
-  let probe = $state(null) // { bild, sekunden }
-  let arbeitet = $state(false)
-
   /* The generator program, on a machine that does not have it yet. A fresh
      installation used to get a flat refusal here and nowhere to go with it —
      the panel said "not set up" and there was no step that would set it up.
@@ -121,35 +118,6 @@
   const FARBE = { bereit: 'gruen', zeichnet: 'blau', kein_modell: 'still', kein_programm: 'rot' }
   const standfarbe = $derived(FARBE[stand?.stand] ?? 'still')
 
-  async function probelauf() {
-    if (arbeitet || !gewaehlt) return
-    arbeitet = true
-    probe = null
-    const start = Date.now()
-    try {
-      /* Small and short on purpose: this is a proof that the chain works,
-         not a picture anybody wants. Eight steps at 256 px is a few seconds
-         even on a slow machine. */
-      const ergebnis = await api.bildZeichnen({
-        modell: gewaehlt,
-        prompt: 'a simple red circle on white',
-        breite: 256,
-        hoehe: 256,
-        schritte: 8,
-        /* The run shows up in the open chat's little history, the picture
-           does not land in the conversation: this is a proof that drawing
-           works, not a picture anybody ordered. */
-        lauf_chat: zustand.aktiverChat,
-      })
-      probe = { bild: ergebnis.bild, sekunden: Math.round((Date.now() - start) / 100) / 10 }
-    } catch (fehler) {
-      melde(String(fehler.message || fehler), 'fehler')
-    } finally {
-      arbeitet = false
-      laden()
-    }
-  }
-
   const auswahl = $derived((stand?.modelle ?? []).map((name) => ({ wert: name, text: name })))
   const samplerauswahl = $derived((stand?.sampler ?? []).map((n) => ({ wert: n, text: n })))
 </script>
@@ -159,21 +127,16 @@
   unter={t(`bildserver.stand_${stand?.stand ?? 'kein_programm'}`)}
   {standfarbe}
   standtext={stand?.stand === 'bereit' || stand?.stand === 'zeichnet'
-    ? t('status.erreichbar')
-    : t('status.nicht_erreichbar')}
+    ? t('status.aktiv')
+    : t('status.inaktiv')}
   wofuer={t('bildserver.wofuer')}
   modelle={auswahl}
   bind:gewaehlt
   modellBeschriftung={t('bildserver.modell')}
-  modellGesperrt={arbeitet}
   leerText={stand ? t('bildserver.kein_modell_lang') : ''}
   katalogTat={() => katalogOeffnen('bild')}
   speicherort="bildmodelle"
   onOrtGeaendert={laden}
-  tatText={arbeitet ? t('bildserver.probe_laeuft') : t('bildserver.probelauf')}
-  tatPunkt={arbeitet ? 'blau' : 'still'}
-  tatGesperrt={arbeitet || !gewaehlt || programmFehlt}
-  onTat={probelauf}
 >
   {#snippet mitte()}
     {#if programmFehlt}
@@ -194,16 +157,10 @@
         <div class="gruppenname">{t('bildserver.vorgaben')}</div>
         <label>{t('bild.sampler')}
           <Auswahlfeld bind:wert={vorgaben.sampler} eintraege={samplerauswahl}
-                       gesperrt={arbeitet} beschriftung={t('bild.sampler')}
+                       beschriftung={t('bild.sampler')}
                        gewaehlt={vorgabenSichern} />
         </label>
         <p class="masse_hinweis">{t('bildserver.masse_folgen_modell')}</p>
-      </div>
-    {/if}
-    {#if probe}
-      <div class="probe">
-        <img src={api.bildAdresse(probe.bild)} alt={t('bildserver.probelauf')} />
-        <span>{t('bildserver.probe_fertig', { s: probe.sekunden })}</span>
       </div>
     {/if}
   {/snippet}
@@ -288,20 +245,5 @@
     font-size: 11.5px;
     line-height: 1.45;
     color: var(--text-still);
-  }
-  .probe {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12.5px;
-    color: var(--text-still);
-  }
-  /* The house frame, as on every other picture in the program. */
-  .probe img {
-    width: 96px;
-    height: 96px;
-    border-radius: 12px;
-    border: 2px solid var(--linie-stark);
-    object-fit: cover;
   }
 </style>

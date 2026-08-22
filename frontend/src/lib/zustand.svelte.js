@@ -76,6 +76,10 @@ export const zustand = $state({
   /* Which tab the catalogue should open on when a panel sends the user
      there — read once by the catalogue window, then cleared. */
   katalogArtWunsch: null,
+  /* Which picture model the picture window should open on when the
+     catalogue sends the user there — read once by that window, then
+     cleared. Same trail as the tab wish above. */
+  bildModellWunsch: null,
   cloudOffen: false,
   werkzeugeOffen: false,
   werkzeugfrage: null, // { generationId, aufrufId, name, argumente, chatId }
@@ -131,6 +135,14 @@ export function menueFensterOeffnen(name) {
    window, so this leaves a way back INTO it — the same trail the catalogue
    tile in that window lays down, so the arrow at the top leads home instead
    of vanishing the way a plain menu jump would. */
+/* An installed picture model is not started like a chat model — there is no
+   server to bring up. Starting one means going where it is used: the
+   picture window, with that model already picked. */
+export function bildfensterOeffnen(modell) {
+  zustand.bildModellWunsch = modell
+  zustand.katalogOffen = false
+}
+
 export function katalogOeffnen(art) {
   zustand.katalogArtWunsch = art
   ausFenster(
